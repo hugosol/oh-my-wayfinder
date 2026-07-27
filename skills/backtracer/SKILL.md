@@ -3,7 +3,7 @@ name: backtracer
 description: Trace user stories and design patterns from resolved wayfinder tickets back across the map — surfacing missing tickets, layer gaps, and asymmetry before they become bugs. Use after a wayfinder ticket is resolved.
 ---
 
-A wayfinder map charts decisions one ticket at a time. Each resolved ticket has a design document (in `design/`) and a lighthouse document (in `lighthouse/`). The lighthouse document contains user stories with "so that" clauses and invariants declaring patterns the decision aligns with. Backtracer **traces** these signals across the entire map: every "so that" clause, every pattern statement, every implicit dependency in ticket bodies. Where a signal doesn't land on a corresponding ticket, that's a gap.
+A wayfinder map charts decisions one ticket at a time. Each resolved ticket produces a structured resolution — user stories with "so that" clauses, and invariants declaring patterns the decision aligns with. Backtracer **traces** these signals across the entire map: every "so that" clause, every pattern statement, every implicit dependency in ticket bodies. Where a signal doesn't land on a corresponding ticket, that's a gap.
 
 Backtracer does not judge whether a gap matters — it traces and reports. The human judges.
 
@@ -13,18 +13,18 @@ Backtracer does not judge whether a gap matters — it traces and reports. The h
 
 Load the wayfinder map (label `wayfinder:map`). Read the map body, then fetch:
 
-- **Resolved tickets**: all tickets from **Decisions so far**. For each, read its design ticket body and its lighthouse document.
+- **Resolved tickets**: all tickets from **Decisions so far**. For each, read its body (the **Question**) and its resolution comment.
 - **Open tickets**: all child issues not in Decisions so far. Read each body.
 
-Lighthouse documents must follow the format defined in **/lighthouse**'s [SKILL.md](../lighthouse/SKILL.md) (the `<lighthouse-template>`). If a lighthouse document doesn't follow this format, still read the design ticket body — body-level trace (Step 2c) runs on every ticket regardless.
+Resolution comments must follow the format defined in your copy of **to-resolution**'s [SKILL.md](../to-resolution/SKILL.md) (the `<resolution-template>`). If a resolution comment doesn't follow this format, still read its body — body-level trace (Step 2c) runs on every ticket regardless.
 
-Completion criterion: map body + every design ticket body + every lighthouse document loaded and ready.
+Completion criterion: map body + every ticket body + every structured resolution loaded and ready.
 
 ### 2. Extract signals
 
 Extract three kinds of signals. These are mechanical extractions — pattern match, don't interpret.
 
-**a) Intent signals** — from each lighthouse document's `## 用户故事` section:
+**a) Intent signals** — from each structured resolution's `## User Stories` section:
 
 For each "so that" clause, extract the **key noun phrases and verb phrases** — the concrete things the user wants and the actions they enable. Examples:
 
@@ -36,7 +36,7 @@ For each "so that" clause, extract the **key noun phrases and verb phrases** —
 
 Discard connectors ("the", "a", "can", "is") — keep only the nouns and verbs that would appear in a ticket title or body.
 
-**b) Pattern signals** — from each lighthouse document's `## 不变量` section:
+**b) Pattern signals** — from each structured resolution's `## Invariants` section:
 
 For each invariant that declares pattern alignment (e.g. "new engine types follow the same conventions"), extract:
 
@@ -45,7 +45,7 @@ For each invariant that declares pattern alignment (e.g. "new engine types follo
 
 **c) Dependency signals** — from every ticket body (resolved and open):
 
-Scan each design ticket's body for words that imply a prerequisite action. Key patterns:
+Scan each ticket's **Question** for words that imply a prerequisite action. Key patterns:
 
 | If a ticket body contains… | It implies a dependency on… |
 |---|---|
@@ -57,19 +57,19 @@ Scan each design ticket's body for words that imply a prerequisite action. Key p
 
 For each implied dependency, extract the dependency name as a signal.
 
-Completion criterion: every lighthouse document processed for intent and pattern signals. Every design ticket body processed for dependency signals.
+Completion criterion: every structured resolution processed for intent and pattern signals. Every ticket body processed for dependency signals.
 
 ### 3. Trace signals across the map
 
-For each extracted signal, search **all design ticket bodies** (resolved and open). A signal is **covered** if at least one ticket body contains the signal's key terms. A signal with no match is a **gap**.
+For each extracted signal, search **all ticket bodies** (resolved and open). A signal is **covered** if at least one ticket body contains the signal's key terms. A signal with no match is a **gap**.
 
 Exception: if the signal appears only in the same ticket that produced it, it is NOT self-covered — the trace looks for a *different* ticket.
 
-**Peer symmetry trace**: for each pattern signal, collect all surface items from the pattern name (e.g. "daily engine" → bat, dashboard, CLI, config). Then collect all surface items from tickets belonging to the new concept (e.g. design tickets tagged or titled with the new engine type). Items present in the pattern but absent from the new concept are **peer asymmetry gaps**.
+**Peer symmetry trace**: for each pattern signal, collect all surface items from the pattern name (e.g. "daily engine" → bat, dashboard, CLI, config). Then collect all surface items from tickets belonging to the new concept (e.g. tickets tagged or titled with the new engine type). Items present in the pattern but absent from the new concept are **peer asymmetry gaps**.
 
-**Layer trace**: for each dependency signal, search for a design ticket whose body or title describes delivering that dependency. No match → **layer gap**.
+**Layer trace**: for each dependency signal, search for a ticket whose body or title describes delivering that dependency. No match → **layer gap**.
 
-**Layer-integrity trace**: for each design ticket body, check whether its content describes actions belonging to a different layer than the ticket's stated purpose. A scan ticket describing nested loops is an engine-layer action → **layer violation**.
+**Layer-integrity trace**: for each ticket body, check whether its content describes actions belonging to a different layer than the ticket's stated purpose. A scan ticket describing nested loops is an engine-layer action → **layer violation**.
 
 Completion criterion: every signal traced. Three lists built — covered, gaps, violations.
 

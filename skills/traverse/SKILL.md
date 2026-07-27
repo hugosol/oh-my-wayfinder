@@ -3,7 +3,7 @@ name: traverse
 description: Walk the full design tree of a completed wayfinder map — checking dependencies, peer symmetry, layer integrity, and boundary completeness — to surface gaps before to-spec. Use after all wayfinder tickets are resolved, or whenever the map should be audited end-to-end.
 ---
 
-All the facts are already in the map, the design ticket bodies, and the lighthouse documents. Traverse reads them all, builds the design tree, and walks every branch to find gaps — things the map needs but no ticket covers. Only ask the user about gaps the documents can't resolve.
+All the facts are already in the map, the ticket bodies, and the resolution comments. Traverse reads them all, builds the design tree, and walks every branch to find gaps — things the map needs but no ticket covers. Only ask the user about gaps the documents can't resolve.
 
 Do not act on it until the user confirms the gaps.
 
@@ -15,17 +15,17 @@ User invokes with a wayfinder map (URL or number). All tickets must be resolved 
 
 ### 1. Load all sources
 
-Load the wayfinder map (label `wayfinder:map`). Read the map body. Then read every child issue: for each resolved ticket, read its design ticket body and its lighthouse document. Lighthouse documents should follow /lighthouse's format — if one doesn't, still read what's there.
+Load the wayfinder map (label `wayfinder:map`). Read the map body. Then read every child issue: for each resolved ticket, read its body (the **Question**) and its resolution comment. Resolution comments should follow to-resolution's format — if one doesn't, still read what's there.
 
-Completion criterion: map body + every design ticket body + every lighthouse document loaded.
+Completion criterion: map body + every ticket body + every resolution loaded.
 
 ### 2. Build the design tree
 
 From these sources, build the tree. Every ticket is a node. The tree has four kinds of edges:
 
-- **Dependency edges** — from lighthouse Preconditions. If ticket A's Precondition says "needs X" and ticket B's Postcondition says "provides X", draw A → B.
-- **Pattern edges** — from lighthouse Invariants. If ticket A says "follows the same conventions as daily engine", draw A → daily engine (the existing pattern).
-- **Layer edges** — from design ticket bodies. Group tickets by their claimed layer: engine, strategy, config, output, scan.
+- **Dependency edges** — from resolution Preconditions. If ticket A's Precondition says "needs X" and ticket B's Postcondition says "provides X", draw A → B.
+- **Pattern edges** — from resolution Invariants. If ticket A says "follows the same conventions as daily engine", draw A → daily engine (the existing pattern).
+- **Layer edges** — from ticket bodies. Group tickets by their claimed layer: engine, strategy, config, output, scan.
 - **Boundary edges** — between tickets whose bodies describe adjacent concerns. If ticket 03 defines a strategy interface and ticket 09 defines a config format, they share a boundary at "strategy configuration".
 
 Nodes without outgoing dependency edges are missing their prerequisites.
@@ -36,7 +36,7 @@ Completion criterion: every ticket placed as a node. All four edge types drawn.
 
 Four checks, applied to every node:
 
-**Dependency check.** For each node, walk its dependency edges. Every dependency must land on a node that provides it. A dependency with no provider → **gap**. Ask: the Postcondition "provides X" doesn't appear in any lighthouse document — does X need a ticket?
+**Dependency check.** For each node, walk its dependency edges. Every dependency must land on a node that provides it. A dependency with no provider → **gap**. Ask: the Postcondition "provides X" doesn't appear in any resolution — does X need a ticket?
 
 **Peer symmetry check.** For each pattern edge, collect the surface items of the pattern (from existing codebase — files, scripts, configs, dashboard entries). Collect the surface items claimed by the new node's tickets. Items in the pattern but not in the new node → **gap**. Most peers are found by reading the repository; only ask the user when the pattern's surface is ambiguous.
 

@@ -68,7 +68,7 @@ A session **claims** a ticket by assigning it to the dev driving the map, **firs
 
 Blocking uses the tracker's **native** dependency relationship — essential because it renders the frontier _visually_ in the tracker's own UI, so the human sees what's takeable without opening the map. Only a tracker that lacks native blocking falls back to a body convention. A ticket is **unblocked** when every ticket blocking it is closed; the **frontier** is the open, unblocked, unclaimed children — the edge of the known.
 
-The answer isn't part of the body — it's recorded in the lighthouse document (see [Work through the map](#work-through-the-map)). Assets created while resolving a ticket are linked from the issue, not pasted in.
+The answer isn't part of the body — it's recorded on resolution (see [Work through the map](#work-through-the-map)). Assets created while resolving a ticket are linked from the issue, not pasted in.
 
 ## Ticket Types
 
@@ -117,7 +117,7 @@ Fog only ever gathers _toward_ the destination. The destination fixes the scope,
 
 Out-of-scope work never graduates — the frontier stops at the destination — so it returns only if the destination is redrawn, and then as a fresh effort, not a resumption.
 
-Ruling something out of scope is a scoping act, not a step on the route. When a ticket that already exists turns out to sit past the destination — mis-scoped in while charting, or exposed by a lighthouse decision — **close it** (a closed ticket is unambiguously off the frontier) and leave one line in the **Out of scope** section: the gist plus why it's out of scope, linking the closed ticket. It stays out of **Decisions so far**, which records the route actually walked — a scope boundary isn't a step on it.
+Ruling something out of scope is a scoping act, not a step on the route. When a ticket that already exists turns out to sit past the destination — mis-scoped in while charting, or exposed by a resolution — **close it** (a closed ticket is unambiguously off the frontier) and leave one line in the **Out of scope** section: the gist plus why it's out of scope, linking the closed ticket. It stays out of **Decisions so far**, which records the route actually walked — a scope boundary isn't a step on it.
 
 ## Invocation
 
@@ -146,12 +146,13 @@ User invokes with a map (URL or number). A ticket is **optional** — without on
 1. Load the **map** — the low-res view, not every ticket body.
 2. Choose the ticket. If the user named one, use it. Otherwise take the first frontier ticket in order. **Claim it**: assign it to yourself before any work.
 3. Resolve it — **zoom as needed**: fetch the full body of any related or closed ticket on demand; invoke the skills the `## Notes` block names. If in doubt, use `/grilling` and `/domain-modeling`.
-4. Write the discussion results to the design ticket body. Then invoke `/lighthouse` — MANDATORY, NON-BYPASSABLE — to produce the lighthouse document. Close the design ticket, and append a context pointer to the map's Decisions-so-far.
-   - `/lighthouse` reads the design ticket body and the conversation context; confirm the draft with the user, then write it to `lighthouse/<NN>-<slug>.md`.
-   - If `/lighthouse` is unavailable, STOP — do not proceed.
-   - The one-line gist for the map's Decisions-so-far comes from the `## 决策` field.
+4. **Invoke `/to-resolution`** — MANDATORY, NON-BYPASSABLE.
+   - The resolution MUST be produced by the /to-resolution skill.
+   - NEVER write resolution text directly in the ticket body.
+   - If /to-resolution is unavailable, STOP — do not proceed.
+   - To-resolution reads the conversation context; confirm the draft with the user, then append it to the ticket under `## Resolution`, set `Status: resolved`, and append a context pointer to the map's Decisions-so-far. The one-line gist comes from the `## Decision` field.
 5. **Invoke `/backtracer`** — MANDATORY, NON-BYPASSABLE.
-   - Backtracer reads the map, design tickets, and lighthouse documents, checks coverage and symmetry, and reports gaps.
+   - Backtracer reads the map and the resolution, checks Intent coverage and Symmetry, and reports gaps.
    - The user confirms which gaps become new tickets.
    - If backtracer is unavailable, STOP — do not proceed.
 6. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. This includes any tickets backtracer surfaced and the user confirmed. If the answer reveals a ticket — this one or another — sits beyond the destination, **rule it out of scope** rather than resolving it on the route. If the decision invalidates other parts of the map, update or delete those tickets.

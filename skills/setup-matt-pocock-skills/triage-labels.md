@@ -4,7 +4,7 @@ This repo uses two distinct ticket systems with separate status vocabularies.
 
 ## Design tickets (wayfinder)
 
-Design tickets are **planning artifacts** produced by `/wayfinder`. They live in `.scratch/<feature>/design/`. Each design ticket asks "what should we decide?" and its lighthouse document records the decision.
+Design tickets are **planning artifacts** produced by `/wayfinder`. They live in `.scratch/<feature>/design/`. Each design ticket asks "what should we decide?" and its resolution records the answer.
 
 | Status | Meaning |
 |--------|---------|
