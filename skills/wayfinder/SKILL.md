@@ -79,24 +79,24 @@ Every ticket is either **HITL** — human in the loop, worked *with* a human who
 - **Grilling** (HITL): Conversation. The default case. Always invoke the /grilling and /domain-modeling skills.
 - **Task** (HITL or AFK): Manual work that must happen before a *decision* can be made — nothing to decide, prototype, or research, but the discussion is blocked until it's done. Signing up for a service so its API can be judged, provisioning access, moving data so its shape can be seen. This is the one type that *does* rather than decides — and it earns its place by unblocking a decision, not by delivering the destination. The agent drives it alone where it can (AFK); otherwise it hands the human a precise checklist (HITL). Resolved when the work is done; the answer records what was done and any resulting facts (credentials location, new URLs, row counts) later tickets depend on.
 
-## Design tickets vs task tickets
+## Decision tickets vs task tickets
 
-This map produces **design tickets** — planning artifacts that capture decisions. Each asks "what should we decide?" Design tickets live in `.scratch/<feature>/design/` and use the Design ticket status vocabulary (`open` → `claimed` → `resolved`).
+This map produces **decision tickets** — planning artifacts that capture decisions. Each asks "what should we decide?" Decision tickets live in `.scratch/<feature>/decision/` and use the Decision ticket status vocabulary (`open` → `claimed` → `resolved`).
 
-A `resolved` design ticket means the decision is locked. **NO code has been written.** Implementation is a separate phase.
+A `resolved` decision ticket means the decision is locked. **NO code has been written.** Implementation is a separate phase.
 
 **Task tickets** are a different artifact, produced later by `/to-tickets` from the to-spec document. They live in `.scratch/<feature>/issues/` and use the Task ticket status vocabulary (`ready-for-agent` → `in-progress` → `closed`). Task tickets are consumed by `/implement`.
 
-| | Design ticket | Task ticket |
+| | Decision ticket | Task ticket |
 |---|---|---|
 | Produced by | `/wayfinder` | `/to-tickets` |
-| Directory | `design/` | `issues/` |
+| Directory | `decision/` | `issues/` |
 | Question | What should we decide? | What should we build? |
 | Statuses | `open` → `claimed` → `resolved` | `ready-for-agent` → `in-progress` → `closed` |
 | `resolved` means | Decision locked, no code | N/A — use `closed` |
 | `closed` means | N/A — use `resolved` | Code implemented, tested, merged |
 
-NEVER mark a design ticket with a task ticket status, or vice versa. NEVER assume a resolved design ticket means code exists.
+NEVER mark a decision ticket with a task ticket status, or vice versa. NEVER assume a resolved decision ticket means code exists.
 
 ## Fog of war
 
@@ -139,19 +139,19 @@ User invokes with a loose idea.
 User invokes with a map (URL or number). A ticket is **optional** — without one, you pick the next decision, not the user.
 
 0. **Load the tracker vocabulary.** Read `docs/agents/triage-labels.md` and `docs/agents/issue-tracker.md`.
-   - This map produces **design tickets** — use the Design ticket status vocabulary.
+   - This map produces **decision tickets** — use the Decision ticket status vocabulary.
    - Key: `resolved` means "Decision made, implementation pending" — NOT "code implemented".
-   - Design tickets (in `design/`) and task tickets (in `issues/`) are different systems with **non-overlapping status vocabularies**.
+   - Decision tickets (in `decision/`) and task tickets (in `issues/`) are different systems with **non-overlapping status vocabularies**.
 
 1. Load the **map** — the low-res view, not every ticket body.
 2. Choose the ticket. If the user named one, use it. Otherwise take the first frontier ticket in order. **Claim it**: assign it to yourself before any work.
 3. Resolve it — **zoom as needed**: fetch the full body of any related or closed ticket on demand; invoke the skills the `## Notes` block names. If in doubt, use `/grilling` and `/domain-modeling`.
-4. Write the discussion results to the design ticket body. Then invoke `/lighthouse` — MANDATORY, NON-BYPASSABLE — to produce the lighthouse document. Close the design ticket, and append a context pointer to the map's Decisions-so-far.
-   - `/lighthouse` reads the design ticket body and the conversation context; confirm the draft with the user, then write it to `lighthouse/<NN>-<slug>.md`.
+4. Write the discussion results to the decision ticket body. Then invoke `/lighthouse` — MANDATORY, NON-BYPASSABLE — to produce the lighthouse document. Close the decision ticket, and append a context pointer to the map's Decisions-so-far.
+   - `/lighthouse` reads the decision ticket body and the conversation context; confirm the draft with the user, then write it to `lighthouse/<NN>-<slug>.md`.
    - If `/lighthouse` is unavailable, STOP — do not proceed.
    - The one-line gist for the map's Decisions-so-far comes from the `## 决策` field.
 5. **Invoke `/backtracer`** — MANDATORY, NON-BYPASSABLE.
-   - Backtracer reads the map, design tickets, and lighthouse documents, checks coverage and symmetry, and reports gaps.
+   - Backtracer reads the map, decision tickets, and lighthouse documents, checks coverage and symmetry, and reports gaps.
    - The user confirms which gaps become new tickets.
    - If backtracer is unavailable, STOP — do not proceed.
 6. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. This includes any tickets backtracer surfaced and the user confirmed. If the answer reveals a ticket — this one or another — sits beyond the destination, **rule it out of scope** rather than resolving it on the route. If the decision invalidates other parts of the map, update or delete those tickets.

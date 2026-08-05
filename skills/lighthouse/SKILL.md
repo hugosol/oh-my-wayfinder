@@ -3,15 +3,15 @@ name: lighthouse
 description: Produce a lighthouse document from a resolved wayfinder ticket — decision, user stories, preconditions, postconditions, and invariants — so that backtracer can trace signals across the map. Use after a wayfinder ticket is resolved.
 ---
 
-After a wayfinder ticket is resolved — the decision is made — create a lighthouse document from the design ticket body and the grilling conversation. A lighthouse document is the single source of truth for what was decided, why, and what it constrains. Backtracer traces the "so that" clauses and pattern statements in this document across the map to surface gaps.
+After a wayfinder ticket is resolved — the decision is made — create a lighthouse document from the decision ticket body and the grilling conversation. A lighthouse document is the single source of truth for what was decided, why, and what it constrains. Backtracer traces the "so that" clauses and pattern statements in this document across the map to surface gaps.
 
-Do NOT interview the user — just synthesize what you already know from the design ticket and the conversation. The decision has been made; your job is to capture it, not to reopen it.
+Do NOT interview the user — just synthesize what you already know from the decision ticket and the conversation. The decision has been made; your job is to capture it, not to reopen it.
 
 ## Process
 
-### 1. Read the design ticket
+### 1. Read the decision ticket
 
-Read the design ticket body. The `## 问题` section contains the original question, known constraints, and the issues that needed decisions. Carry these forward verbatim into the lighthouse document — this is the permanent record of what was asked.
+Read the decision ticket body. The `## 问题` section contains the original question, known constraints, and the issues that needed decisions. Carry these forward verbatim into the lighthouse document — this is the permanent record of what was asked.
 
 ### 2. Read the conversation
 
@@ -25,11 +25,11 @@ Write the document to `lighthouse/<NN>-<slug>.md`. Use this template:
 
 # NN: 标题 — 决策灯塔
 
-> 问题与讨论: [NN: 标题](../design/NN-<slug>.md)
+> 问题与讨论: [NN: 标题](../decision/NN-<slug>.md)
 
 ## 问题
 
-<从 design ticket body 的 `## 问题` 搬运，包括 `### 已知约束` 和 `### 待决议题`>
+<从 decision ticket body 的 `## 问题` 搬运，包括 `### 已知约束` 和 `### 待决议题`>
 
 ## 讨论结果
 
@@ -80,4 +80,4 @@ Capture every need and design preference that surfaced during the discussion —
 
 Present the draft to the user. Ask: "Does this capture the decision correctly? Any missing user stories or invariants?" Iterate until confirmed.
 
-Once confirmed, the document is ready. The calling skill (typically wayfinder) writes it to `lighthouse/`, closes the design ticket, and updates the map.
+Once confirmed, the document is ready. The calling skill (typically wayfinder) writes it to `lighthouse/`, closes the decision ticket, and updates the map.

@@ -3,7 +3,7 @@ name: traverse
 description: Walk the full design tree of a completed wayfinder map — checking dependencies, peer symmetry, layer integrity, and boundary completeness — to surface gaps before to-spec. Use after all wayfinder tickets are resolved, or whenever the map should be audited end-to-end.
 ---
 
-All the facts are already in the map, the design ticket bodies, and the lighthouse documents. Traverse reads them all, builds the design tree, and walks every branch to find gaps — things the map needs but no ticket covers. Only ask the user about gaps the documents can't resolve.
+All the facts are already in the map, the decision ticket bodies, and the lighthouse documents. Traverse reads them all, builds the design tree, and walks every branch to find gaps — things the map needs but no ticket covers. Only ask the user about gaps the documents can't resolve.
 
 Do not act on it until the user confirms the gaps.
 
@@ -15,9 +15,9 @@ User invokes with a wayfinder map (URL or number). All tickets must be resolved 
 
 ### 1. Load all sources
 
-Load the wayfinder map (label `wayfinder:map`). Read the map body. Then read every child issue: for each resolved ticket, read its design ticket body and its lighthouse document. Lighthouse documents should follow /lighthouse's format — if one doesn't, still read what's there.
+Load the wayfinder map (label `wayfinder:map`). Read the map body. Then read every child issue: for each resolved ticket, read its decision ticket body and its lighthouse document. Lighthouse documents should follow /lighthouse's format — if one doesn't, still read what's there.
 
-Completion criterion: map body + every design ticket body + every lighthouse document loaded.
+Completion criterion: map body + every decision ticket body + every lighthouse document loaded.
 
 ### 2. Build the design tree
 
@@ -25,7 +25,7 @@ From these sources, build the tree. Every ticket is a node. The tree has four ki
 
 - **Dependency edges** — from lighthouse Preconditions. If ticket A's Precondition says "needs X" and ticket B's Postcondition says "provides X", draw A → B.
 - **Pattern edges** — from lighthouse Invariants. If ticket A says "follows the same conventions as daily engine", draw A → daily engine (the existing pattern).
-- **Layer edges** — from design ticket bodies. Group tickets by their claimed layer: engine, strategy, config, output, scan.
+- **Layer edges** — from decision ticket bodies. Group tickets by their claimed layer: engine, strategy, config, output, scan.
 - **Boundary edges** — between tickets whose bodies describe adjacent concerns. If ticket 03 defines a strategy interface and ticket 09 defines a config format, they share a boundary at "strategy configuration".
 
 Nodes without outgoing dependency edges are missing their prerequisites.
