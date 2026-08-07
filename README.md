@@ -80,11 +80,10 @@ Legend: blue outline = new skills in this repo · green = auto-invoked · orange
 
 ## Flow B — `/spec-to-code`: spec to code (Oh My Pi only)
 
-Run `/spec-to-code <slug>` with the spec at `.scratch/<slug>/spec.md`. That single command is the only manual step — everything after it runs automatically.
+Run `/spec-to-code <slug>` with the spec at `.scratch/<slug>/spec.md` (published by `/to-spec`). That single command is the only manual step — everything after it runs automatically.
 
 ```mermaid
 flowchart TD
-    PRE["Prerequisites:<br/>to-tickets skill<br/>+ tdd skill + tdd agent"] -.-> P
     P["Spec at<br/>.scratch/&lt;slug&gt;/spec.md"] --> C["/spec-to-code &lt;slug&gt;<br/><b>manual kickoff</b>"]
     C --> A["to-tickets activated<br/><b>auto</b>"]
     A --> Q{"Tickets generated?"}
@@ -95,10 +94,9 @@ flowchart TD
     TD --> DONE["Completion summary"]
 
     style C fill:#fff3e0,stroke:#dd6b20
-    style PRE fill:#f4f4f4,stroke:#999,stroke-dasharray:5 5
 ```
 
-The `tdd` agent (`extensions/agents/tdd.md`) is the only piece this repo adds to this loop — the `to-tickets` and `tdd` skills themselves are upstream. The extension fails fast if any prerequisite is missing.
+The `tdd` agent (`extensions/agents/tdd.md`) is the only piece this repo adds to this loop — the `to-tickets` and `tdd` skills themselves are upstream. The extension fails fast if the `to-tickets` skill, the `tdd` skill, or the `tdd` agent is missing — checked automatically, nothing to confirm manually.
 
 ## Thanks
 

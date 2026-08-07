@@ -80,11 +80,10 @@ flowchart TD
 
 ## 流程图 B — `/spec-to-code`：spec 到代码（仅 Oh My Pi）
 
-spec 位于 `.scratch/<slug>/spec.md`，运行 `/spec-to-code <slug>`。这一条命令是唯一的手动步骤——之后全部自动运行。
+spec 位于 `.scratch/<slug>/spec.md`（由 `/to-spec` 发布），运行 `/spec-to-code <slug>`。这一条命令是唯一的手动步骤——之后全部自动运行。
 
 ```mermaid
 flowchart TD
-    PRE["前置：to-tickets skill<br/>+ tdd skill + tdd agent"] -.-> P
     P["spec 文件<br/>.scratch/&lt;slug&gt;/spec.md"] --> C["/spec-to-code &lt;slug&gt;<br/><b>手动启动</b>"]
     C --> A["激活 to-tickets<br/><b>自动</b>"]
     A --> Q{"tickets 已生成?"}
@@ -95,10 +94,9 @@ flowchart TD
     TD --> DONE["输出完成摘要"]
 
     style C fill:#fff3e0,stroke:#dd6b20
-    style PRE fill:#f4f4f4,stroke:#999,stroke-dasharray:5 5
 ```
 
-`tdd` agent（`extensions/agents/tdd.md`）是本仓库为这条流程新增的唯一部分——`to-tickets` 与 `tdd` skill 本身来自上游。缺少任一前置条件时扩展会立即报错。
+`tdd` agent（`extensions/agents/tdd.md`）是本仓库为这条流程新增的唯一部分——`to-tickets` 与 `tdd` skill 本身来自上游。前置条件（`to-tickets` skill、`tdd` skill 或 `tdd` agent）由扩展自动检查、立即报错，无需手动确认。
 
 ## 致谢
 
