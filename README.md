@@ -2,7 +2,7 @@
 
 [中文文档](./README.cn.md)
 
-A fork of **[mattpocock/skills](https://github.com/mattpocock/skills)** — the engineering skills for AI agents — extended with new planning-quality skills and an automation extension for the **Oh My Pi** agent.
+A fork of **[mattpocock/skills](https://github.com/mattpocock/skills)** — the engineering skills for AI agents — extended with new planning-quality skills and an automation extension for the **[Oh My Pi](https://github.com/can1357/oh-my-pi)** agent.
 
 This repository contains **only what differs from upstream**. Install Matt's skills first, then overlay this repo's files on top (see [Installation](#installation)).
 
@@ -12,7 +12,7 @@ This repository contains **only what differs from upstream**. Install Matt's ski
 
 The planning loop they drive: `wayfinder` charts an effort too big for one session as a map of decision tickets on your issue tracker; every resolved ticket is captured in a **lighthouse** document; **backtracer** traces signals across the map to surface gaps; **traverse** audits the completed map end to end before it hands off to `to-spec`.
 
-**Part 2 — Oh My Pi automation extension** (`@oh-my-pi/pi-coding-agent` only)
+**Part 2 — [Oh My Pi](https://github.com/can1357/oh-my-pi) automation extension** (`@oh-my-pi/pi-coding-agent` only)
 
 `/prd-to-code` turns a PRD spec into task tickets and executes them with serial TDD subagents — one command, fully automatic. Irrelevant if you use another agent; ignore it.
 
@@ -102,7 +102,7 @@ Then run `/setup-matt-pocock-skills` once per repo, as with the upstream set.
 
 ## Thanks
 
-The core of this repository is **[mattpocock/skills](https://github.com/mattpocock/skills)** — thanks to Matt Pocock for building it and releasing it under MIT, and for the [skills.sh](https://skills.sh/mattpocock/skills) installer and the [newsletter](https://www.aihero.dev/s/skills-newsletter) that keep the ecosystem alive.
+The core of this repository is **[mattpocock/skills](https://github.com/mattpocock/skills)** — thanks to Matt Pocock for building it and releasing it under MIT, and for the [skills.sh](https://skills.sh/mattpocock/skills) installer and the [newsletter](https://www.aihero.dev/s/skills-newsletter) that keep the ecosystem alive. Thanks also to the [Oh My Pi](https://github.com/can1357/oh-my-pi) project — the agent harness this extension targets.
 
 ## License
 

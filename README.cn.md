@@ -2,7 +2,7 @@
 
 [English](./README.md)
 
-**[mattpocock/skills](https://github.com/mattpocock/skills) 的 fork** —— 为 AI 编程 agent 设计的工程技能集。本仓库在其基础上新增了规划质检类 skill，并为 **Oh My Pi** agent 编写了自动化扩展。
+**[mattpocock/skills](https://github.com/mattpocock/skills) 的 fork** —— 为 AI 编程 agent 设计的工程技能集。本仓库在其基础上新增了规划质检类 skill，并为 **[Oh My Pi](https://github.com/can1357/oh-my-pi)** agent 编写了自动化扩展。
 
 本仓库**只包含与上游的差异部分**。请先安装 Matt 的技能集，再把本仓库的文件覆盖上去（见 [安装](#安装)）。
 
@@ -12,7 +12,7 @@
 
 它们驱动的规划循环：`wayfinder` 把一次超出单个会话的工作量绘制成 issue tracker 上的决策票地图；每张票解决后由 **lighthouse** 固化为文档；**backtracer** 在地图上追踪信号、暴露缺口；**traverse** 在地图完成后做端到端终审，然后交给 `to-spec`。
 
-**第二部分 — Oh My Pi 自动化扩展**（仅 `@oh-my-pi/pi-coding-agent`）
+**第二部分 — [Oh My Pi](https://github.com/can1357/oh-my-pi) 自动化扩展**（仅 `@oh-my-pi/pi-coding-agent`）
 
 `/prd-to-code` 把一份 PRD 规格自动切分为任务票，并用串行 TDD 子代理逐个实现——一条命令，全流程自动。使用其他 agent 的读者可以完全忽略这部分。
 
@@ -102,7 +102,7 @@ flowchart LR
 
 ## 致谢
 
-本仓库的核心是 **[mattpocock/skills](https://github.com/mattpocock/skills)**——感谢 Matt Pocock 构建并以 MIT 协议开源这套技能，也感谢 [skills.sh](https://skills.sh/mattpocock/skills) 安装器与[新闻通讯](https://www.aihero.dev/s/skills-newsletter)让整个生态持续运转。
+本仓库的核心是 **[mattpocock/skills](https://github.com/mattpocock/skills)**——感谢 Matt Pocock 构建并以 MIT 协议开源这套技能，也感谢 [skills.sh](https://skills.sh/mattpocock/skills) 安装器与[新闻通讯](https://www.aihero.dev/s/skills-newsletter)让整个生态持续运转。同时感谢 [Oh My Pi](https://github.com/can1357/oh-my-pi) 项目——本扩展所服务的 agent 平台。
 
 ## License
 
