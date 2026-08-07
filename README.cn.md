@@ -4,7 +4,19 @@
 
 **[mattpocock/skills](https://github.com/mattpocock/skills) 的 fork** —— 为 AI 编程 agent 设计的工程技能集。本仓库在其基础上新增了规划质检类 skill，并为 **[Oh My Pi](https://github.com/can1357/oh-my-pi)** agent 编写了自动化扩展。
 
-本仓库**只包含与上游的差异部分**。请先安装 Matt 的技能集，再把本仓库的文件覆盖上去（见 [安装](#安装)）。
+本仓库**只包含与上游的差异部分**。请先安装 Matt 的技能集，再把本仓库的文件覆盖上去（见 [快速开始](#快速开始)）。
+
+## 快速开始
+
+> 开始之前，请确保你已经理解 wayfinder 的流程——本仓库的一切都建立在它之上（见 [流程图 A](#流程图-a--wayfinder-规划管线)）。
+
+本仓库是 Matt 技能集之上的增量，所以：先装上游，再覆盖。
+
+1. 安装 Matt 的技能集：`npx skills@latest add mattpocock/skills`。
+2. 把本仓库的 `skills/` 目录复制并覆盖到已安装的 skill 目录——同名文件自动替换上游版本，其余文件为纯新增。
+3. Oh My Pi 用户：把 `extensions/prd-to-code.ts` 和 `extensions/agents/tdd.md` 放入扩展位置（扩展会自动发现同目录下的 `tdd` agent）。
+
+然后与上游一致，每个仓库运行一次 `/setup-matt-pocock-skills`。
 
 ## 仓库内容
 
@@ -34,13 +46,11 @@
 ```mermaid
 flowchart TD
     S["setup-matt-pocock-skills<br/><i>手动 · 每个仓库一次</i>"] --> W["wayfinder — 建图<br/><b>手动</b>"]
-    W --> D["命名目的地<br/>(grilling + domain-modeling)"]
-    D --> G["广度优先 grilling — 侦察雾区"]
+    W --> G["Grilling：命名目的地 + 侦察雾区<br/>(grilling + domain-modeling)"]
     G -->|"无雾"| N["不需要地图 — 直接开工"]
     G -->|"有雾"| M["创建 map issue"]
     M --> T["创建 tickets + 布线 blocking"]
-    T --> R["并行放出 research 子代理"]
-    R --> L["票循环：claim → 解析 → 写 design ticket"]
+    T --> L["票循环：claim → 解析 → 写 design ticket"]
     L --> LH["lighthouse<br/><b>自动</b>"]
     LH --> BT["backtracer<br/><b>自动</b>"]
     BT --> CG{"列出遗漏点<br/>用户决定"}
@@ -56,7 +66,7 @@ flowchart TD
     style BT fill:#e6ffe6,stroke:#2b6cb0,stroke-width:2px
     style TR fill:#fff3e0,stroke:#2b6cb0,stroke-width:2px
     style W fill:#fff3e0,stroke:#dd6b20
-    style S fill:#fff3e0,stroke:#dd6b20
+    style S fill:#f3e8ff,stroke:#805ad5,stroke-width:2px
     style TS fill:#f4f4f4,stroke:#999,stroke-dasharray:5 5
     style X fill:#f4f4f4,stroke:#999,stroke-dasharray:5 5
 ```
@@ -66,7 +76,7 @@ flowchart TD
 - `backtracer`（逐票）与 `traverse`（收尾）之后，skill 会列出它发现的遗漏点。skill 文件本身不规定如何处理——由用户决定。建议的处理方式：创建新票、就在当前会话用 grilling 消化、或记入地图的 **Not yet specified**（雾区）。
 - 管线在 `to-spec` 处交接给上游。之后的 `to-tickets`、`implement` 属于 mattpocock/skills，不在本仓库。
 
-颜色图例：蓝色粗边框 = 本仓库新增的 skill · 绿色 = 自动调用 · 橙色 = 手动触发 · 灰色虚线 = 上游 / 本仓库之外。
+颜色图例：蓝色粗边框 = 本仓库新增的 skill · 绿色 = 自动调用 · 橙色 = 手动触发 · 紫色 = 一次性 setup · 灰色虚线 = 上游 / 本仓库之外。
 
 ## 流程图 B — PRD 到代码（仅 Oh My Pi）
 
@@ -89,16 +99,6 @@ flowchart LR
 ```
 
 `tdd` agent（`extensions/agents/tdd.md`）是本仓库为这条流程新增的唯一部分——`to-tickets` 与 `tdd` skill 本身来自上游。缺少任一前置条件时扩展会立即报错。
-
-## 安装
-
-本仓库是 Matt 技能集之上的增量，所以：先装上游，再覆盖。
-
-1. 安装 Matt 的技能集：`npx skills@latest add mattpocock/skills`（按需选择，务必保留 `setup-matt-pocock-skills`）。
-2. 把本仓库的 `skills/` 目录复制并覆盖到已安装的 skill 目录——同名文件自动替换上游版本，其余文件为纯新增。
-3. Oh My Pi 用户：把 `extensions/prd-to-code.ts` 和 `extensions/agents/tdd.md` 放入扩展位置（扩展会自动发现同目录下的 `tdd` agent）。
-
-然后与上游一致，每个仓库运行一次 `/setup-matt-pocock-skills`。
 
 ## 致谢
 

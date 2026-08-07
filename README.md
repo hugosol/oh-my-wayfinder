@@ -4,7 +4,19 @@
 
 A fork of **[mattpocock/skills](https://github.com/mattpocock/skills)** — the engineering skills for AI agents — extended with new planning-quality skills and an automation extension for the **[Oh My Pi](https://github.com/can1357/oh-my-pi)** agent.
 
-This repository contains **only what differs from upstream**. Install Matt's skills first, then overlay this repo's files on top (see [Installation](#installation)).
+This repository contains **only what differs from upstream**. Install Matt's skills first, then overlay this repo's files on top (see [Quick Start](#quick-start)).
+
+## Quick Start
+
+> Make sure you understand the wayfinder flow before you start — it is the core this repo builds on (see [Flow A](#flow-a--the-wayfinder-planning-pipeline)).
+
+This repo is a delta on top of Matt's set, so: install upstream first, then overlay.
+
+1. Install Matt's skills: `npx skills@latest add mattpocock/skills`.
+2. Copy this repo's `skills/` directory over the installed skill directory — files with the same name replace upstream's, the rest are plain additions.
+3. Oh My Pi users: copy `extensions/prd-to-code.ts` and `extensions/agents/tdd.md` into your extension setup (the extension finds the `tdd` agent next to itself).
+
+Then run `/setup-matt-pocock-skills` once per repo, as with the upstream set.
 
 ## What's inside
 
@@ -34,13 +46,11 @@ The planning loop they drive: `wayfinder` charts an effort too big for one sessi
 ```mermaid
 flowchart TD
     S["setup-matt-pocock-skills<br/><i>manual · once per repo</i>"] --> W["wayfinder — chart the map<br/><b>manual</b>"]
-    W --> D["Name the destination<br/>(grilling + domain-modeling)"]
-    D --> G["Breadth-first grilling — scout the fog"]
+    W --> G["Grilling: name the destination, scout the fog<br/>(grilling + domain-modeling)"]
     G -->|"no fog"| N["No map needed — build directly"]
     G -->|"fog found"| M["Create the map issue"]
     M --> T["Create tickets + wire blocking edges"]
-    T --> R["Fire research subagents in parallel"]
-    R --> L["Ticket loop: claim → resolve → write design ticket"]
+    T --> L["Ticket loop: claim → resolve → write design ticket"]
     L --> LH["lighthouse<br/><b>auto</b>"]
     LH --> BT["backtracer<br/><b>auto</b>"]
     BT --> CG{"Gaps listed<br/>user decides"}
@@ -56,7 +66,7 @@ flowchart TD
     style BT fill:#e6ffe6,stroke:#2b6cb0,stroke-width:2px
     style TR fill:#fff3e0,stroke:#2b6cb0,stroke-width:2px
     style W fill:#fff3e0,stroke:#dd6b20
-    style S fill:#fff3e0,stroke:#dd6b20
+    style S fill:#f3e8ff,stroke:#805ad5,stroke-width:2px
     style TS fill:#f4f4f4,stroke:#999,stroke-dasharray:5 5
     style X fill:#f4f4f4,stroke:#999,stroke-dasharray:5 5
 ```
@@ -66,7 +76,7 @@ flowchart TD
 - After `backtracer` (per ticket) and after `traverse` (at the end), the skill lists the gaps it found. The skill files do not dictate how to handle them — the user decides. Suggested ways: create a new ticket, settle the gap with a grilling session right in the current conversation, or record it as fog in the map's **Not yet specified**.
 - The pipeline hands off to upstream `to-spec`. Everything after that — `to-tickets`, `implement` — ships in mattpocock/skills, not here.
 
-Legend: blue outline = new skills in this repo · green = auto-invoked · orange = manual trigger · gray dashed = upstream / beyond this repo.
+Legend: blue outline = new skills in this repo · green = auto-invoked · orange = manual trigger · purple = one-time setup · gray dashed = upstream / beyond this repo.
 
 ## Flow B — PRD to code (Oh My Pi only)
 
@@ -89,16 +99,6 @@ flowchart LR
 ```
 
 The `tdd` agent (`extensions/agents/tdd.md`) is the only piece this repo adds to this loop — the `to-tickets` and `tdd` skills themselves are upstream. The extension fails fast if any prerequisite is missing.
-
-## Installation
-
-This repo is a delta on top of Matt's set, so: install upstream first, then overlay.
-
-1. Install Matt's skills: `npx skills@latest add mattpocock/skills` (pick what you need; keep `setup-matt-pocock-skills`).
-2. Copy this repo's `skills/` directory over the installed skill directory — files with the same name replace upstream's, the rest are plain additions.
-3. Oh My Pi users: copy `extensions/prd-to-code.ts` and `extensions/agents/tdd.md` into your extension setup (the extension finds the `tdd` agent next to itself).
-
-Then run `/setup-matt-pocock-skills` once per repo, as with the upstream set.
 
 ## Thanks
 
