@@ -46,11 +46,11 @@ The planning loop they drive: `wayfinder` charts an effort too big for one sessi
 ```mermaid
 flowchart TD
     S["setup-matt-pocock-skills<br/><i>manual · once per repo</i>"] --> W["wayfinder — chart the map<br/><b>manual</b>"]
-    W --> G["Grilling: name the destination, scout the fog<br/>(grilling + domain-modeling)"]
-    G -->|"no fog"| N["No map needed — build directly"]
+    W --> G["Grilling: name the destination,<br/>scout the fog<br/>grilling + domain-modeling"]
+    G -->|"no fog"| N["No map needed —<br/>build directly"]
     G -->|"fog found"| M["Create the map issue"]
-    M --> T["Create tickets + wire blocking edges"]
-    T --> L["Ticket loop: claim → resolve → write design ticket"]
+    M --> T["Create tickets +<br/>wire blocking edges"]
+    T --> L["Ticket loop:<br/>claim → resolve →<br/>write design ticket"]
     L --> LH["lighthouse<br/><b>auto</b>"]
     LH --> BT["backtracer<br/><b>auto</b>"]
     BT --> CG{"Gaps listed<br/>user decides"}
@@ -60,7 +60,7 @@ flowchart TD
     TR --> CG2{"Gaps listed<br/>user decides"}
     CG2 -->|"create ticket"| T
     CG2 -->|"accept"| TS["to-spec — upstream skill"]
-    TS -.->|"to-tickets / implement — upstream"| X["…"]
+    TS -.->|"to-tickets / implement"| X["…"]
 
     style LH fill:#e6ffe6,stroke:#2b6cb0,stroke-width:2px
     style BT fill:#e6ffe6,stroke:#2b6cb0,stroke-width:2px
@@ -83,15 +83,15 @@ Legend: blue outline = new skills in this repo · green = auto-invoked · orange
 Run `/prd-to-code <slug>` with the PRD at `.scratch/<slug>/PRD.md`. That single command is the only manual step — everything after it runs automatically.
 
 ```mermaid
-flowchart LR
-    PRE["Prerequisites: to-tickets skill + tdd skill + tdd agent"] -.-> P
-    P["PRD at .scratch/&lt;slug&gt;/PRD.md"] --> C["/prd-to-code &lt;slug&gt;<br/><b>manual kickoff</b>"]
+flowchart TD
+    PRE["Prerequisites:<br/>to-tickets skill<br/>+ tdd skill + tdd agent"] -.-> P
+    P["PRD at<br/>.scratch/&lt;slug&gt;/PRD.md"] --> C["/prd-to-code &lt;slug&gt;<br/><b>manual kickoff</b>"]
     C --> A["to-tickets activated<br/><b>auto</b>"]
     A --> Q{"Tickets generated?"}
-    Q -->|"no"| QA["Agent asks questions → user answers"] --> A
+    Q -->|"no"| QA["Agent asks questions →<br/>user answers"] --> A
     Q -->|"yes"| P2["Phase 2<br/><b>auto</b>"]
-    P2 --> ORD["Sort tickets by dependencies"]
-    ORD --> TD["task(agent=tdd) per ticket — serial<br/>each waits for the previous"]
+    P2 --> ORD["Sort tickets by<br/>dependencies"]
+    ORD --> TD["task(agent=tdd) per ticket<br/>— serial, each waits<br/>for the previous"]
     TD --> DONE["Completion summary"]
 
     style C fill:#fff3e0,stroke:#dd6b20
