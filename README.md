@@ -83,7 +83,7 @@ Legend: blue outline = new skills in this repo · green = auto-invoked · orange
 Run `/prd-to-code <slug>` with the PRD at `.scratch/<slug>/PRD.md`. That single command is the only manual step — everything after it runs automatically.
 
 ```mermaid
-flowchart LR
+flowchart TD
     PRE["Prerequisites:<br/>to-tickets skill<br/>+ tdd skill + tdd agent"] -.-> P
     P["PRD at<br/>.scratch/&lt;slug&gt;/PRD.md"] --> C["/prd-to-code &lt;slug&gt;<br/><b>manual kickoff</b>"]
     C --> A["to-tickets activated<br/><b>auto</b>"]

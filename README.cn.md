@@ -83,7 +83,7 @@ flowchart TD
 PRD 位于 `.scratch/<slug>/PRD.md`，运行 `/prd-to-code <slug>`。这一条命令是唯一的手动步骤——之后全部自动运行。
 
 ```mermaid
-flowchart LR
+flowchart TD
     PRE["前置：to-tickets skill<br/>+ tdd skill + tdd agent"] -.-> P
     P["PRD 文件<br/>.scratch/&lt;slug&gt;/PRD.md"] --> C["/prd-to-code &lt;slug&gt;<br/><b>手动启动</b>"]
     C --> A["激活 to-tickets<br/><b>自动</b>"]
