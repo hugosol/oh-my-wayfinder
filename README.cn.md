@@ -26,7 +26,7 @@
 
 **第二部分 — [Oh My Pi](https://github.com/can1357/oh-my-pi) 自动化扩展**（仅 `@oh-my-pi/pi-coding-agent`）
 
-`/prd-to-code` 把一份 PRD 规格自动切分为任务票，并用串行 TDD 子代理逐个实现——一条命令，全流程自动。使用其他 agent 的读者可以完全忽略这部分。
+`/prd-to-code` 把一份 spec 自动切分为任务票，并用串行 TDD 子代理逐个实现——一条命令，全流程自动。使用其他 agent 的读者可以完全忽略这部分。
 
 ## 相比上游新增了什么
 
@@ -35,9 +35,9 @@
 | `lighthouse` | **新增** | 把已解决的 wayfinder 票固化为灯塔文档：决策、用户故事、前置条件、后置条件、不变量——backtracer 追踪的信号源 | 每张 wayfinder 票解决后立即执行 | **自动**（由 wayfinder 调用） |
 | `backtracer` | **新增** | 把票与灯塔文档中的 "so that" 子句、不变量、依赖信号回溯到整张地图——在缺口变成 bug 之前暴露缺失票、层次缺口与不对称 | lighthouse 之后，每张已解决票执行一次 | **自动**（由 wayfinder 调用） |
 | `traverse` | **新增** | 已完成地图的终审：构建设计树并走查每条分支——依赖覆盖、同级对称、层次完整、边界完备 | 所有 wayfinder 票解决后、进入 to-spec 之前 | **手动** |
-| `wayfinder` | **改造** | 上游 skill 的重构版：每张票解决后强制 lighthouse + backtracer，区分设计票（`.scratch/<feature>/design/`）与任务票（`issues/`），缺口决策交由用户拍板 | 当工作量超出单个 agent 会话时 | **手动** |
+| `wayfinder` | **改造** | 上游 skill 的重构版：每张票解决后强制 lighthouse + backtracer，区分决策票（`.scratch/<feature>/decision/`）与任务票（`issues/`），缺口决策交由用户拍板 | 当工作量超出单个 agent 会话时 | **手动** |
 | `setup-matt-pocock-skills` | **改造** | 上游设置 skill，轻量适配（issue tracker 选项、triage 标签、domain 文档布局） | 每个仓库一次，首次使用前 | **手动** |
-| `prd-to-code` + `tdd` agent | **扩展**（仅 OMP） | PRD → 任务票 → 串行 TDD 子代理，一条命令后全自动 | 有规格文档并希望实现它时 | **手动启动**，之后全自动 |
+| `prd-to-code` + `tdd` agent | **扩展**（仅 OMP） | Spec → 任务票 → 串行 TDD 子代理，一条命令后全自动 | 有规格文档并希望实现它时 | **手动启动**，之后全自动 |
 
 「自动」指调用方 skill 在流程中强制触发该步骤——是 skill 指令层面的保证，而非独立的调度器。
 
@@ -50,7 +50,7 @@ flowchart TD
     G -->|"无雾"| N["不需要地图 — 直接开工"]
     G -->|"有雾"| M["创建 map issue"]
     M --> T["创建 tickets + 布线 blocking"]
-    T --> L["票循环：claim → 解析 →<br/>写 design ticket"]
+    T --> L["票循环：claim → 解析 →<br/>写 decision ticket"]
     L --> LH["lighthouse<br/><b>自动</b>"]
     LH --> BT["backtracer<br/><b>自动</b>"]
     BT --> CG{"列出遗漏点<br/>用户决定"}
@@ -78,14 +78,14 @@ flowchart TD
 
 颜色图例：蓝色粗边框 = 本仓库新增的 skill · 绿色 = 自动调用 · 橙色 = 手动触发 · 紫色 = 一次性 setup · 灰色虚线 = 上游 / 本仓库之外。
 
-## 流程图 B — PRD 到代码（仅 Oh My Pi）
+## 流程图 B — `/prd-to-code`：spec 到代码（仅 Oh My Pi）
 
-PRD 位于 `.scratch/<slug>/PRD.md`，运行 `/prd-to-code <slug>`。这一条命令是唯一的手动步骤——之后全部自动运行。
+spec 位于 `.scratch/<slug>/spec.md`，运行 `/prd-to-code <slug>`。这一条命令是唯一的手动步骤——之后全部自动运行。
 
 ```mermaid
 flowchart TD
     PRE["前置：to-tickets skill<br/>+ tdd skill + tdd agent"] -.-> P
-    P["PRD 文件<br/>.scratch/&lt;slug&gt;/PRD.md"] --> C["/prd-to-code &lt;slug&gt;<br/><b>手动启动</b>"]
+    P["spec 文件<br/>.scratch/&lt;slug&gt;/spec.md"] --> C["/prd-to-code &lt;slug&gt;<br/><b>手动启动</b>"]
     C --> A["激活 to-tickets<br/><b>自动</b>"]
     A --> Q{"tickets 已生成?"}
     Q -->|"否"| QA["agent 提问 → 用户回答"] --> A

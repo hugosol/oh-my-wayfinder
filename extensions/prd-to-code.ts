@@ -1,11 +1,11 @@
 /**
- * PRD-to-Code Extension — Autonomous two-phase workflow.
+ * Spec-to-Code Extension — Autonomous two-phase workflow.
  *
- * Phase 1: /to-tickets  → generate ticket files from PRD
+ * Phase 1: /to-tickets  → generate ticket files from spec
  * Phase 2: /tdd          → develop based on ticket files
  *
  * Usage: /prd-to-code <slug>
- *   PRD at:  .scratch/<slug>/PRD.md
+ *   Spec at:  .scratch/<slug>/spec.md
  *   Tickets: .scratch/<slug>/issues/*.md
  */
 
@@ -117,7 +117,7 @@ async function startPhase2(pi: ExtensionAPI, slug: string): Promise<void> {
 // ============================================================================
 
 export default function prdToCode(pi: ExtensionAPI): void {
-	pi.setLabel("PRD-to-Code");
+	pi.setLabel("Spec-to-Code");
 
 	pi.on("agent_end", async (_event, _ctx) => {
 		if (currentPhase !== "phase1" || !currentSlug) return;
@@ -144,11 +144,11 @@ export default function prdToCode(pi: ExtensionAPI): void {
 				return;
 			}
 
-			const prd = `.scratch/${slug}/PRD.md`;
+			const spec = `.scratch/${slug}/spec.md`;
 			try {
-				await Bun.file(prd).text();
+				await Bun.file(spec).text();
 			} catch {
-				ctx.ui.notify(`PRD 文件不存在: ${prd}`, "error");
+				ctx.ui.notify(`spec 文件不存在: ${spec}`, "error");
 				return;
 			}
 
@@ -175,7 +175,7 @@ export default function prdToCode(pi: ExtensionAPI): void {
 			const success = await activateSkill(
 				pi,
 				"to-tickets",
-				`请分析以下PRD，生成独立的 ticket 文件。PRD 路径：${prd}`,
+				`请分析以下spec，生成独立的 ticket 文件。spec 路径：${spec}`,
 			);
 
 			if (!success) {

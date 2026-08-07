@@ -26,7 +26,7 @@ The planning loop they drive: `wayfinder` charts an effort too big for one sessi
 
 **Part 2 — [Oh My Pi](https://github.com/can1357/oh-my-pi) automation extension** (`@oh-my-pi/pi-coding-agent` only)
 
-`/prd-to-code` turns a PRD spec into task tickets and executes them with serial TDD subagents — one command, fully automatic. Irrelevant if you use another agent; ignore it.
+`/prd-to-code` turns a spec into task tickets and executes them with serial TDD subagents — one command, fully automatic. Irrelevant if you use another agent; ignore it.
 
 ## What's new compared to upstream
 
@@ -35,9 +35,9 @@ The planning loop they drive: `wayfinder` charts an effort too big for one sessi
 | `lighthouse` | **New** | Produces a lighthouse document from a resolved wayfinder ticket: the decision, user stories, preconditions, postconditions, invariants — the single source of truth backtracer traces | Immediately after a wayfinder ticket is resolved | **Auto** (invoked by wayfinder) |
 | `backtracer` | **New** | Traces "so that" clauses, invariants, and dependencies from tickets and lighthouse documents across the whole map — surfacing missing tickets, layer gaps, and asymmetry before they become bugs | Immediately after lighthouse, once per resolved ticket | **Auto** (invoked by wayfinder) |
 | `traverse` | **New** | Final audit of a completed map: builds the design tree and walks every branch — dependency coverage, peer symmetry, layer integrity, boundary completeness | After all wayfinder tickets are resolved, before to-spec | **Manual** |
-| `wayfinder` | **Modified** | Upstream skill, reworked: mandates lighthouse + backtracer after every resolved ticket, separates design tickets (`.scratch/<feature>/design/`) from task tickets (`issues/`), routes gap decisions through the user | When an effort is too big for one agent session | **Manual** |
+| `wayfinder` | **Modified** | Upstream skill, reworked: mandates lighthouse + backtracer after every resolved ticket, separates decision tickets (`.scratch/<feature>/decision/`) from task tickets (`issues/`), routes gap decisions through the user | When an effort is too big for one agent session | **Manual** |
 | `setup-matt-pocock-skills` | **Modified** | Upstream setup skill, lightly adapted (tracker options, triage labels, domain-doc layout) | Once per repo, before first use | **Manual** |
-| `prd-to-code` + `tdd` agent | **Extension** (OMP only) | PRD → task tickets → serial TDD subagents, fully automatic after one command | When you have a spec you want implemented | **Manual kickoff**, then automatic |
+| `prd-to-code` + `tdd` agent | **Extension** (OMP only) | Spec → task tickets → serial TDD subagents, fully automatic after one command | When you have a spec you want implemented | **Manual kickoff**, then automatic |
 
 "Auto" means the calling skill mandates the step as part of its flow — an instruction-level guarantee, not a separate scheduler.
 
@@ -50,7 +50,7 @@ flowchart TD
     G -->|"no fog"| N["No map needed —<br/>build directly"]
     G -->|"fog found"| M["Create the map issue"]
     M --> T["Create tickets +<br/>wire blocking edges"]
-    T --> L["Ticket loop:<br/>claim → resolve →<br/>write design ticket"]
+    T --> L["Ticket loop:<br/>claim → resolve →<br/>write decision ticket"]
     L --> LH["lighthouse<br/><b>auto</b>"]
     LH --> BT["backtracer<br/><b>auto</b>"]
     BT --> CG{"Gaps listed<br/>user decides"}
@@ -78,14 +78,14 @@ flowchart TD
 
 Legend: blue outline = new skills in this repo · green = auto-invoked · orange = manual trigger · purple = one-time setup · gray dashed = upstream / beyond this repo.
 
-## Flow B — PRD to code (Oh My Pi only)
+## Flow B — `/prd-to-code`: spec to code (Oh My Pi only)
 
-Run `/prd-to-code <slug>` with the PRD at `.scratch/<slug>/PRD.md`. That single command is the only manual step — everything after it runs automatically.
+Run `/prd-to-code <slug>` with the spec at `.scratch/<slug>/spec.md`. That single command is the only manual step — everything after it runs automatically.
 
 ```mermaid
 flowchart TD
     PRE["Prerequisites:<br/>to-tickets skill<br/>+ tdd skill + tdd agent"] -.-> P
-    P["PRD at<br/>.scratch/&lt;slug&gt;/PRD.md"] --> C["/prd-to-code &lt;slug&gt;<br/><b>manual kickoff</b>"]
+    P["Spec at<br/>.scratch/&lt;slug&gt;/spec.md"] --> C["/prd-to-code &lt;slug&gt;<br/><b>manual kickoff</b>"]
     C --> A["to-tickets activated<br/><b>auto</b>"]
     A --> Q{"Tickets generated?"}
     Q -->|"no"| QA["Agent asks questions →<br/>user answers"] --> A
