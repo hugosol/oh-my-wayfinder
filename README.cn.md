@@ -46,7 +46,7 @@
 ```mermaid
 flowchart TD
     S["setup-matt-pocock-skills<br/><i>手动 · 每个仓库一次</i>"] --> W["wayfinder — 建图<br/><b>手动</b>"]
-    W --> G["Grilling：命名目的地 +<br/>侦察雾区<br/>(grilling + domain-modeling)"]
+    W --> G["Grilling：命名目的地 +<br/>侦察雾区<br/>grilling + domain-modeling"]
     G -->|"无雾"| N["不需要地图 — 直接开工"]
     G -->|"有雾"| M["创建 map issue"]
     M --> T["创建 tickets + 布线 blocking"]

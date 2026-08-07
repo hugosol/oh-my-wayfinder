@@ -46,7 +46,7 @@ The planning loop they drive: `wayfinder` charts an effort too big for one sessi
 ```mermaid
 flowchart TD
     S["setup-matt-pocock-skills<br/><i>manual · once per repo</i>"] --> W["wayfinder — chart the map<br/><b>manual</b>"]
-    W --> G["Grilling: name the destination,<br/>scout the fog<br/>(grilling + domain-modeling)"]
+    W --> G["Grilling: name the destination,<br/>scout the fog<br/>grilling + domain-modeling"]
     G -->|"no fog"| N["No map needed —<br/>build directly"]
     G -->|"fog found"| M["Create the map issue"]
     M --> T["Create tickets +<br/>wire blocking edges"]
