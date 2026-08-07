@@ -14,7 +14,7 @@ This repo is a delta on top of Matt's set, so: install upstream first, then over
 
 1. Install Matt's skills: `npx skills@latest add mattpocock/skills`.
 2. Copy this repo's `skills/` directory over the installed skill directory — files with the same name replace upstream's, the rest are plain additions.
-3. Oh My Pi users: copy `extensions/prd-to-code.ts` and `extensions/agents/tdd.md` into your extension setup (the extension finds the `tdd` agent next to itself).
+3. Oh My Pi users: copy `extensions/spec-to-code.ts` and `extensions/agents/tdd.md` into your extension setup (the extension finds the `tdd` agent next to itself).
 
 Then run `/setup-matt-pocock-skills` once per repo, as with the upstream set.
 
@@ -26,7 +26,7 @@ The planning loop they drive: `wayfinder` charts an effort too big for one sessi
 
 **Part 2 — [Oh My Pi](https://github.com/can1357/oh-my-pi) automation extension** (`@oh-my-pi/pi-coding-agent` only)
 
-`/prd-to-code` turns a spec into task tickets and executes them with serial TDD subagents — one command, fully automatic. Irrelevant if you use another agent; ignore it.
+`/spec-to-code` turns a spec into task tickets and executes them with serial TDD subagents — one command, fully automatic. Irrelevant if you use another agent; ignore it.
 
 ## What's new compared to upstream
 
@@ -37,7 +37,7 @@ The planning loop they drive: `wayfinder` charts an effort too big for one sessi
 | `traverse` | **New** | Final audit of a completed map: builds the design tree and walks every branch — dependency coverage, peer symmetry, layer integrity, boundary completeness | After all wayfinder tickets are resolved, before to-spec | **Manual** |
 | `wayfinder` | **Modified** | Upstream skill, reworked: mandates lighthouse + backtracer after every resolved ticket, separates decision tickets (`.scratch/<feature>/decision/`) from task tickets (`issues/`), routes gap decisions through the user | When an effort is too big for one agent session | **Manual** |
 | `setup-matt-pocock-skills` | **Modified** | Upstream setup skill, lightly adapted (tracker options, triage labels, domain-doc layout) | Once per repo, before first use | **Manual** |
-| `prd-to-code` + `tdd` agent | **Extension** (OMP only) | Spec → task tickets → serial TDD subagents, fully automatic after one command | When you have a spec you want implemented | **Manual kickoff**, then automatic |
+| `spec-to-code` + `tdd` agent | **Extension** (OMP only) | Spec → task tickets → serial TDD subagents, fully automatic after one command | When you have a spec you want implemented | **Manual kickoff**, then automatic |
 
 "Auto" means the calling skill mandates the step as part of its flow — an instruction-level guarantee, not a separate scheduler.
 
@@ -78,14 +78,14 @@ flowchart TD
 
 Legend: blue outline = new skills in this repo · green = auto-invoked · orange = manual trigger · purple = one-time setup · gray dashed = upstream / beyond this repo.
 
-## Flow B — `/prd-to-code`: spec to code (Oh My Pi only)
+## Flow B — `/spec-to-code`: spec to code (Oh My Pi only)
 
-Run `/prd-to-code <slug>` with the spec at `.scratch/<slug>/spec.md`. That single command is the only manual step — everything after it runs automatically.
+Run `/spec-to-code <slug>` with the spec at `.scratch/<slug>/spec.md`. That single command is the only manual step — everything after it runs automatically.
 
 ```mermaid
 flowchart TD
     PRE["Prerequisites:<br/>to-tickets skill<br/>+ tdd skill + tdd agent"] -.-> P
-    P["Spec at<br/>.scratch/&lt;slug&gt;/spec.md"] --> C["/prd-to-code &lt;slug&gt;<br/><b>manual kickoff</b>"]
+    P["Spec at<br/>.scratch/&lt;slug&gt;/spec.md"] --> C["/spec-to-code &lt;slug&gt;<br/><b>manual kickoff</b>"]
     C --> A["to-tickets activated<br/><b>auto</b>"]
     A --> Q{"Tickets generated?"}
     Q -->|"no"| QA["Agent asks questions →<br/>user answers"] --> A

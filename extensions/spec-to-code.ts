@@ -4,7 +4,7 @@
  * Phase 1: /to-tickets  → generate ticket files from spec
  * Phase 2: /tdd          → develop based on ticket files
  *
- * Usage: /prd-to-code <slug>
+ * Usage: /spec-to-code <slug>
  *   Spec at:  .scratch/<slug>/spec.md
  *   Tickets: .scratch/<slug>/issues/*.md
  */
@@ -116,7 +116,7 @@ async function startPhase2(pi: ExtensionAPI, slug: string): Promise<void> {
 // Extension entry point
 // ============================================================================
 
-export default function prdToCode(pi: ExtensionAPI): void {
+export default function specToCode(pi: ExtensionAPI): void {
 	pi.setLabel("Spec-to-Code");
 
 	pi.on("agent_end", async (_event, _ctx) => {
@@ -134,13 +134,13 @@ export default function prdToCode(pi: ExtensionAPI): void {
 		}
 	});
 
-	pi.registerCommand("prd-to-code", {
+	pi.registerCommand("spec-to-code", {
 		description: "Autonomous Spec → Tickets → Code workflow",
 		handler: async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
 			const slug = args.trim();
 
 			if (!slug) {
-				ctx.ui.notify("用法: /prd-to-code <slug>", "error");
+				ctx.ui.notify("用法: /spec-to-code <slug>", "error");
 				return;
 			}
 
