@@ -46,11 +46,11 @@
 ```mermaid
 flowchart TD
     S["setup-matt-pocock-skills<br/><i>手动 · 每个仓库一次</i>"] --> W["wayfinder — 建图<br/><b>手动</b>"]
-    W --> G["Grilling：命名目的地 + 侦察雾区<br/>(grilling + domain-modeling)"]
+    W --> G["Grilling：命名目的地 +<br/>侦察雾区<br/>(grilling + domain-modeling)"]
     G -->|"无雾"| N["不需要地图 — 直接开工"]
     G -->|"有雾"| M["创建 map issue"]
     M --> T["创建 tickets + 布线 blocking"]
-    T --> L["票循环：claim → 解析 → 写 design ticket"]
+    T --> L["票循环：claim → 解析 →<br/>写 design ticket"]
     L --> LH["lighthouse<br/><b>自动</b>"]
     LH --> BT["backtracer<br/><b>自动</b>"]
     BT --> CG{"列出遗漏点<br/>用户决定"}
@@ -84,8 +84,8 @@ PRD 位于 `.scratch/<slug>/PRD.md`，运行 `/prd-to-code <slug>`。这一条�
 
 ```mermaid
 flowchart LR
-    PRE["前置：to-tickets skill + tdd skill + tdd agent"] -.-> P
-    P["PRD 文件 .scratch/&lt;slug&gt;/PRD.md"] --> C["/prd-to-code &lt;slug&gt;<br/><b>手动启动</b>"]
+    PRE["前置：to-tickets skill<br/>+ tdd skill + tdd agent"] -.-> P
+    P["PRD 文件<br/>.scratch/&lt;slug&gt;/PRD.md"] --> C["/prd-to-code &lt;slug&gt;<br/><b>手动启动</b>"]
     C --> A["激活 to-tickets<br/><b>自动</b>"]
     A --> Q{"tickets 已生成?"}
     Q -->|"否"| QA["agent 提问 → 用户回答"] --> A
