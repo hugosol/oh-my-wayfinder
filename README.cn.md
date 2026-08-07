@@ -60,7 +60,7 @@ flowchart TD
     TR --> CG2{"列出遗漏点<br/>用户决定"}
     CG2 -->|"创建新票"| T
     CG2 -->|"接受"| TS["to-spec — 上游 skill"]
-    TS -.->|"to-tickets / implement — 上游"| X["…"]
+    TS -.->|"to-tickets / implement"| X["…"]
 
     style LH fill:#e6ffe6,stroke:#2b6cb0,stroke-width:2px
     style BT fill:#e6ffe6,stroke:#2b6cb0,stroke-width:2px

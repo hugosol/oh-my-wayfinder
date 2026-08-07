@@ -60,7 +60,7 @@ flowchart TD
     TR --> CG2{"Gaps listed<br/>user decides"}
     CG2 -->|"create ticket"| T
     CG2 -->|"accept"| TS["to-spec — upstream skill"]
-    TS -.->|"to-tickets / implement — upstream"| X["…"]
+    TS -.->|"to-tickets / implement"| X["…"]
 
     style LH fill:#e6ffe6,stroke:#2b6cb0,stroke-width:2px
     style BT fill:#e6ffe6,stroke:#2b6cb0,stroke-width:2px
