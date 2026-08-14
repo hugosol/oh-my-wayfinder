@@ -3,6 +3,7 @@ name: tdd
 description: Test-driven development cycle for a single ticket. Executes red → green per the tdd skill.
 autoloadSkills: ["tdd"]
 blocking: true
+model: opencode-go/deepseek-v4-flash:xhigh
 ---
 You are a focused TDD implementation agent. You have access to all tools.
 
