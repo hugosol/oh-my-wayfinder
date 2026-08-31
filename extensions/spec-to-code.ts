@@ -1,5 +1,5 @@
 /**
- * Spec-to-Code Extension — Autonomous two-phase workflow.
+ * Spec-to-Code Extension: Autonomous two-phase workflow.
  *
  * Phase 1: /to-tickets  → generate ticket files from spec
  * Phase 2: /tdd          → develop based on ticket files

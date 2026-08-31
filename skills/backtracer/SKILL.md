@@ -1,11 +1,11 @@
 ---
 name: backtracer
-description: Trace user stories and design patterns from resolved wayfinder tickets back across the map — surfacing missing tickets, layer gaps, and asymmetry before they become bugs. Use after a wayfinder ticket is resolved.
+description: "Trace user stories and design patterns from resolved wayfinder tickets back across the map: surfacing missing tickets, layer gaps, and asymmetry before they become bugs. Use after a wayfinder ticket is resolved."
 ---
 
 A wayfinder map charts decisions one ticket at a time. Each resolved ticket has a decision document (in `decision/`) and a lighthouse document (in `lighthouse/`). The lighthouse document contains user stories with "so that" clauses and invariants declaring patterns the decision aligns with. Backtracer **traces** these signals across the entire map: every "so that" clause, every pattern statement, every implicit dependency in ticket bodies. Where a signal doesn't land on a corresponding ticket, that's a gap.
 
-Backtracer does not judge whether a gap matters — it traces and reports. The human judges.
+Backtracer does not judge whether a gap matters. It traces and reports. The human judges.
 
 ## Process
 
@@ -16,17 +16,17 @@ Load the wayfinder map (label `wayfinder:map`). Read the map body, then fetch:
 - **Resolved tickets**: all tickets from **Decisions so far**. For each, read its decision ticket body and its lighthouse document.
 - **Open tickets**: all child issues not in Decisions so far. Read each body.
 
-Lighthouse documents must follow the format defined in **/lighthouse**'s [SKILL.md](../lighthouse/SKILL.md) (the `<lighthouse-template>`). If a lighthouse document doesn't follow this format, still read the decision ticket body — body-level trace (Step 2c) runs on every ticket regardless.
+Lighthouse documents must follow the format defined in **/lighthouse**'s [SKILL.md](../lighthouse/SKILL.md) (the `<lighthouse-template>`). If a lighthouse document doesn't follow this format, still read the decision ticket body; body-level trace (Step 2c) runs on every ticket regardless.
 
 Completion criterion: map body + every decision ticket body + every lighthouse document loaded and ready.
 
 ### 2. Extract signals
 
-Extract three kinds of signals. These are mechanical extractions — pattern match, don't interpret.
+Extract three kinds of signals. These are mechanical extractions: pattern match, don't interpret.
 
-**a) Intent signals** — from each lighthouse document's `## 用户故事` section:
+**a) Intent signals**: from each lighthouse document's `## 用户故事` section:
 
-For each "so that" clause, extract the **key noun phrases and verb phrases** — the concrete things the user wants and the actions they enable. Examples:
+For each "so that" clause, extract the **key noun phrases and verb phrases**: the concrete things the user wants and the actions they enable. Examples:
 
 | "so that" clause | Extracted signals |
 |---|---|
@@ -34,16 +34,16 @@ For each "so that" clause, extract the **key noun phrases and verb phrases** —
 | "so that users can operate the strategy from the command line" | `command line`, `operate strategy` |
 | "so that the engine can iterate day-by-day and bar-by-bar" | `iterate day-by-day`, `iterate bar-by-bar` |
 
-Discard connectors ("the", "a", "can", "is") — keep only the nouns and verbs that would appear in a ticket title or body.
+Discard connectors ("the", "a", "can", "is"). Keep only the nouns and verbs that would appear in a ticket title or body.
 
-**b) Pattern signals** — from each lighthouse document's `## 不变量` section:
+**b) Pattern signals**: from each lighthouse document's `## 不变量` section:
 
 For each invariant that declares pattern alignment (e.g. "new engine types follow the same conventions"), extract:
 
-- The **pattern name** — what existing category this aligns with (e.g. "daily engine")
-- The **surface items** — the concrete things that category has (e.g. bat scripts, dashboard cards, CLI entry, config directory)
+- The **pattern name**: what existing category this aligns with (e.g. "daily engine")
+- The **surface items**: the concrete things that category has (e.g. bat scripts, dashboard cards, CLI entry, config directory)
 
-**c) Dependency signals** — from every ticket body (resolved and open):
+**c) Dependency signals**: from every ticket body (resolved and open):
 
 Scan each decision ticket's body for words that imply a prerequisite action. Key patterns:
 
@@ -63,7 +63,7 @@ Completion criterion: every lighthouse document processed for intent and pattern
 
 For each extracted signal, search **all decision ticket bodies** (resolved and open). A signal is **covered** if at least one ticket body contains the signal's key terms. A signal with no match is a **gap**.
 
-Exception: if the signal appears only in the same ticket that produced it, it is NOT self-covered — the trace looks for a *different* ticket.
+Exception: if the signal appears only in the same ticket that produced it, it is NOT self-covered; the trace looks for a *different* ticket.
 
 **Peer symmetry trace**: for each pattern signal, collect all surface items from the pattern name (e.g. "daily engine" → bat, dashboard, CLI, config). Then collect all surface items from tickets belonging to the new concept (e.g. decision tickets tagged or titled with the new engine type). Items present in the pattern but absent from the new concept are **peer asymmetry gaps**.
 
@@ -71,14 +71,14 @@ Exception: if the signal appears only in the same ticket that produced it, it is
 
 **Layer-integrity trace**: for each decision ticket body, check whether its content describes actions belonging to a different layer than the ticket's stated purpose. A scan ticket describing nested loops is an engine-layer action → **layer violation**.
 
-Completion criterion: every signal traced. Three lists built — covered, gaps, violations.
+Completion criterion: every signal traced. Three lists built: covered, gaps, violations.
 
 ### 4. Report gaps
 
 Present a gap report. Use this exact format:
 
 ```
-## Trace Report — <ticket title>
+## Trace Report: <ticket title>
 
 ### Intent gaps
 - **Missing operational surface**: "<signal>" from "<so that clause>" → no ticket covers it
@@ -89,13 +89,13 @@ Present a gap report. Use this exact format:
 - **Missing prerequisite**: ticket <name> implies dependency on "<signal>" → no ticket exists for it
 
 ### Layer violations
-- **Wrong layer**: ticket <name> contains <action> — belongs in <layer>, not <current layer>
+- **Wrong layer**: ticket <name> contains <action>; belongs in <layer>, not <current layer>
 
 ### Peer asymmetry
-- **Missing from <new concept>**: <surface item> — present in <pattern name> but absent here
+- **Missing from <new concept>**: <surface item>; present in <pattern name> but absent here
 ```
 
-Group gaps by type. Don't merge — a signal that appears in both Intent and Layer sections stays in both. The user sees every angle.
+Group gaps by type. Don't merge. A signal that appears in both Intent and Layer sections stays in both. The user sees every angle.
 
 Completion criterion: every gap listed under exactly one or more of the four gap types above.
 
@@ -103,10 +103,10 @@ Completion criterion: every gap listed under exactly one or more of the four gap
 
 For each gap, ask the user: "Create a ticket for this?" The user responds with one of:
 
-- **Yes** → create a child issue of the map, wire its blocking edges
-- **No** → record the reason, move on
-- **Fog** → add to the map's **Not yet specified** if it's in scope but not yet sharp enough to ticket
+- **Yes**: create a child issue of the map, wire its blocking edges
+- **No**: record the reason, move on
+- **Fog**: add to the map's **Not yet specified** if it's in scope but not yet sharp enough to ticket
 
 After resolving all gaps, update the map: remove any **Not yet specified** entries that the new tickets have made specifiable.
 
-Completion criterion: every gap is in one of three terminal states — ticket created, user declined, or deferred to fog.
+Completion criterion: every gap is in one of three terminal states: ticket created, user declined, or deferred to fog.

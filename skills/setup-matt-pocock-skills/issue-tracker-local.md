@@ -25,9 +25,9 @@ Read the file at the referenced path. The user will normally pass the path or th
 
 Used by `/wayfinder`. The **map** is a file with one **child** file per ticket.
 
-- **Map**: `.scratch/<effort>/map.md` — the Notes / Decisions-so-far / Fog body.
+- **Map**: `.scratch/<effort>/map.md`, the Notes / Decisions-so-far / Fog body.
 - **Decision ticket**: `.scratch/<effort>/decision/<NN>-<slug>.md`, numbered from `01`, with the question in the body. A `Type:` line records the ticket type (`research`/`prototype`/`grilling`/`task`); a `Status:` line records `open`/`claimed`/`resolved`.
 - **Blocking**: a `Blocked by: NN, NN` line near the top. A ticket is unblocked when every file it lists is `resolved`.
 - **Frontier**: scan `.scratch/<effort>/decision/` for files that are open, unblocked, and unclaimed; first by number wins.
 - **Claim**: set `Status: claimed` and save before any work.
-- **Resolve**: write the discussion results to the ticket body, then call `/lighthouse` to produce the lighthouse document in `lighthouse/`. Set `Status: resolved`, and append a context pointer (gist + link) to the map's Decisions-so-far in `map.md`.
+- **Resolve**: write the discussion results to the ticket body, then call the Skill tool with "lighthouse" to produce the lighthouse document in `lighthouse/`. Set `Status: resolved`, and append a context pointer (gist + link) to the map's Decisions-so-far in `map.md`.
