@@ -2,9 +2,9 @@
 
 This repo uses two distinct ticket systems with separate status vocabularies.
 
-## Design tickets (wayfinder)
+## Decision tickets (wayfinder)
 
-Design tickets are **planning artifacts** produced by `/wayfinder`. They live in `.scratch/<feature>/design/`. Each design ticket asks "what should we decide?" and its lighthouse document records the decision.
+Decision tickets are **planning artifacts** produced by `/wayfinder`. They live in `.scratch/<feature>/decision/`. Each decision ticket asks "what should we decide?" and its lighthouse document records the decision.
 
 | Status | Meaning |
 |--------|---------|
@@ -12,7 +12,7 @@ Design tickets are **planning artifacts** produced by `/wayfinder`. They live in
 | `claimed` | Agent is actively working on this decision |
 | `resolved` | Decision made and recorded. **NO code has been written.** Implementation happens later via task tickets. |
 
-Design tickets are NEVER implementation tasks. A `resolved` design ticket means the design is locked — not that code exists.
+Decision tickets are NEVER implementation tasks. A `resolved` decision ticket means the decision is locked, not that code exists.
 
 ## Task tickets (to-tickets)
 
@@ -35,4 +35,4 @@ Task tickets are **implementation artifacts** produced by `/to-tickets`. They li
 
 ---
 
-When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from the appropriate ticket type's table above. Design tickets and task tickets use **different** status vocabularies — never cross them.
+When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from the appropriate ticket type's table above. Decision tickets and task tickets use **different** status vocabularies; never cross them.
