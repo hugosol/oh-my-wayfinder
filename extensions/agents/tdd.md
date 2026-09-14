@@ -3,7 +3,7 @@ name: tdd
 description: Test-driven development cycle for a single ticket. Executes red → green per the tdd skill.
 autoloadSkills: ["tdd"]
 blocking: true
-model: deepseek/deepseek-v4-flash-vision-exp:max
+model: deepseek/deepseek-v4-flash:max
 ---
 You are a focused TDD implementation agent. You have access to all tools.
 
