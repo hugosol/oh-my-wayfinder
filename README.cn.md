@@ -4,7 +4,7 @@
 
 **[mattpocock/skills](https://github.com/mattpocock/skills) 的 fork**：为 AI 编程 agent 设计的工程技能集。本仓库在其基础上新增了规划质检类 skill，并为 **[Oh My Pi](https://github.com/can1357/oh-my-pi)** agent 编写了自动化扩展。
 
-本仓库改造上游的四个 skill（`wayfinder`、`setup-matt-pocock-skills`、`to-tickets`、`ask-matt`），并以**完整目录**形式发布（无需改动的文件逐字取自上游），另加新增的 `lighthouse` / `backtracer` / `traverse` 与 Oh My Pi 扩展。请先安装 Matt 的技能集，再把本仓库的文件覆盖上去（见 [快速开始](#快速开始)）。
+本仓库改造上游的五个 skill（`wayfinder`、`setup-matt-pocock-skills`、`to-tickets`、`ask-matt`、`code-review`），并以**完整目录**形式发布（无需改动的文件逐字取自上游），另加新增的 `lighthouse` / `backtracer` / `traverse` 与 Oh My Pi 扩展。请先安装 Matt 的技能集，再把本仓库的文件覆盖上去（见 [快速开始](#快速开始)）。
 
 ## 快速开始
 
@@ -39,6 +39,7 @@
 | `setup-matt-pocock-skills` | **改造** | 上游设置 skill，轻量适配（issue tracker 选项、triage 标签、domain 文档布局） | 每个仓库一次，首次使用前 | **手动** |
 | `to-tickets` | **改造** | 上游 skill：本地 tracker 的输出去向改为 `.scratch/<feature>/implementation/` | 把 spec 或计划拆成票时 | **手动** |
 | `ask-matt` | **改造** | 路由文本：本地 tracker 路径改为 `.scratch/<feature>/implementation/` | 询问该用哪个 skill 时 | **手动** |
+| `code-review` | **改造** | 上游 skill 的重构版：默认 review 目标改为相对 `HEAD` 的未提交改动（含未跟踪文件、遵守 `.gitignore`）；传入固定点仍 review 已提交区间 | review 进行中的工作、分支或 PR 时 | **手动** |
 | `spec-to-code` + `tdd` agent | **扩展**（仅 OMP） | Spec → 实现票 → 串行 TDD 子代理，一条命令后全自动 | 有规格文档并希望实现它时 | **手动启动**，之后全自动 |
 
 「自动」指调用方 skill 在流程中强制触发该步骤，是 skill 指令层面的保证，而非独立的调度器。
@@ -110,14 +111,14 @@ flowchart TD
 
 ## 源文件与构建
 
-四个被改造的 skill 以完整目录发布，与上游的差异以数据形式保存：
+五个被改造的 skill 以完整目录发布，与上游的差异以数据形式保存：
 
-- `upstream/`：整目录拷贝进来的四个上游 skill 目录；里面多出来的文件（例如 `agents/openai.yaml`）无所谓，构建会忽略它们。
-- `deltas/manifest.json` 只保留 `files` 白名单，列出本仓库为这四个 skill 发布的全部九个文件。只有列表中的文件会从 `upstream/` 读取并写入 `skills/`；这两个 `skills/<skill>/` 目录下的其他文件会被构建删除。
-- [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md)、[deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md)、[deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md) 与 [deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md) 同时是映射源文件和人类审核入口。每项映射把目标、ID、理由和 diff 放在一起；白名单中没有映射的文件原样继承。
-- `skills/`：安装产物。`lighthouse`、`backtracer`、`traverse` 为手写；manifest 里列出的九个文件为生成物，**不要手工编辑**。
+- `upstream/`：整目录拷贝进来的五个上游 skill 目录；里面多出来的文件（例如 `agents/openai.yaml`）无所谓，构建会忽略它们。
+- `deltas/manifest.json` 只保留 `files` 白名单，列出本仓库为这五个 skill 发布的全部十个文件。只有列表中的文件会从 `upstream/` 读取并写入 `skills/`；这两个 `skills/<skill>/` 目录下的其他文件会被构建删除。
+- [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md)、[deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md)、[deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md)、[deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md) 与 [deltas/mappings/code-review.md](deltas/mappings/code-review.md) 同时是映射源文件和人类审核入口。每项映射把目标、ID、理由和 diff 放在一起；白名单中没有映射的文件原样继承。
+- `skills/`：安装产物。`lighthouse`、`backtracer`、`traverse` 为手写；manifest 里列出的十个文件为生成物，**不要手工编辑**。
 
-直接在 `deltas/mappings/` 下的四份文档中编辑映射：
+直接在 `deltas/mappings/` 下的五份文档中编辑映射：
 
 - 文档以 `# <skill>` 开头，用 `## <skill>/<file>` 指定有改动且位于白名单内的目标，用 `### <op-id>` 标识映射。ID 使用小写 kebab-case，在同一 skill 内唯一。每项映射包含简短理由和恰好一个反引号围栏的 `diff` 块。
 - 每行第一个字符为 `-`（原文）、`+`（替换文本）或空格（两者共有）。还原文本时只移除这一个字符，其余空白原样保留；空行也必须带标记。使用 LF 换行并保留文件末尾换行。如果 diff 内含 Markdown 代码围栏，使用更长且前后匹配的反引号围栏。
@@ -129,7 +130,7 @@ node deltas/build.mjs          # 重新生成 skills/ 下被列出的文件
 node deltas/build.mjs --check  # 校验它们与 upstream/ + deltas/ 一致
 ```
 
-更新上游快照是手动操作、不涉及 git：把较新上游 checkout 里的 `wayfinder/`、`setup-matt-pocock-skills/`、`to-tickets/` 与 `ask-matt/` 整个目录覆盖到 `upstream/` 下的同名路径，然后运行 `node deltas/build.mjs`，提交前检查 `skills/` 的变化。当上游改写了某个 op 依赖的文本时，构建会大声失败并指出该 op；列表中的文件若被上游删除，构建同样会失败。
+更新上游快照是手动操作、不涉及 git：把较新上游 checkout 里的 `wayfinder/`、`setup-matt-pocock-skills/`、`to-tickets/`、`ask-matt/` 与 `code-review/` 整个目录覆盖到 `upstream/` 下的同名路径，然后运行 `node deltas/build.mjs`，提交前检查 `skills/` 的变化。当上游改写了某个 op 依赖的文本时，构建会大声失败并指出该 op；列表中的文件若被上游删除，构建同样会失败。
 
 ## 致谢
 

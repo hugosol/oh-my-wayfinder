@@ -4,7 +4,7 @@
 
 A fork of **[mattpocock/skills](https://github.com/mattpocock/skills)**, the engineering skills for AI agents. It is extended with new planning-quality skills and an automation extension for the **[Oh My Pi](https://github.com/can1357/oh-my-pi)** agent.
 
-This repository reworks four upstream skills (`wayfinder`, `setup-matt-pocock-skills`, `to-tickets`, `ask-matt`) and ships them as **complete skill directories** (files that need no change are copied from upstream verbatim), plus the new `lighthouse` / `backtracer` / `traverse` skills and the Oh My Pi extension. Install Matt's skills first, then overlay this repo's files on top (see [Quick Start](#quick-start)).
+This repository reworks five upstream skills (`wayfinder`, `setup-matt-pocock-skills`, `to-tickets`, `ask-matt`, `code-review`) and ships them as **complete skill directories** (files that need no change are copied from upstream verbatim), plus the new `lighthouse` / `backtracer` / `traverse` skills and the Oh My Pi extension. Install Matt's skills first, then overlay this repo's files on top (see [Quick Start](#quick-start)).
 
 ## Quick Start
 
@@ -39,6 +39,7 @@ The planning loop they drive: `wayfinder` charts an effort too big for one sessi
 | `setup-matt-pocock-skills` | **Modified** | Upstream setup skill, lightly adapted (tracker options, triage labels, domain-doc layout) | Once per repo, before first use | **Manual** |
 | `to-tickets` | **Modified** | Upstream skill, local-tracker output moved to `.scratch/<feature>/implementation/` | Splitting a spec or plan into tickets | **Manual** |
 | `ask-matt` | **Modified** | Router text: the local tracker path is `.scratch/<feature>/implementation/` | Asking which skill fits | **Manual** |
+| `code-review` | **Modified** | Upstream skill, reworked: the default review target is the uncommitted changes against `HEAD` (untracked files included, `.gitignore` respected); supplying a fixed point still reviews the committed range | Reviewing work in progress, a branch, or a PR | **Manual** |
 | `spec-to-code` + `tdd` agent | **Extension** (OMP only) | Spec → implementation tickets → serial TDD subagents, fully automatic after one command | When you have a spec you want implemented | **Manual kickoff**, then automatic |
 
 "Auto" means the calling skill mandates the step as part of its flow. It is an instruction-level guarantee, not a separate scheduler.
@@ -110,14 +111,14 @@ The `tdd` agent (`extensions/agents/tdd.md`) is the only piece this repo adds to
 
 ## Sources & build
 
-The four reworked skills ship complete, and the divergence from upstream is kept as data:
+The five reworked skills ship complete, and the divergence from upstream is kept as data:
 
-- `upstream/` holds those four upstream skill directories, copied in whole; extra files there (such as `agents/openai.yaml`) are fine and ignored by the build.
-- `deltas/manifest.json` holds only the `files` whitelist: the exact nine files this repo ships for the four skills. Only listed files are read from `upstream/` and written to `skills/`; anything else under those `skills/<skill>/` directories is removed by the build.
-- [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md), [deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md), [deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md) and [deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md) are the mapping sources and the human review entry points. Each mapping keeps its target, ID, reason and diff together. Listed files without mappings are inherited verbatim.
-- `skills/` is the install artifact. `lighthouse`, `backtracer` and `traverse` are hand-written; the nine files listed in the manifest are generated, so do not edit them by hand.
+- `upstream/` holds those five upstream skill directories, copied in whole; extra files there (such as `agents/openai.yaml`) are fine and ignored by the build.
+- `deltas/manifest.json` holds only the `files` whitelist: the exact ten files this repo ships for the five skills. Only listed files are read from `upstream/` and written to `skills/`; anything else under those `skills/<skill>/` directories is removed by the build.
+- [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md), [deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md), [deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md), [deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md) and [deltas/mappings/code-review.md](deltas/mappings/code-review.md) are the mapping sources and the human review entry points. Each mapping keeps its target, ID, reason and diff together. Listed files without mappings are inherited verbatim.
+- `skills/` is the install artifact. `lighthouse`, `backtracer` and `traverse` are hand-written; the ten files listed in the manifest are generated, so do not edit them by hand.
 
-Edit mappings directly in the four documents under `deltas/mappings/`:
+Edit mappings directly in the five documents under `deltas/mappings/`:
 
 - Start with `# <skill>`. Use `## <skill>/<file>` for each changed, whitelisted target, then `### <op-id>` for each mapping. IDs use lowercase kebab-case and are unique within a skill. Each mapping has a short reason and exactly one backtick-fenced `diff` block.
 - Each diff line starts with `-` (original), `+` (replacement), or a space (both). Only that first character is removed when reconstructing the text; preserve all remaining whitespace. Even blank lines need a prefix. Keep LF line endings and a final newline. Use longer matching backtick fences if the diff contains Markdown code fences.
@@ -129,7 +130,7 @@ node deltas/build.mjs          # regenerate the listed files under skills/
 node deltas/build.mjs --check  # verify they still match upstream/ + deltas/
 ```
 
-Bumping the upstream snapshot is manual and needs no git: copy the whole `wayfinder/`, `setup-matt-pocock-skills/`, `to-tickets/` and `ask-matt/` directories from a newer upstream checkout over the same paths under `upstream/`, then run `node deltas/build.mjs` and review the changes under `skills/` before committing. When upstream rewrites text that an op depends on, the build fails loudly and names the op; a listed file that upstream removed fails the build too.
+Bumping the upstream snapshot is manual and needs no git: copy the whole `wayfinder/`, `setup-matt-pocock-skills/`, `to-tickets/`, `ask-matt/` and `code-review/` directories from a newer upstream checkout over the same paths under `upstream/`, then run `node deltas/build.mjs` and review the changes under `skills/` before committing. When upstream rewrites text that an op depends on, the build fails loudly and names the op; a listed file that upstream removed fails the build too.
 
 ## Thanks
 
