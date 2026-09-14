@@ -79,24 +79,24 @@ Every ticket is either **HITL** (human in the loop, worked _with_ a human who sp
 - **Grilling** (HITL): Conversation. The default case. Always call the Skill tool twice, for "grilling" and "domain-modeling".
 - **Task** (HITL or AFK): Manual work that must happen before a _decision_ can be made: nothing to decide, prototype, or research, but the discussion is blocked until it's done. Signing up for a service so its API can be judged, provisioning access, moving data so its shape can be seen. This is the one type that _does_ rather than decides, and it earns its place by unblocking a decision, not by delivering the destination. The agent drives it alone where it can (AFK); otherwise it hands the human a precise checklist (HITL). Resolved when the work is done; the answer records what was done and any resulting facts (credentials location, new URLs, row counts) later tickets depend on.
 
-## Decision tickets vs task tickets
+## Decision tickets vs implementation tickets
 
 This map produces **decision tickets**: planning artifacts that capture decisions. Each asks "what should we decide?" Decision tickets live in `.scratch/<feature>/decision/` and use the Decision ticket status vocabulary (`open` → `claimed` → `resolved`).
 
 A `resolved` decision ticket means the decision is locked. **NO code has been written.** Implementation is a separate phase.
 
-**Task tickets** are a different artifact, produced later by `/to-tickets` from the to-spec document. They live in `.scratch/<feature>/issues/` and use the Task ticket status vocabulary (`ready-for-agent` → `in-progress` → `closed`). Task tickets are consumed by `/implement`.
+**Implementation tickets** are a different artifact, produced later by `/to-tickets` from the to-spec document. They live in `.scratch/<feature>/implementation/` and use the Implementation ticket status vocabulary (`ready-for-agent` → `in-progress` → `closed`). Implementation tickets are consumed by `/implement`.
 
-| | Decision ticket | Task ticket |
+| | Decision ticket | Implementation ticket |
 |---|---|---|
 | Produced by | `/wayfinder` | `/to-tickets` |
-| Directory | `decision/` | `issues/` |
+| Directory | `decision/` | `implementation/` |
 | Question | What should we decide? | What should we build? |
 | Statuses | `open` → `claimed` → `resolved` | `ready-for-agent` → `in-progress` → `closed` |
 | `resolved` means | Decision locked, no code | N/A; use `closed` |
 | `closed` means | N/A; use `resolved` | Code implemented, tested, merged |
 
-NEVER mark a decision ticket with a task ticket status, or vice versa. NEVER assume a resolved decision ticket means code exists.
+NEVER mark a decision ticket with an implementation ticket status, or vice versa. NEVER assume a resolved decision ticket means code exists.
 
 ## Fog of war
 
@@ -141,7 +141,7 @@ User invokes with a map (URL or number). A ticket is **optional**: without one, 
 0. **Load the tracker vocabulary.** Read `docs/agents/triage-labels.md` and `docs/agents/issue-tracker.md`.
    - This map produces **decision tickets**: use the Decision ticket status vocabulary.
    - Key: `resolved` means "Decision made, implementation pending"; NOT "code implemented".
-   - Decision tickets (in `decision/`) and task tickets (in `issues/`) are different systems with **non-overlapping status vocabularies**.
+   - Decision tickets (in `decision/`) and implementation tickets (in `implementation/`) are different systems with **non-overlapping status vocabularies**.
 
 1. Load the **map**: the low-res view, not every ticket body.
 2. Choose the ticket. If the user named one, use it. Otherwise take the first frontier ticket in order. **Claim it**: assign it to yourself before any work.

@@ -8,23 +8,23 @@ Two ticket vocabularies instead of five canonical roles.
 
 ```diff
 -- **Triage labels**: the strings used for the five canonical triage roles
-+- **Triage labels**: the strings used for issue statuses, with separate vocabularies for decision tickets and task tickets
++- **Triage labels**: the strings used for issue statuses, with separate vocabularies for decision tickets and implementation tickets
 ```
 
 ### section-b-defaults
 
-Section B asks about the decision and task vocabularies plus the shared labels.
+Section B asks about the decision and implementation vocabularies plus the shared labels.
 
 ```diff
 -The defaults are the five canonical roles, each label string equal to its name: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. On **yes**, write them as-is. Only if the user says no, usually because their tracker already uses other names (e.g. `bug:triage` for `needs-triage`), collect the overrides so `triage` applies existing labels instead of creating duplicates.
-+The defaults define two ticket systems with separate status vocabularies: Decision tickets (`open` / `claimed` / `resolved`) and Task tickets (`ready-for-agent` / `ready-for-human` / `in-progress` / `closed`), plus shared labels (`needs-triage` / `needs-info` / `wontfix`). On **yes**, write them as-is. Only if the user says no (usually because their tracker already uses other names) collect the overrides so `triage` applies existing labels instead of creating duplicates.
++The defaults define two ticket systems with separate status vocabularies: Decision tickets (`open` / `claimed` / `resolved`) and Implementation tickets (`ready-for-agent` / `ready-for-human` / `in-progress` / `closed`), plus shared labels (`needs-triage` / `needs-info` / `wontfix`). On **yes**, write them as-is. Only if the user says no (usually because their tracker already uses other names) collect the overrides so `triage` applies existing labels instead of creating duplicates.
 ```
 
 ## setup-matt-pocock-skills/triage-labels.md
 
 ### triage-labels-body
 
-Use separate decision and task vocabularies rather than mapping every ticket to the same five roles.
+Use separate decision and implementation vocabularies rather than mapping every ticket to the same five roles.
 
 ```diff
 -The skills speak in terms of five canonical triage roles. This file maps those roles to the actual label strings used in this repo's issue tracker.
@@ -47,13 +47,13 @@ Use separate decision and task vocabularies rather than mapping every ticket to 
 +|--------|---------|
 +| `open` | Not yet claimed by an agent |
 +| `claimed` | Agent is actively working on this decision |
-+| `resolved` | Decision made and recorded. **NO code has been written.** Implementation happens later via task tickets. |
++| `resolved` | Decision made and recorded. **NO code has been written.** Code is written later from implementation tickets. |
 +
 +Decision tickets are NEVER implementation tasks. A `resolved` decision ticket means the decision is locked, not that code exists.
 +
-+## Task tickets (to-tickets)
++## Implementation tickets (to-tickets)
 +
-+Task tickets are **implementation artifacts** produced by `/to-tickets`. They live in `.scratch/<feature>/issues/`. Each task ticket is a tracer-bullet vertical slice that delivers working, testable behaviour.
++Implementation tickets are produced by `/to-tickets`. They live in `.scratch/<feature>/implementation/`. Each implementation ticket is a tracer-bullet vertical slice that delivers working, testable behaviour.
 +
 +| Status | Meaning |
 +|--------|---------|
@@ -72,30 +72,30 @@ Use separate decision and task vocabularies rather than mapping every ticket to 
 +
 +---
 +
-+When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from the appropriate ticket type's table above. Decision tickets and task tickets use **different** status vocabularies; never cross them.
++When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from the appropriate ticket type's table above. Decision tickets and implementation tickets use **different** status vocabularies; never cross them.
 ```
 
 ## setup-matt-pocock-skills/issue-tracker-local.md
 
 ### local-conventions
 
-decision/ and issues/ are separate ticket directories.
+decision/ and implementation/ are separate ticket directories.
 
 ```diff
 -- Implementation issues are one file per ticket at `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`, never a single combined tickets file
 +- **Decision tickets** (planning): `.scratch/<feature-slug>/decision/<NN>-<slug>.md`, numbered from `01`
 +  → Produced by `/wayfinder`. Use Decision ticket statuses from `triage-labels.md`.
-+- **Task tickets** (implementation): `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`
-+  → Produced by `/to-tickets`. Use Task ticket statuses from `triage-labels.md`.
++- **Implementation tickets**: `.scratch/<feature-slug>/implementation/<NN>-<slug>.md`, numbered from `01`
++  → Produced by `/to-tickets`. Use Implementation ticket statuses from `triage-labels.md`.
 ```
 
 ### local-publish
 
-Publishing routes decision tickets to decision/ and task tickets to issues/.
+Publishing routes decision tickets to decision/ and implementation tickets to implementation/.
 
 ```diff
 -Create a new file under `.scratch/<feature-slug>/` (creating the directory if needed).
-+Create a new file under `.scratch/<feature-slug>/` (creating the directory if needed). Decision tickets go in `decision/`; task tickets go in `issues/`.
++Create a new file under `.scratch/<feature-slug>/` (creating the directory if needed). Decision tickets go in `decision/`; implementation tickets go in `implementation/`.
 ```
 
 ### local-map-and-child

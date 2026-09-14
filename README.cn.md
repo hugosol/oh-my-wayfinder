@@ -4,7 +4,7 @@
 
 **[mattpocock/skills](https://github.com/mattpocock/skills) 的 fork**：为 AI 编程 agent 设计的工程技能集。本仓库在其基础上新增了规划质检类 skill，并为 **[Oh My Pi](https://github.com/can1357/oh-my-pi)** agent 编写了自动化扩展。
 
-本仓库改造上游的两个 skill（`wayfinder`、`setup-matt-pocock-skills`），并以**完整目录**形式发布（无需改动的文件逐字取自上游），另加新增的 `lighthouse` / `backtracer` / `traverse` 与 Oh My Pi 扩展。请先安装 Matt 的技能集，再把本仓库的文件覆盖上去（见 [快速开始](#快速开始)）。
+本仓库改造上游的四个 skill（`wayfinder`、`setup-matt-pocock-skills`、`to-tickets`、`ask-matt`），并以**完整目录**形式发布（无需改动的文件逐字取自上游），另加新增的 `lighthouse` / `backtracer` / `traverse` 与 Oh My Pi 扩展。请先安装 Matt 的技能集，再把本仓库的文件覆盖上去（见 [快速开始](#快速开始)）。
 
 ## 快速开始
 
@@ -26,7 +26,7 @@
 
 **第二部分：[Oh My Pi](https://github.com/can1357/oh-my-pi) 自动化扩展**（仅 `@oh-my-pi/pi-coding-agent`）
 
-`/spec-to-code` 把一份 spec 自动切分为任务票，并用串行 TDD 子代理逐个实现。一条命令，全流程自动。使用其他 agent 的读者可以完全忽略这部分。
+`/spec-to-code` 把一份 spec 自动切分为实现票，并用串行 TDD 子代理逐个实现。一条命令，全流程自动。使用其他 agent 的读者可以完全忽略这部分。
 
 ## 相比上游新增了什么
 
@@ -35,17 +35,21 @@
 | `lighthouse` | **新增** | 把已解决的 wayfinder 票固化为灯塔文档：决策、用户故事、前置条件、后置条件、不变量，是 backtracer 追踪的信号源 | 每张 wayfinder 票解决后立即执行 | **自动**（由 wayfinder 调用） |
 | `backtracer` | **新增** | 把票与灯塔文档中的 "so that" 子句、不变量、依赖信号回溯到整张地图，在缺口变成 bug 之前暴露缺失票、层次缺口与不对称 | lighthouse 之后，每张已解决票执行一次 | **自动**（由 wayfinder 调用） |
 | `traverse` | **新增** | 已完成地图的终审：构建设计树并走查每条分支，检查依赖覆盖、同级对称、层次完整、边界完备 | 所有 wayfinder 票解决后、进入 to-spec 之前 | **手动** |
-| `wayfinder` | **改造** | 上游 skill 的重构版：每张票解决后强制 lighthouse + backtracer，区分决策票（`.scratch/<feature>/decision/`）与任务票（`issues/`），缺口决策交由用户拍板 | 当工作量超出单个 agent 会话时 | **手动** |
+| `wayfinder` | **改造** | 上游 skill 的重构版：每张票解决后强制 lighthouse + backtracer，区分决策票（`.scratch/<feature>/decision/`）与实现票（`.scratch/<feature>/implementation/`），缺口决策交由用户拍板 | 当工作量超出单个 agent 会话时 | **手动** |
 | `setup-matt-pocock-skills` | **改造** | 上游设置 skill，轻量适配（issue tracker 选项、triage 标签、domain 文档布局） | 每个仓库一次，首次使用前 | **手动** |
-| `spec-to-code` + `tdd` agent | **扩展**（仅 OMP） | Spec → 任务票 → 串行 TDD 子代理，一条命令后全自动 | 有规格文档并希望实现它时 | **手动启动**，之后全自动 |
+| `to-tickets` | **改造** | 上游 skill：本地 tracker 的输出去向改为 `.scratch/<feature>/implementation/` | 把 spec 或计划拆成票时 | **手动** |
+| `ask-matt` | **改造** | 路由文本：本地 tracker 路径改为 `.scratch/<feature>/implementation/` | 询问该用哪个 skill 时 | **手动** |
+| `spec-to-code` + `tdd` agent | **扩展**（仅 OMP） | Spec → 实现票 → 串行 TDD 子代理，一条命令后全自动 | 有规格文档并希望实现它时 | **手动启动**，之后全自动 |
 
 「自动」指调用方 skill 在流程中强制触发该步骤，是 skill 指令层面的保证，而非独立的调度器。
 
 ## 暂不支持 GitHub / GitLab tracker
 
-管线中「自动」的那部分（每张票解决后强制 lighthouse + backtracer）目前只针对**本地 markdown tracker**（`.scratch/<feature>/decision/`）设计。GitHub 与 GitLab 的 tracker 配置原样来自上游，描述的仍是上游原本的 resolve 步骤，因此这两种场景暂不支持。
+管线中「自动」的那部分（每张票解决后强制 lighthouse + backtracer）目前只针对**本地 markdown tracker**（`.scratch/<feature>/decision/` 用于规划、`.scratch/<feature>/implementation/` 用于实现票）设计。GitHub 与 GitLab 的 tracker 配置原样来自上游，描述的仍是上游原本的 resolve 步骤，因此这两种场景暂不支持。
 
 这是有意留到后续的步骤，不是遗漏。
+
+**本地目录改名（对本地 tracker 是破坏性变更）**：实现票从 `.scratch/<feature>/issues/` 移到 `.scratch/<feature>/implementation/`，术语也从「任务票」改为「实现票」；已配置过的仓库不会被自动迁移。
 
 ## 流程图 A：wayfinder 规划管线
 
@@ -80,7 +84,7 @@ flowchart TD
 - 整条管线只有两个手动触发点：`wayfinder` 本身和 `traverse`（终审）。
 - `lighthouse` 与 `backtracer` 由 wayfinder 在每张票解决后自动调用。
 - `backtracer`（逐票）与 `traverse`（收尾）之后，skill 会列出它发现的遗漏点。skill 文件本身不规定如何处理：由用户决定。建议的处理方式：创建新票、就在当前会话用 grilling 消化、或记入地图的 **Not yet specified**（雾区）。
-- 管线在 `to-spec` 处交接给上游。之后的 `to-tickets`、`implement` 属于 mattpocock/skills，不在本仓库。
+- 管线在 `to-spec` 处交接给上游。`implement` 属于 mattpocock/skills；本仓库 vendoring `to-tickets` 与 `ask-matt` 仅用于修改本地票目录。
 
 颜色图例：蓝色粗边框 = 本仓库新增的 skill · 绿色 = 自动调用 · 橙色 = 手动触发 · 紫色 = 一次性 setup · 灰色虚线 = 上游 / 本仓库之外。
 
@@ -106,12 +110,12 @@ flowchart TD
 
 ## 源文件与构建
 
-两个被改造的 skill 以完整目录发布，与上游的差异以数据形式保存：
+四个被改造的 skill 以完整目录发布，与上游的差异以数据形式保存：
 
-- `upstream/`：整目录拷贝进来的两个上游 skill 目录；里面多出来的文件（例如 `agents/openai.yaml`）无所谓，构建会忽略它们。
-- `deltas/manifest.json` 只保留 `files` 白名单，列出本仓库为这两个 skill 发布的全部七个文件。只有列表中的文件会从 `upstream/` 读取并写入 `skills/`；这两个 `skills/<skill>/` 目录下的其他文件会被构建删除。
-- [deltas/wayfinder.md](deltas/wayfinder.md) 和 [deltas/setup-matt-pocock-skills.md](deltas/setup-matt-pocock-skills.md) 同时是映射源文件和人类审核入口。每项映射把目标、ID、理由和 diff 放在一起；白名单中没有映射的文件原样继承。
-- `skills/`：安装产物。`lighthouse`、`backtracer`、`traverse` 为手写；manifest 里列出的七个文件为生成物，**不要手工编辑**。
+- `upstream/`：整目录拷贝进来的四个上游 skill 目录；里面多出来的文件（例如 `agents/openai.yaml`）无所谓，构建会忽略它们。
+- `deltas/manifest.json` 只保留 `files` 白名单，列出本仓库为这四个 skill 发布的全部九个文件。只有列表中的文件会从 `upstream/` 读取并写入 `skills/`；这两个 `skills/<skill>/` 目录下的其他文件会被构建删除。
+- [deltas/wayfinder.md](deltas/wayfinder.md)、[deltas/setup-matt-pocock-skills.md](deltas/setup-matt-pocock-skills.md)、[deltas/to-tickets.md](deltas/to-tickets.md) 与 [deltas/ask-matt.md](deltas/ask-matt.md) 同时是映射源文件和人类审核入口。每项映射把目标、ID、理由和 diff 放在一起；白名单中没有映射的文件原样继承。
+- `skills/`：安装产物。`lighthouse`、`backtracer`、`traverse` 为手写；manifest 里列出的九个文件为生成物，**不要手工编辑**。
 
 直接在两份 Markdown 文档中编辑映射：
 
@@ -125,7 +129,7 @@ node deltas/build.mjs          # 重新生成 skills/ 下被列出的文件
 node deltas/build.mjs --check  # 校验它们与 upstream/ + deltas/ 一致
 ```
 
-更新上游快照是手动操作、不涉及 git：把较新上游 checkout 里的 `wayfinder/` 与 `setup-matt-pocock-skills/` 整个目录覆盖到 `upstream/` 下的同名路径，然后运行 `node deltas/build.mjs`，提交前检查 `skills/` 的变化。当上游改写了某个 op 依赖的文本时，构建会大声失败并指出该 op；列表中的文件若被上游删除，构建同样会失败。
+更新上游快照是手动操作、不涉及 git：把较新上游 checkout 里的 `wayfinder/`、`setup-matt-pocock-skills/`、`to-tickets/` 与 `ask-matt/` 整个目录覆盖到 `upstream/` 下的同名路径，然后运行 `node deltas/build.mjs`，提交前检查 `skills/` 的变化。当上游改写了某个 op 依赖的文本时，构建会大声失败并指出该 op；列表中的文件若被上游删除，构建同样会失败。
 
 ## 致谢
 

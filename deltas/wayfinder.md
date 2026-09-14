@@ -16,24 +16,24 @@ The resolution is recorded in the lighthouse document, not as a tracker comment.
 Distinguish planning decisions from implementation tasks so a resolved decision never implies code exists.
 
 ```diff
-+## Decision tickets vs task tickets
++## Decision tickets vs implementation tickets
 +
 +This map produces **decision tickets**: planning artifacts that capture decisions. Each asks "what should we decide?" Decision tickets live in `.scratch/<feature>/decision/` and use the Decision ticket status vocabulary (`open` → `claimed` → `resolved`).
 +
 +A `resolved` decision ticket means the decision is locked. **NO code has been written.** Implementation is a separate phase.
 +
-+**Task tickets** are a different artifact, produced later by `/to-tickets` from the to-spec document. They live in `.scratch/<feature>/issues/` and use the Task ticket status vocabulary (`ready-for-agent` → `in-progress` → `closed`). Task tickets are consumed by `/implement`.
++**Implementation tickets** are a different artifact, produced later by `/to-tickets` from the to-spec document. They live in `.scratch/<feature>/implementation/` and use the Implementation ticket status vocabulary (`ready-for-agent` → `in-progress` → `closed`). Implementation tickets are consumed by `/implement`.
 +
-+| | Decision ticket | Task ticket |
++| | Decision ticket | Implementation ticket |
 +|---|---|---|
 +| Produced by | `/wayfinder` | `/to-tickets` |
-+| Directory | `decision/` | `issues/` |
++| Directory | `decision/` | `implementation/` |
 +| Question | What should we decide? | What should we build? |
 +| Statuses | `open` → `claimed` → `resolved` | `ready-for-agent` → `in-progress` → `closed` |
 +| `resolved` means | Decision locked, no code | N/A; use `closed` |
 +| `closed` means | N/A; use `resolved` | Code implemented, tested, merged |
 +
-+NEVER mark a decision ticket with a task ticket status, or vice versa. NEVER assume a resolved decision ticket means code exists.
++NEVER mark a decision ticket with an implementation ticket status, or vice versa. NEVER assume a resolved decision ticket means code exists.
 +
  ## Fog of war
 ```
@@ -49,13 +49,13 @@ The trigger for ruling a ticket out of scope is a lighthouse decision.
 
 ### work-through-step-0
 
-Load the tracker vocabulary before choosing a ticket so decision and task statuses stay separate.
+Load the tracker vocabulary before choosing a ticket so decision and implementation statuses stay separate.
 
 ```diff
 +0. **Load the tracker vocabulary.** Read `docs/agents/triage-labels.md` and `docs/agents/issue-tracker.md`.
 +   - This map produces **decision tickets**: use the Decision ticket status vocabulary.
 +   - Key: `resolved` means "Decision made, implementation pending"; NOT "code implemented".
-+   - Decision tickets (in `decision/`) and task tickets (in `issues/`) are different systems with **non-overlapping status vocabularies**.
++   - Decision tickets (in `decision/`) and implementation tickets (in `implementation/`) are different systems with **non-overlapping status vocabularies**.
 +
  1. Load the **map**: the low-res view, not every ticket body.
 ```

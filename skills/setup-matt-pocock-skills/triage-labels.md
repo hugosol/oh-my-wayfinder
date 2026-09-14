@@ -10,13 +10,13 @@ Decision tickets are **planning artifacts** produced by `/wayfinder`. They live 
 |--------|---------|
 | `open` | Not yet claimed by an agent |
 | `claimed` | Agent is actively working on this decision |
-| `resolved` | Decision made and recorded. **NO code has been written.** Implementation happens later via task tickets. |
+| `resolved` | Decision made and recorded. **NO code has been written.** Code is written later from implementation tickets. |
 
 Decision tickets are NEVER implementation tasks. A `resolved` decision ticket means the decision is locked, not that code exists.
 
-## Task tickets (to-tickets)
+## Implementation tickets (to-tickets)
 
-Task tickets are **implementation artifacts** produced by `/to-tickets`. They live in `.scratch/<feature>/issues/`. Each task ticket is a tracer-bullet vertical slice that delivers working, testable behaviour.
+Implementation tickets are produced by `/to-tickets`. They live in `.scratch/<feature>/implementation/`. Each implementation ticket is a tracer-bullet vertical slice that delivers working, testable behaviour.
 
 | Status | Meaning |
 |--------|---------|
@@ -35,4 +35,4 @@ Task tickets are **implementation artifacts** produced by `/to-tickets`. They li
 
 ---
 
-When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from the appropriate ticket type's table above. Decision tickets and task tickets use **different** status vocabularies; never cross them.
+When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from the appropriate ticket type's table above. Decision tickets and implementation tickets use **different** status vocabularies; never cross them.
