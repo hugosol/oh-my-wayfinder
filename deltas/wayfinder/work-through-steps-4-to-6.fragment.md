@@ -1,7 +1,7 @@
 4. Write the discussion results to the decision ticket body. Then call the Skill tool with "lighthouse". This is MANDATORY and NON-BYPASSABLE. Close the decision ticket, and append a context pointer to the map's Decisions-so-far.
    - The `lighthouse` skill reads the decision ticket body and the conversation context; confirm the draft with the user, then write it to `lighthouse/<NN>-<slug>.md`.
    - If `lighthouse` is unavailable, STOP. Do not proceed.
-   - The one-line gist for the map's Decisions-so-far comes from the `## 决策` field.
+   - The one-line gist for the map's Decisions-so-far comes from the `## Decision` field.
 5. **Call the Skill tool with "backtracer".** This is MANDATORY and NON-BYPASSABLE.
    - Backtracer reads the map, decision tickets, and lighthouse documents, checks coverage and symmetry, and reports gaps.
    - The user confirms which gaps become new tickets.

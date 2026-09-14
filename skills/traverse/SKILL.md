@@ -1,6 +1,7 @@
 ---
 name: traverse
-description: "Walk the full design tree of a completed wayfinder map: checking dependencies, peer symmetry, layer integrity, and boundary completeness, to surface gaps before to-spec. Use after all wayfinder tickets are resolved, or whenever the map should be audited end-to-end."
+description: "Audit a completed wayfinder map end-to-end: dependency coverage, peer symmetry, layer integrity, boundary completeness."
+disable-model-invocation: true
 ---
 
 All the facts are already in the map, the decision ticket bodies, and the lighthouse documents. Traverse reads them all, builds the design tree, and walks every branch to find gaps: things the map needs but no ticket covers. Only ask the user about gaps the documents can't resolve.

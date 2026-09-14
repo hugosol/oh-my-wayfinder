@@ -4,7 +4,7 @@
 
 **[mattpocock/skills](https://github.com/mattpocock/skills) 的 fork**：为 AI 编程 agent 设计的工程技能集。本仓库在其基础上新增了规划质检类 skill，并为 **[Oh My Pi](https://github.com/can1357/oh-my-pi)** agent 编写了自动化扩展。
 
-本仓库**只包含与上游的差异部分**。请先安装 Matt 的技能集，再把本仓库的文件覆盖上去（见 [快速开始](#快速开始)）。
+本仓库改造上游的两个 skill（`wayfinder`、`setup-matt-pocock-skills`），并以**完整目录**形式发布（无需改动的文件逐字取自上游），另加新增的 `lighthouse` / `backtracer` / `traverse` 与 Oh My Pi 扩展。请先安装 Matt 的技能集，再把本仓库的文件覆盖上去（见 [快速开始](#快速开始)）。
 
 ## 快速开始
 
@@ -40,6 +40,12 @@
 | `spec-to-code` + `tdd` agent | **扩展**（仅 OMP） | Spec → 任务票 → 串行 TDD 子代理，一条命令后全自动 | 有规格文档并希望实现它时 | **手动启动**，之后全自动 |
 
 「自动」指调用方 skill 在流程中强制触发该步骤，是 skill 指令层面的保证，而非独立的调度器。
+
+## 暂不支持 GitHub / GitLab tracker
+
+管线中「自动」的那部分（每张票解决后强制 lighthouse + backtracer）目前只针对**本地 markdown tracker**（`.scratch/<feature>/decision/`）设计。GitHub 与 GitLab 的 tracker 配置原样来自上游，描述的仍是上游原本的 resolve 步骤，因此这两种场景暂不支持。
+
+这是有意留到后续的步骤，不是遗漏。
 
 ## 流程图 A：wayfinder 规划管线
 
@@ -97,6 +103,21 @@ flowchart TD
 ```
 
 `tdd` agent（`extensions/agents/tdd.md`）是本仓库为这条流程新增的唯一部分。`to-tickets` 与 `tdd` skill 本身来自上游。前置条件（`to-tickets` skill、`tdd` skill 或 `tdd` agent）由扩展自动检查、立即报错，无需手动确认。
+
+## 源文件与构建
+
+两个被改造的 skill 以完整目录发布，与上游的差异以数据形式保存：
+
+- `upstream/`：整目录拷贝进来的两个上游 skill 目录；里面多出来的文件（例如 `agents/openai.yaml`）无所谓，构建会忽略它们。
+- `deltas/manifest.json` 是白名单。`files` 列出本仓库为该两个 skill 发布的全部七个文件；`ops` 把每个文件映射到施加在上游原文上的变换对（`<id>.expect.md` 是必须恰好出现一次的文本，`<id>.fragment.md` 是替换文本）。只有列表中的文件会从 `upstream/` 读取并写入 `skills/`；这两个 `skills/<skill>/` 目录下的其他文件会被构建删除。
+- `skills/`：安装产物。`lighthouse`、`backtracer`、`traverse` 为手写；manifest 里列出的七个文件为生成物，**不要手工编辑**。
+
+```bash
+node deltas/build.mjs          # 重新生成 skills/ 下被列出的文件
+node deltas/build.mjs --check  # 校验它们与 upstream/ + deltas/ 一致
+```
+
+更新上游快照是手动操作、不涉及 git：把较新上游 checkout 里的 `wayfinder/` 与 `setup-matt-pocock-skills/` 整个目录覆盖到 `upstream/` 下的同名路径，然后运行 `node deltas/build.mjs`，提交前检查 `skills/` 的变化。当上游改写了某个 op 依赖的文本时，构建会大声失败并指出该 op；列表中的文件若被上游删除，构建同样会失败。
 
 ## 致谢
 

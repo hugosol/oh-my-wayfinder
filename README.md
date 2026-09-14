@@ -4,7 +4,7 @@
 
 A fork of **[mattpocock/skills](https://github.com/mattpocock/skills)**, the engineering skills for AI agents. It is extended with new planning-quality skills and an automation extension for the **[Oh My Pi](https://github.com/can1357/oh-my-pi)** agent.
 
-This repository contains **only what differs from upstream**. Install Matt's skills first, then overlay this repo's files on top (see [Quick Start](#quick-start)).
+This repository reworks two upstream skills (`wayfinder`, `setup-matt-pocock-skills`) and ships them as **complete skill directories** (files that need no change are copied from upstream verbatim), plus the new `lighthouse` / `backtracer` / `traverse` skills and the Oh My Pi extension. Install Matt's skills first, then overlay this repo's files on top (see [Quick Start](#quick-start)).
 
 ## Quick Start
 
@@ -40,6 +40,12 @@ The planning loop they drive: `wayfinder` charts an effort too big for one sessi
 | `spec-to-code` + `tdd` agent | **Extension** (OMP only) | Spec → task tickets → serial TDD subagents, fully automatic after one command | When you have a spec you want implemented | **Manual kickoff**, then automatic |
 
 "Auto" means the calling skill mandates the step as part of its flow. It is an instruction-level guarantee, not a separate scheduler.
+
+## Supported trackers (for now)
+
+The automatic part of this pipeline, the mandatory `lighthouse` and `backtracer` steps after every resolved ticket, is wired for the **local markdown tracker** only (`.scratch/<feature>/decision/`). The GitHub and GitLab tracker setups ship from upstream unchanged and still describe upstream's plain resolve step, so this repo does not support them yet.
+
+That is a deliberate later step, not an oversight.
 
 ## Flow A: the wayfinder planning pipeline
 
@@ -97,6 +103,21 @@ flowchart TD
 ```
 
 The `tdd` agent (`extensions/agents/tdd.md`) is the only piece this repo adds to this loop. The `to-tickets` and `tdd` skills themselves are upstream. The extension fails fast if the `to-tickets` skill, the `tdd` skill, or the `tdd` agent is missing; it checks automatically, with nothing to confirm manually.
+
+## Sources & build
+
+The two reworked skills ship complete, and the divergence from upstream is kept as data:
+
+- `upstream/` holds those two upstream skill directories, copied in whole; extra files there (such as `agents/openai.yaml`) are fine and ignored by the build.
+- `deltas/manifest.json` is the whitelist. `files` lists the exact seven files this repo ships for the two skills; `ops` maps each file to the transform pairs applied to its upstream text (`<id>.expect.md` is text that must occur exactly once, `<id>.fragment.md` is its replacement). Only listed files are read from `upstream/` and written to `skills/`; anything else under those `skills/<skill>/` directories is removed by the build.
+- `skills/` is the install artifact. `lighthouse`, `backtracer` and `traverse` are hand-written; the seven files listed in the manifest are generated, so do not edit them by hand.
+
+```bash
+node deltas/build.mjs          # regenerate the listed files under skills/
+node deltas/build.mjs --check  # verify they still match upstream/ + deltas/
+```
+
+Bumping the upstream snapshot is manual and needs no git: copy the whole `wayfinder/` and `setup-matt-pocock-skills/` directories from a newer upstream checkout over the same paths under `upstream/`, then run `node deltas/build.mjs` and review the changes under `skills/` before committing. When upstream rewrites text that an op depends on, the build fails loudly and names the op; a listed file that upstream removed fails the build too.
 
 ## Thanks
 
