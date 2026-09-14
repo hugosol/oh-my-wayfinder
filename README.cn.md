@@ -109,8 +109,16 @@ flowchart TD
 两个被改造的 skill 以完整目录发布，与上游的差异以数据形式保存：
 
 - `upstream/`：整目录拷贝进来的两个上游 skill 目录；里面多出来的文件（例如 `agents/openai.yaml`）无所谓，构建会忽略它们。
-- `deltas/manifest.json` 是白名单。`files` 列出本仓库为该两个 skill 发布的全部七个文件；`ops` 把每个文件映射到施加在上游原文上的变换对（`<id>.expect.md` 是必须恰好出现一次的文本，`<id>.fragment.md` 是替换文本）。只有列表中的文件会从 `upstream/` 读取并写入 `skills/`；这两个 `skills/<skill>/` 目录下的其他文件会被构建删除。
+- `deltas/manifest.json` 只保留 `files` 白名单，列出本仓库为这两个 skill 发布的全部七个文件。只有列表中的文件会从 `upstream/` 读取并写入 `skills/`；这两个 `skills/<skill>/` 目录下的其他文件会被构建删除。
+- [deltas/wayfinder.md](deltas/wayfinder.md) 和 [deltas/setup-matt-pocock-skills.md](deltas/setup-matt-pocock-skills.md) 同时是映射源文件和人类审核入口。每项映射把目标、ID、理由和 diff 放在一起；白名单中没有映射的文件原样继承。
 - `skills/`：安装产物。`lighthouse`、`backtracer`、`traverse` 为手写；manifest 里列出的七个文件为生成物，**不要手工编辑**。
+
+直接在两份 Markdown 文档中编辑映射：
+
+- 文档以 `# <skill>` 开头，用 `## <skill>/<file>` 指定有改动且位于白名单内的目标，用 `### <op-id>` 标识映射。ID 使用小写 kebab-case，在同一 skill 内唯一。每项映射包含简短理由和恰好一个反引号围栏的 `diff` 块。
+- 每行第一个字符为 `-`（原文）、`+`（替换文本）或空格（两者共有）。还原文本时只移除这一个字符，其余空白原样保留；空行也必须带标记。使用 LF 换行并保留文件末尾换行。如果 diff 内含 Markdown 代码围栏，使用更长且前后匹配的反引号围栏。
+- 每个块表达一次连续替换，纯插入必须带已有上下文。这是项目内的精简 diff 格式，没有文件头或 `@@` 行号，不是供 `git apply` 使用的补丁。
+- 同一目标内按文档顺序执行映射，后项处理前项修改后的文本。还原出的原文必须恰好出现一次；定位缺失或有歧义、没有实际改动及格式损坏都会导致构建失败。
 
 ```bash
 node deltas/build.mjs          # 重新生成 skills/ 下被列出的文件

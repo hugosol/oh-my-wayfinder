@@ -1,15 +1,4 @@
 {
-  "$comment": [
-    "Build inputs for the two upstream skills this repo reworks.",
-    "`files` is the whitelist: only these paths are read from upstream/ and written to",
-    "skills/. Anything else under upstream/ is ignored (for example agents/openai.yaml),",
-    "and anything else under the generated skill directories is removed by the build.",
-    "Each op id X resolves to deltas/X.expect.md (text that must occur exactly once in its",
-    "upstream file) and deltas/X.fragment.md (its replacement, applied verbatim). Both files",
-    "must end with a newline. Ops run in listed order per file; anything not covered by an op",
-    "is inherited verbatim from upstream/. Regenerate with `node deltas/build.mjs`; verify",
-    "with `node deltas/build.mjs --check`."
-  ],
   "files": [
     "wayfinder/SKILL.md",
     "setup-matt-pocock-skills/SKILL.md",
@@ -18,67 +7,5 @@
     "setup-matt-pocock-skills/issue-tracker-github.md",
     "setup-matt-pocock-skills/issue-tracker-gitlab.md",
     "setup-matt-pocock-skills/domain.md"
-  ],
-  "ops": {
-    "wayfinder/SKILL.md": [
-      {
-        "id": "wayfinder/answer-recording",
-        "note": "The resolution is recorded in the lighthouse document, not as a tracker comment."
-      },
-      {
-        "id": "wayfinder/decision-tickets-section",
-        "note": "New section separating decision tickets from task tickets. The anchor heading '## Fog of war' is re-emitted at the end of the fragment."
-      },
-      {
-        "id": "wayfinder/out-of-scope-lighthouse-decision",
-        "note": "The trigger for ruling a ticket out of scope is a lighthouse decision."
-      },
-      {
-        "id": "wayfinder/work-through-step-0",
-        "note": "Step 0 loads the tracker vocabulary; the step 1 line is re-emitted."
-      },
-      {
-        "id": "wayfinder/work-through-steps-4-to-6",
-        "note": "Steps 4-6 make lighthouse and backtracer mandatory, replacing upstream's comment-and-close step."
-      }
-    ],
-    "setup-matt-pocock-skills/SKILL.md": [
-      {
-        "id": "setup-matt-pocock-skills/triage-labels-bullet",
-        "note": "Two ticket vocabularies instead of five canonical roles."
-      },
-      {
-        "id": "setup-matt-pocock-skills/section-b-defaults",
-        "note": "Section B asks about the decision and task vocabularies plus the shared labels."
-      }
-    ],
-    "setup-matt-pocock-skills/triage-labels.md": [
-      {
-        "id": "setup-matt-pocock-skills/triage-labels-body",
-        "note": "The five-role mapping table is replaced by the two-vocabulary model; the '# Triage Labels' heading is inherited from upstream."
-      }
-    ],
-    "setup-matt-pocock-skills/issue-tracker-local.md": [
-      {
-        "id": "setup-matt-pocock-skills/local-conventions",
-        "note": "decision/ and issues/ are separate ticket directories."
-      },
-      {
-        "id": "setup-matt-pocock-skills/local-publish",
-        "note": "Publishing routes decision tickets to decision/ and task tickets to issues/."
-      },
-      {
-        "id": "setup-matt-pocock-skills/local-map-and-child",
-        "note": "Child tickets are decision tickets with the open/claimed/resolved vocabulary."
-      },
-      {
-        "id": "setup-matt-pocock-skills/local-frontier",
-        "note": "The frontier scans decision/."
-      },
-      {
-        "id": "setup-matt-pocock-skills/local-resolve",
-        "note": "Resolve runs lighthouse and records the discussion in the ticket body."
-      }
-    ]
-  }
+  ]
 }

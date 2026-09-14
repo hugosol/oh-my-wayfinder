@@ -109,8 +109,16 @@ The `tdd` agent (`extensions/agents/tdd.md`) is the only piece this repo adds to
 The two reworked skills ship complete, and the divergence from upstream is kept as data:
 
 - `upstream/` holds those two upstream skill directories, copied in whole; extra files there (such as `agents/openai.yaml`) are fine and ignored by the build.
-- `deltas/manifest.json` is the whitelist. `files` lists the exact seven files this repo ships for the two skills; `ops` maps each file to the transform pairs applied to its upstream text (`<id>.expect.md` is text that must occur exactly once, `<id>.fragment.md` is its replacement). Only listed files are read from `upstream/` and written to `skills/`; anything else under those `skills/<skill>/` directories is removed by the build.
+- `deltas/manifest.json` holds only the `files` whitelist: the exact seven files this repo ships for the two skills. Only listed files are read from `upstream/` and written to `skills/`; anything else under those `skills/<skill>/` directories is removed by the build.
+- [deltas/wayfinder.md](deltas/wayfinder.md) and [deltas/setup-matt-pocock-skills.md](deltas/setup-matt-pocock-skills.md) are both the mapping sources and the human review entry points. Each mapping keeps its target, ID, reason and diff together. Listed files without mappings are inherited verbatim.
 - `skills/` is the install artifact. `lighthouse`, `backtracer` and `traverse` are hand-written; the seven files listed in the manifest are generated, so do not edit them by hand.
+
+Edit mappings directly in the two Markdown documents:
+
+- Start with `# <skill>`. Use `## <skill>/<file>` for each changed, whitelisted target, then `### <op-id>` for each mapping. IDs use lowercase kebab-case and are unique within a skill. Each mapping has a short reason and exactly one backtick-fenced `diff` block.
+- Each diff line starts with `-` (original), `+` (replacement), or a space (both). Only that first character is removed when reconstructing the text; preserve all remaining whitespace. Even blank lines need a prefix. Keep LF line endings and a final newline. Use longer matching backtick fences if the diff contains Markdown code fences.
+- A block represents one continuous replacement. Pure insertions need existing context. This is a project-local diff format, without file headers or `@@` line numbers, not a `git apply` patch.
+- Mappings run in document order within each target, against the result of earlier mappings. The reconstructed original must occur exactly once; missing or ambiguous locators, no-ops and malformed mappings fail the build.
 
 ```bash
 node deltas/build.mjs          # regenerate the listed files under skills/

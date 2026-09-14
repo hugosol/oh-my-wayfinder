@@ -1,1 +1,0 @@
-- **Triage labels**: the strings used for issue statuses, with separate vocabularies for decision tickets and task tickets
