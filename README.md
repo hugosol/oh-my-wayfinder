@@ -4,7 +4,7 @@
 
 A fork of **[mattpocock/skills](https://github.com/mattpocock/skills)**, the engineering skills for AI agents. It is extended with new planning-quality skills and an automation extension for the **[Oh My Pi](https://github.com/can1357/oh-my-pi)** agent.
 
-This repository contains **only what differs from upstream**. Install Matt's skills first, then overlay this repo's files on top (see [Quick Start](#quick-start)).
+This repository reworks five upstream skills (`wayfinder`, `setup-matt-pocock-skills`, `to-tickets`, `ask-matt`, `code-review`) and ships them as **complete skill directories** (files that need no change are copied from upstream verbatim), plus the new `lighthouse` / `backtracer` / `traverse` skills and the Oh My Pi extension. Install Matt's skills first, then overlay this repo's files on top (see [Quick Start](#quick-start)).
 
 ## Quick Start
 
@@ -26,7 +26,7 @@ The planning loop they drive: `wayfinder` charts an effort too big for one sessi
 
 **Part 2: [Oh My Pi](https://github.com/can1357/oh-my-pi) automation extension** (`@oh-my-pi/pi-coding-agent` only)
 
-`/spec-to-code` turns a spec into task tickets and executes them with serial TDD subagents: one command, fully automatic. Irrelevant if you use another agent; ignore it.
+`/spec-to-code` turns a spec into implementation tickets and executes them with serial TDD subagents: one command, fully automatic. Irrelevant if you use another agent; ignore it.
 
 ## What's new compared to upstream
 
@@ -35,11 +35,22 @@ The planning loop they drive: `wayfinder` charts an effort too big for one sessi
 | `lighthouse` | **New** | Produces a lighthouse document from a resolved wayfinder ticket: the decision, user stories, preconditions, postconditions, and invariants. It is the single source of truth backtracer traces. | Immediately after a wayfinder ticket is resolved | **Auto** (invoked by wayfinder) |
 | `backtracer` | **New** | Traces "so that" clauses, invariants, and dependencies from tickets and lighthouse documents across the whole map, surfacing missing tickets, layer gaps, and asymmetry before they become bugs. | Immediately after lighthouse, once per resolved ticket | **Auto** (invoked by wayfinder) |
 | `traverse` | **New** | Final audit of a completed map: builds the design tree and walks every branch, checking dependency coverage, peer symmetry, layer integrity, and boundary completeness. | After all wayfinder tickets are resolved, before to-spec | **Manual** |
-| `wayfinder` | **Modified** | Upstream skill, reworked: mandates lighthouse + backtracer after every resolved ticket, separates decision tickets (`.scratch/<feature>/decision/`) from task tickets (`issues/`), routes gap decisions through the user | When an effort is too big for one agent session | **Manual** |
+| `wayfinder` | **Modified** | Upstream skill, reworked: mandates lighthouse + backtracer after every resolved ticket, separates decision tickets (`.scratch/<feature>/decision/`) from implementation tickets (`.scratch/<feature>/implementation/`), routes gap decisions through the user | When an effort is too big for one agent session | **Manual** |
 | `setup-matt-pocock-skills` | **Modified** | Upstream setup skill, lightly adapted (tracker options, triage labels, domain-doc layout) | Once per repo, before first use | **Manual** |
-| `spec-to-code` + `tdd` agent | **Extension** (OMP only) | Spec → task tickets → serial TDD subagents, fully automatic after one command | When you have a spec you want implemented | **Manual kickoff**, then automatic |
+| `to-tickets` | **Modified** | Upstream skill, local-tracker output moved to `.scratch/<feature>/implementation/` | Splitting a spec or plan into tickets | **Manual** |
+| `ask-matt` | **Modified** | Router text: the local tracker path is `.scratch/<feature>/implementation/` | Asking which skill fits | **Manual** |
+| `code-review` | **Modified** | Upstream skill, reworked: the default review target is the uncommitted changes against `HEAD` (untracked files included, `.gitignore` respected); supplying a fixed point still reviews the committed range | Reviewing work in progress, a branch, or a PR | **Manual** |
+| `spec-to-code` + `tdd` agent | **Extension** (OMP only) | Spec → implementation tickets → serial TDD subagents, fully automatic after one command | When you have a spec you want implemented | **Manual kickoff**, then automatic |
 
 "Auto" means the calling skill mandates the step as part of its flow. It is an instruction-level guarantee, not a separate scheduler.
+
+## Supported trackers (for now)
+
+The automatic part of this pipeline, the mandatory `lighthouse` and `backtracer` steps after every resolved ticket, is wired for the **local markdown tracker** only (`.scratch/<feature>/decision/` for planning, `.scratch/<feature>/implementation/` for implementation tickets). The GitHub and GitLab tracker setups ship from upstream unchanged and still describe upstream's plain resolve step, so this repo does not support them yet.
+
+That is a deliberate later step, not an oversight.
+
+**Local directory rename (breaking for local trackers).** Implementation tickets moved from `.scratch/<feature>/issues/` to `.scratch/<feature>/implementation/`, and the vocabulary changed from "task ticket" to "implementation ticket". Existing setups are not migrated.
 
 ## Flow A: the wayfinder planning pipeline
 
@@ -74,7 +85,7 @@ flowchart TD
 - Only two manual triggers in the whole pipeline: `wayfinder` itself and `traverse` (the final audit).
 - `lighthouse` and `backtracer` are invoked automatically by wayfinder after every resolved ticket.
 - After `backtracer` (per ticket) and after `traverse` (at the end), the skill lists the gaps it found. The skill files do not dictate how to handle them: the user decides. Suggested ways: create a new ticket, settle the gap with a grilling session right in the current conversation, or record it as fog in the map's **Not yet specified**.
-- The pipeline hands off to upstream `to-spec`. Everything after that (`to-tickets`, `implement`) ships in mattpocock/skills, not here.
+- The pipeline hands off to upstream `to-spec`. `implement` ships in mattpocock/skills; this repo vendors `to-tickets` and `ask-matt` only to rename the local ticket directory.
 
 Legend: blue outline = new skills in this repo · green = auto-invoked · orange = manual trigger · purple = one-time setup · gray dashed = upstream / beyond this repo.
 
@@ -97,6 +108,29 @@ flowchart TD
 ```
 
 The `tdd` agent (`extensions/agents/tdd.md`) is the only piece this repo adds to this loop. The `to-tickets` and `tdd` skills themselves are upstream. The extension fails fast if the `to-tickets` skill, the `tdd` skill, or the `tdd` agent is missing; it checks automatically, with nothing to confirm manually.
+
+## Sources & build
+
+The five reworked skills ship complete, and the divergence from upstream is kept as data:
+
+- `upstream/` holds those five upstream skill directories, copied in whole; extra files there (such as `agents/openai.yaml`) are fine and ignored by the build.
+- `deltas/manifest.json` holds only the `files` whitelist: the exact ten files this repo ships for the five skills. Only listed files are read from `upstream/` and written to `skills/`; anything else under those `skills/<skill>/` directories is removed by the build.
+- [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md), [deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md), [deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md), [deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md) and [deltas/mappings/code-review.md](deltas/mappings/code-review.md) are the mapping sources and the human review entry points. Each mapping keeps its target, ID, reason and diff together. Listed files without mappings are inherited verbatim.
+- `skills/` is the install artifact. `lighthouse`, `backtracer` and `traverse` are hand-written; the ten files listed in the manifest are generated, so do not edit them by hand.
+
+Edit mappings directly in the five documents under `deltas/mappings/`:
+
+- Start with `# <skill>`. Use `## <skill>/<file>` for each changed, whitelisted target, then `### <op-id>` for each mapping. IDs use lowercase kebab-case and are unique within a skill. Each mapping has a short reason and exactly one backtick-fenced `diff` block.
+- Each diff line starts with `-` (original), `+` (replacement), or a space (both). Only that first character is removed when reconstructing the text; preserve all remaining whitespace. Even blank lines need a prefix. Keep LF line endings and a final newline. Use longer matching backtick fences if the diff contains Markdown code fences.
+- A block represents one continuous replacement. Pure insertions need existing context. This is a project-local diff format, without file headers or `@@` line numbers, not a `git apply` patch.
+- Mappings run in document order within each target, against the result of earlier mappings. The reconstructed original must occur exactly once; missing or ambiguous locators, no-ops and malformed mappings fail the build.
+
+```bash
+node deltas/build.mjs          # regenerate the listed files under skills/
+node deltas/build.mjs --check  # verify they still match upstream/ + deltas/
+```
+
+Bumping the upstream snapshot is manual and needs no git: copy the whole `wayfinder/`, `setup-matt-pocock-skills/`, `to-tickets/`, `ask-matt/` and `code-review/` directories from a newer upstream checkout over the same paths under `upstream/`, then run `node deltas/build.mjs` and review the changes under `skills/` before committing. When upstream rewrites text that an op depends on, the build fails loudly and names the op; a listed file that upstream removed fails the build too.
 
 ## Thanks
 

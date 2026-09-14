@@ -24,7 +24,7 @@ Completion criterion: map body + every decision ticket body + every lighthouse d
 
 Extract three kinds of signals. These are mechanical extractions: pattern match, don't interpret.
 
-**a) Intent signals**: from each lighthouse document's `## 用户故事` section:
+**a) Intent signals**: from each lighthouse document's `## User stories` section:
 
 For each "so that" clause, extract the **key noun phrases and verb phrases**: the concrete things the user wants and the actions they enable. Examples:
 
@@ -36,7 +36,7 @@ For each "so that" clause, extract the **key noun phrases and verb phrases**: th
 
 Discard connectors ("the", "a", "can", "is"). Keep only the nouns and verbs that would appear in a ticket title or body.
 
-**b) Pattern signals**: from each lighthouse document's `## 不变量` section:
+**b) Pattern signals**: from each lighthouse document's `## Invariants` section:
 
 For each invariant that declares pattern alignment (e.g. "new engine types follow the same conventions"), extract:
 

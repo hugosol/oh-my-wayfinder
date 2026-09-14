@@ -6,7 +6,7 @@
  *
  * Usage: /spec-to-code <slug>
  *   Spec at:  .scratch/<slug>/spec.md
- *   Tickets: .scratch/<slug>/issues/*.md
+ *   Tickets: .scratch/<slug>/implementation/*.md
  */
 
 import * as fs from "node:fs/promises";
@@ -29,7 +29,7 @@ let firstReplySent = false;
 
 const SKILL_PROMPT_TYPE = "skill-prompt";
 const FIRST_REPLY = "请你仔细思考后回答这些问题";
-const PUBLISH_REPLY = "请发布issue文件";
+const PUBLISH_REPLY = "请发布实现票文件";
 
 // ============================================================================
 // Helpers
@@ -37,7 +37,7 @@ const PUBLISH_REPLY = "请发布issue文件";
 
 async function hasTicketFiles(slug: string): Promise<boolean> {
 	try {
-		const entries = await fs.readdir(`.scratch/${slug}/issues`);
+		const entries = await fs.readdir(`.scratch/${slug}/implementation`);
 		return entries.some(e => e.endsWith(".md"));
 	} catch {
 		return false;
@@ -107,7 +107,7 @@ async function activateSkill(
 
 async function startPhase2(pi: ExtensionAPI, slug: string): Promise<void> {
 	pi.sendUserMessage(
-		`请读取 .scratch/${slug}/issues/ 目录下的所有 ticket 文件。\n分析每个 ticket 的内容和依赖关系，按依赖顺序排列。\n\n对每个 ticket，使用 task 工具执行：\n  agent: "tdd"\n  task: 包含 ticket 的完整内容和名称\n\n⚠️ 约束：\n- 每个 ticket 必须由一次独立的 task(agent="tdd") 调用执行\n- 绝不能将多个 ticket 合并到同一次 task 调用中\n- 必须等待每个 task 完成后，再开始下一个\n- 全部完成后，输出每个 ticket 的完成状态摘要`,
+		`请读取 .scratch/${slug}/implementation/ 目录下的所有 ticket 文件。\n分析每个 ticket 的内容和依赖关系，按依赖顺序排列。\n\n对每个 ticket，使用 task 工具执行：\n  agent: "tdd"\n  task: 包含 ticket 的完整内容和名称\n\n⚠️ 约束：\n- 每个 ticket 必须由一次独立的 task(agent="tdd") 调用执行\n- 绝不能将多个 ticket 合并到同一次 task 调用中\n- 必须等待每个 task 完成后，再开始下一个\n- 全部完成后，输出每个 ticket 的完成状态摘要`,
 		{ deliverAs: "followUp" },
 	);
 }
