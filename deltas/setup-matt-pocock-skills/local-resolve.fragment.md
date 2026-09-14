@@ -1,0 +1,1 @@
+- **Resolve**: write the discussion results to the ticket body, then call the Skill tool with "lighthouse" to produce the lighthouse document in `lighthouse/`. Set `Status: resolved`, and append a context pointer (gist + link) to the map's Decisions-so-far in `map.md`.

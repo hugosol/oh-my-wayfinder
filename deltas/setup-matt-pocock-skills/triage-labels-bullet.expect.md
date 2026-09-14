@@ -1,0 +1,1 @@
+- **Triage labels**: the strings used for the five canonical triage roles

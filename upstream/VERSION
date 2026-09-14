@@ -1,0 +1,20 @@
+repo: https://github.com/mattpocock/skills
+commit: 6654f6b60cd9d5be8b54c6fafe44346dabeb3b76
+fetched: 2026-09-14
+license: MIT, Copyright (c) 2026 Matt Pocock (see /LICENSE)
+
+These are verbatim upstream files at the commit above, taken from the git blob
+(LF), not from a working tree. They are build inputs only: `node deltas/build.mjs`
+reads them together with the ops in deltas/manifest.json and regenerates the
+overlay files under skills/.
+
+To bump the snapshot by hand:
+  1. copy the new version of each path below from the upstream commit:
+       git -C <upstream-clone> show <new-commit>:skills/engineering/wayfinder/SKILL.md
+       git -C <upstream-clone> show <new-commit>:skills/engineering/setup-matt-pocock-skills/SKILL.md
+       git -C <upstream-clone> show <new-commit>:skills/engineering/setup-matt-pocock-skills/triage-labels.md
+       git -C <upstream-clone> show <new-commit>:skills/engineering/setup-matt-pocock-skills/issue-tracker-local.md
+  2. update commit/fetched above
+  3. run `node deltas/build.mjs`; every op that can no longer find its exact
+     upstream text fails loudly and names the op to fix
+  4. review `git diff -- skills/` before committing
