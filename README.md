@@ -114,10 +114,10 @@ The four reworked skills ship complete, and the divergence from upstream is kept
 
 - `upstream/` holds those four upstream skill directories, copied in whole; extra files there (such as `agents/openai.yaml`) are fine and ignored by the build.
 - `deltas/manifest.json` holds only the `files` whitelist: the exact nine files this repo ships for the four skills. Only listed files are read from `upstream/` and written to `skills/`; anything else under those `skills/<skill>/` directories is removed by the build.
-- [deltas/wayfinder.md](deltas/wayfinder.md), [deltas/setup-matt-pocock-skills.md](deltas/setup-matt-pocock-skills.md), [deltas/to-tickets.md](deltas/to-tickets.md) and [deltas/ask-matt.md](deltas/ask-matt.md) are the mapping sources and the human review entry points. Each mapping keeps its target, ID, reason and diff together. Listed files without mappings are inherited verbatim.
+- [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md), [deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md), [deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md) and [deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md) are the mapping sources and the human review entry points. Each mapping keeps its target, ID, reason and diff together. Listed files without mappings are inherited verbatim.
 - `skills/` is the install artifact. `lighthouse`, `backtracer` and `traverse` are hand-written; the nine files listed in the manifest are generated, so do not edit them by hand.
 
-Edit mappings directly in the two Markdown documents:
+Edit mappings directly in the four documents under `deltas/mappings/`:
 
 - Start with `# <skill>`. Use `## <skill>/<file>` for each changed, whitelisted target, then `### <op-id>` for each mapping. IDs use lowercase kebab-case and are unique within a skill. Each mapping has a short reason and exactly one backtick-fenced `diff` block.
 - Each diff line starts with `-` (original), `+` (replacement), or a space (both). Only that first character is removed when reconstructing the text; preserve all remaining whitespace. Even blank lines need a prefix. Keep LF line endings and a final newline. Use longer matching backtick fences if the diff contains Markdown code fences.

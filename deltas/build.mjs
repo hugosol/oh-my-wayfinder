@@ -6,7 +6,7 @@
 //
 // The build is pure text processing: it never shells out and never touches git.
 // manifest.json holds the files whitelist: only these paths are read from upstream/
-// and written to skills/. Each deltas/<skill>.md holds that skill's mappings:
+// and written to skills/. Each deltas/mappings/<skill>.md holds that skill's mappings:
 //   ## target path, ### op id, explanatory prose, then one fenced diff block per op.
 // Diff line prefixes reconstruct the expected text (- and space) and replacement
 // (+ and space). Each expected text must occur exactly once; ops run in document order.
@@ -55,7 +55,7 @@ function readUpstream(path, what) {
 }
 
 function readMappings(skill, listed) {
-  const path = join(root, 'deltas', `${skill}.md`);
+  const path = join(root, 'deltas', 'mappings', `${skill}.md`);
   const lines = readText(path, 'mapping document').split('\n');
   const opsByFile = {};
   const ids = new Set();
@@ -191,7 +191,7 @@ for (const file of files) {
     if (at === -1) {
       fail(
         `op ${op.id}: its expected upstream text was not found in upstream/${file}. ` +
-          `Upstream changed that text; review deltas/${file.split('/')[0]}.md.`,
+          `Upstream changed that text; review deltas/mappings/${file.split('/')[0]}.md.`,
       );
     }
     if (text.indexOf(expect, at + 1) !== -1) {

@@ -114,10 +114,10 @@ flowchart TD
 
 - `upstream/`：整目录拷贝进来的四个上游 skill 目录；里面多出来的文件（例如 `agents/openai.yaml`）无所谓，构建会忽略它们。
 - `deltas/manifest.json` 只保留 `files` 白名单，列出本仓库为这四个 skill 发布的全部九个文件。只有列表中的文件会从 `upstream/` 读取并写入 `skills/`；这两个 `skills/<skill>/` 目录下的其他文件会被构建删除。
-- [deltas/wayfinder.md](deltas/wayfinder.md)、[deltas/setup-matt-pocock-skills.md](deltas/setup-matt-pocock-skills.md)、[deltas/to-tickets.md](deltas/to-tickets.md) 与 [deltas/ask-matt.md](deltas/ask-matt.md) 同时是映射源文件和人类审核入口。每项映射把目标、ID、理由和 diff 放在一起；白名单中没有映射的文件原样继承。
+- [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md)、[deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md)、[deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md) 与 [deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md) 同时是映射源文件和人类审核入口。每项映射把目标、ID、理由和 diff 放在一起；白名单中没有映射的文件原样继承。
 - `skills/`：安装产物。`lighthouse`、`backtracer`、`traverse` 为手写；manifest 里列出的九个文件为生成物，**不要手工编辑**。
 
-直接在两份 Markdown 文档中编辑映射：
+直接在 `deltas/mappings/` 下的四份文档中编辑映射：
 
 - 文档以 `# <skill>` 开头，用 `## <skill>/<file>` 指定有改动且位于白名单内的目标，用 `### <op-id>` 标识映射。ID 使用小写 kebab-case，在同一 skill 内唯一。每项映射包含简短理由和恰好一个反引号围栏的 `diff` 块。
 - 每行第一个字符为 `-`（原文）、`+`（替换文本）或空格（两者共有）。还原文本时只移除这一个字符，其余空白原样保留；空行也必须带标记。使用 LF 换行并保留文件末尾换行。如果 diff 内含 Markdown 代码围栏，使用更长且前后匹配的反引号围栏。
