@@ -38,8 +38,8 @@
 | `backtracer` | **新增** | 把票与灯塔文档中的 "so that" 子句、不变量、依赖信号回溯到整张地图，在缺口变成 bug 之前暴露缺失票、层次缺口与不对称 | lighthouse 之后，每张已解决票执行一次 | **自动**（由 wayfinder 调用） |
 | `traverse` | **新增** | 已完成地图的终审：构建设计树并走查每条分支，检查依赖覆盖、同级对称、层次完整、边界完备 | 所有 wayfinder 票解决后、进入 to-spec 之前 | **手动** |
 | `to-contract` | **新增** | 把 spec 变成已批准的契约：承诺清单（本次实现必须兑现什么）与 seam 决策（在哪里被观察到），写入 `.scratch/<feature>/contract.md` | 介于 to-spec 与 to-tickets 之间 | **手动** |
-| `distill-dialogue` | **新增** | 把对话中有价值的材料围绕命题压缩成一次性落地稿（Markdown），供独立会话整合：含分节去向、出处、来源状态与缺口 | 想把讨论材料先保存、稍后再写进课程文档时 | **手动** |
-| `integrate-lesson` | **新增** | 在全新会话中把落地稿整合进课程 HTML：读取工作区规则与文档整体结构，按分节去向插入、合并或纠错，验证后逐节报告落点与改判 | 把落地稿落到课程文档时 | **手动** |
+| `distill-dialogue` | **新增** | 把对话中有价值的材料围绕命题压缩成一次性落地稿（Markdown），供独立会话整合：含出处、来源状态与缺口 | 想把讨论材料先保存、稍后再写进课程文档时 | **手动** |
+| `integrate-lesson` | **新增** | 在全新会话中把落地稿整合进课程 HTML：读取工作区规则与文档整体结构，按文档结构插入、合并或纠错，验证后逐节报告落位与改判 | 把落地稿落到课程文档时 | **手动** |
 | `wayfinder` | **改造** | 上游 skill 的重构版：每张票解决后强制 lighthouse + backtracer，区分决策票（`.scratch/<feature>/decision/`）与实现票（`.scratch/<feature>/implementation/`），缺口决策交由用户拍板 | 当工作量超出单个 agent 会话时 | **手动** |
 | `setup-matt-pocock-skills` | **改造** | 上游设置 skill，轻量适配（issue tracker 选项、triage 标签、domain 文档布局） | 每个仓库一次，首次使用前 | **手动** |
 | `to-spec` | **改造** | 上游 skill 的重构版：seam 草图与 Testing Decisions 中的 seam 部分移交给 `to-contract`；发布 spec 后指向 `/to-contract` 作为下一步 | 把当前对话变成 spec 时 | **手动** |
