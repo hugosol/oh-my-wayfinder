@@ -4,7 +4,7 @@
 
 **[mattpocock/skills](https://github.com/mattpocock/skills) 的 fork**：为 AI 编程 agent 设计的工程技能集。本仓库在其基础上新增了规划质检类 skill，并为 **[Oh My Pi](https://github.com/can1357/oh-my-pi)** agent 编写了自动化扩展。
 
-本仓库改造上游的五个 skill（`wayfinder`、`setup-matt-pocock-skills`、`to-tickets`、`ask-matt`、`code-review`），并以**完整目录**形式发布（无需改动的文件逐字取自上游），另加新增的 `lighthouse` / `backtracer` / `traverse` 与 Oh My Pi 扩展。请先安装 Matt 的技能集，再把本仓库的文件覆盖上去（见 [快速开始](#快速开始)）。
+本仓库改造上游的六个 skill（`wayfinder`、`setup-matt-pocock-skills`、`to-spec`、`to-tickets`、`ask-matt`、`code-review`），并以**完整目录**形式发布（无需改动的文件逐字取自上游），另加新增的 `lighthouse` / `backtracer` / `traverse` / `to-contract`、教学工作区的一对 skill（`distill-dialogue` / `integrate-lesson`）与 Oh My Pi 扩展。请先安装 Matt 的技能集，再把本仓库的文件覆盖上去（见 [快速开始](#快速开始)）。
 
 ## 快速开始
 
@@ -22,7 +22,9 @@
 
 **第一部分：通用 skills**（与 agent 无关，任何支持 markdown skill 的 agent 均可使用）
 
-它们驱动的规划循环：`wayfinder` 把一次超出单个会话的工作量绘制成 issue tracker 上的决策票地图；每张票解决后由 **lighthouse** 固化为文档；**backtracer** 在地图上追踪信号、暴露缺口；**traverse** 在地图完成后做端到端终审，然后交给 `to-spec`。
+它们驱动的规划循环：`wayfinder` 把一次超出单个会话的工作量绘制成 issue tracker 上的决策票地图；每张票解决后由 **lighthouse** 固化为文档；**backtracer** 在地图上追踪信号、暴露缺口；**traverse** 在地图完成后做端到端终审，然后交给 `to-spec`；`to-spec` 产出 spec 后，`to-contract` 把它变成已批准的契约（承诺清单，以及观察这些承诺的 seam），`to-tickets` 再据此切片。
+
+另有两个 skill 服务于教学工作区而不属于规划循环：`distill-dialogue` 把对话材料围绕命题压缩成落地稿，`integrate-lesson` 在全新会话中把落地稿落进课程文档。
 
 **第二部分：[Oh My Pi](https://github.com/can1357/oh-my-pi) 自动化扩展**（仅 `@oh-my-pi/pi-coding-agent`）
 
@@ -35,14 +37,20 @@
 | `lighthouse` | **新增** | 把已解决的 wayfinder 票固化为灯塔文档：决策、用户故事、前置条件、后置条件、不变量，是 backtracer 追踪的信号源 | 每张 wayfinder 票解决后立即执行 | **自动**（由 wayfinder 调用） |
 | `backtracer` | **新增** | 把票与灯塔文档中的 "so that" 子句、不变量、依赖信号回溯到整张地图，在缺口变成 bug 之前暴露缺失票、层次缺口与不对称 | lighthouse 之后，每张已解决票执行一次 | **自动**（由 wayfinder 调用） |
 | `traverse` | **新增** | 已完成地图的终审：构建设计树并走查每条分支，检查依赖覆盖、同级对称、层次完整、边界完备 | 所有 wayfinder 票解决后、进入 to-spec 之前 | **手动** |
+| `to-contract` | **新增** | 把 spec 变成已批准的契约：承诺清单（本次实现必须兑现什么）与 seam 决策（在哪里被观察到），写入 `.scratch/<feature>/contract.md` | 介于 to-spec 与 to-tickets 之间 | **手动** |
+| `distill-dialogue` | **新增** | 把对话中有价值的材料围绕命题压缩成一次性落地稿（Markdown），供独立会话整合：含分节去向、出处、来源状态与缺口 | 想把讨论材料先保存、稍后再写进课程文档时 | **手动** |
+| `integrate-lesson` | **新增** | 在全新会话中把落地稿整合进课程 HTML：读取工作区规则与文档整体结构，按分节去向插入、合并或纠错，验证后逐节报告落点与改判 | 把落地稿落到课程文档时 | **手动** |
 | `wayfinder` | **改造** | 上游 skill 的重构版：每张票解决后强制 lighthouse + backtracer，区分决策票（`.scratch/<feature>/decision/`）与实现票（`.scratch/<feature>/implementation/`），缺口决策交由用户拍板 | 当工作量超出单个 agent 会话时 | **手动** |
 | `setup-matt-pocock-skills` | **改造** | 上游设置 skill，轻量适配（issue tracker 选项、triage 标签、domain 文档布局） | 每个仓库一次，首次使用前 | **手动** |
-| `to-tickets` | **改造** | 上游 skill：本地 tracker 的输出去向改为 `.scratch/<feature>/implementation/` | 把 spec 或计划拆成票时 | **手动** |
+| `to-spec` | **改造** | 上游 skill 的重构版：seam 草图与 Testing Decisions 中的 seam 部分移交给 `to-contract`；发布 spec 后指向 `/to-contract` 作为下一步 | 把当前对话变成 spec 时 | **手动** |
+| `to-tickets` | **改造** | 上游 skill 的重构版：本地 tracker 的输出去向改为 `.scratch/<feature>/implementation/`，且必须输入已批准契约；票要声明 `Delivers`（或 enabling），quiz 增加覆盖度提问 | 把契约拆成票时 | **手动** |
 | `ask-matt` | **改造** | 路由文本：本地 tracker 路径改为 `.scratch/<feature>/implementation/` | 询问该用哪个 skill 时 | **手动** |
 | `code-review` | **改造** | 上游 skill 的重构版：默认 review 目标改为相对 `HEAD` 的未提交改动（含未跟踪文件、遵守 `.gitignore`）；传入固定点仍 review 已提交区间 | review 进行中的工作、分支或 PR 时 | **手动** |
 | `spec-to-code` + `tdd` agent | **扩展**（仅 OMP） | Spec → 实现票 → 串行 TDD 子代理，一条命令后全自动 | 有规格文档并希望实现它时 | **手动启动**，之后全自动 |
 
 「自动」指调用方 skill 在流程中强制触发该步骤，是 skill 指令层面的保证，而非独立的调度器。
+
+`distill-dialogue` 与 `integrate-lesson` 共用 `skills/distill-dialogue/HANDOFF-FORMAT.md`，不改动既有课程流程：它们是一条额外路径，不是替代。
 
 ## 暂不支持 GitHub / GitLab tracker
 
@@ -70,32 +78,35 @@ flowchart TD
     L -->|"frontier 清空"| TR["traverse：终审<br/><b>手动</b>"]
     TR --> CG2{"列出遗漏点<br/>用户决定"}
     CG2 -->|"创建新票"| T
-    CG2 -->|"接受"| TS["to-spec：上游 skill"]
-    TS -.->|"to-tickets / implement"| X["…"]
+    CG2 -->|"接受"| TS["to-spec<br/><b>手动</b>"]
+    TS --> TC["to-contract<br/><b>手动</b>"]
+    TC -.->|"to-tickets / implement"| X["…"]
 
     style LH fill:#e6ffe6,stroke:#2b6cb0,stroke-width:2px
     style BT fill:#e6ffe6,stroke:#2b6cb0,stroke-width:2px
     style TR fill:#fff3e0,stroke:#2b6cb0,stroke-width:2px
     style W fill:#fff3e0,stroke:#dd6b20
     style S fill:#f3e8ff,stroke:#805ad5,stroke-width:2px
-    style TS fill:#f4f4f4,stroke:#999,stroke-dasharray:5 5
+    style TS fill:#fff3e0,stroke:#2b6cb0,stroke-width:2px
+    style TC fill:#fff3e0,stroke:#2b6cb0,stroke-width:2px
     style X fill:#f4f4f4,stroke:#999,stroke-dasharray:5 5
 ```
 
-- 整条管线只有两个手动触发点：`wayfinder` 本身和 `traverse`（终审）。
+- wayfinder 循环内只有两个手动触发点：`wayfinder` 本身和 `traverse`（终审）；其后的交接 `to-spec` → `to-contract` 同样是手动。
 - `lighthouse` 与 `backtracer` 由 wayfinder 在每张票解决后自动调用。
 - `backtracer`（逐票）与 `traverse`（收尾）之后，skill 会列出它发现的遗漏点。skill 文件本身不规定如何处理：由用户决定。建议的处理方式：创建新票、就在当前会话用 grilling 消化、或记入地图的 **Not yet specified**（雾区）。
-- 管线在 `to-spec` 处交接给上游。`implement` 属于 mattpocock/skills；本仓库 vendoring `to-tickets` 与 `ask-matt` 仅用于修改本地票目录。
+- 管线依次交给 `to-spec` 与 `to-contract`，两者都由本仓库发布。`implement` 属于 mattpocock/skills；本仓库 vendoring `to-tickets` 与 `ask-matt`（本地票目录改名 + 契约门）。
 
 颜色图例：蓝色粗边框 = 本仓库新增的 skill · 绿色 = 自动调用 · 橙色 = 手动触发 · 紫色 = 一次性 setup · 灰色虚线 = 上游 / 本仓库之外。
 
 ## 流程图 B：`/spec-to-code`：spec 到代码（仅 Oh My Pi）
 
-spec 位于 `.scratch/<slug>/spec.md`（由 `/to-spec` 发布），运行 `/spec-to-code <slug>`。这一条命令是唯一的手动步骤。之后全部自动运行。
+spec 位于 `.scratch/<slug>/spec.md`（由 `/to-spec` 发布）、已批准契约位于 `.scratch/<slug>/contract.md`（由 `/to-contract` 写入；Phase 1 的 `to-tickets` 强制要求它），运行 `/spec-to-code <slug>`。这一条命令是唯一的手动步骤。之后全部自动运行。
 
 ```mermaid
 flowchart TD
-    P["spec 文件<br/>.scratch/&lt;slug&gt;/spec.md"] --> C["/spec-to-code &lt;slug&gt;<br/><b>手动启动</b>"]
+    P["spec 文件<br/>.scratch/&lt;slug&gt;/spec.md"] --> CT["契约文件<br/>.scratch/&lt;slug&gt;/contract.md"]
+    CT --> C["/spec-to-code &lt;slug&gt;<br/><b>手动启动</b>"]
     C --> A["激活 to-tickets<br/><b>自动</b>"]
     A --> Q{"tickets 已生成?"}
     Q -->|"否"| QA["agent 提问 → 用户回答"] --> A
@@ -107,18 +118,18 @@ flowchart TD
     style C fill:#fff3e0,stroke:#dd6b20
 ```
 
-`tdd` agent（`extensions/agents/tdd.md`）是本仓库为这条流程新增的唯一部分。`to-tickets` 与 `tdd` skill 本身来自上游。前置条件（`to-tickets` skill、`tdd` skill 或 `tdd` agent）由扩展自动检查、立即报错，无需手动确认。
+`tdd` agent（`extensions/agents/tdd.md`）是本仓库为这条流程新增的唯一部分。`to-tickets`（本仓库改造为契约门）与 `tdd` 来自上游。前置条件（`to-tickets` skill、`tdd` skill 或 `tdd` agent）由扩展自动检查、立即报错，无需手动确认。
 
 ## 源文件与构建
 
-五个被改造的 skill 以完整目录发布，与上游的差异以数据形式保存：
+六个被改造的 skill 以完整目录发布，与上游的差异以数据形式保存：
 
-- `upstream/`：整目录拷贝进来的五个上游 skill 目录；里面多出来的文件（例如 `agents/openai.yaml`）无所谓，构建会忽略它们。
-- `deltas/manifest.json` 只保留 `files` 白名单，列出本仓库为这五个 skill 发布的全部十个文件。只有列表中的文件会从 `upstream/` 读取并写入 `skills/`；这两个 `skills/<skill>/` 目录下的其他文件会被构建删除。
-- [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md)、[deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md)、[deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md)、[deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md) 与 [deltas/mappings/code-review.md](deltas/mappings/code-review.md) 同时是映射源文件和人类审核入口。每项映射把目标、ID、理由和 diff 放在一起；白名单中没有映射的文件原样继承。
-- `skills/`：安装产物。`lighthouse`、`backtracer`、`traverse` 为手写；manifest 里列出的十个文件为生成物，**不要手工编辑**。
+- `upstream/`：整目录拷贝进来的六个上游 skill 目录；里面多出来的文件（例如 `agents/openai.yaml`）无所谓，构建会忽略它们。
+- `deltas/manifest.json` 只保留 `files` 白名单，列出本仓库为这六个 skill 发布的全部十一个文件。只有列表中的文件会从 `upstream/` 读取并写入 `skills/`；这两个 `skills/<skill>/` 目录下的其他文件会被构建删除。
+- [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md)、[deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md)、[deltas/mappings/to-spec.md](deltas/mappings/to-spec.md)、[deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md)、[deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md) 与 [deltas/mappings/code-review.md](deltas/mappings/code-review.md) 同时是映射源文件和人类审核入口。每项映射把目标、ID、理由和 diff 放在一起；白名单中没有映射的文件原样继承。
+- `skills/`：安装产物。`lighthouse`、`backtracer`、`traverse`、`to-contract` 为手写；manifest 里列出的十一个文件为生成物，**不要手工编辑**。
 
-直接在 `deltas/mappings/` 下的五份文档中编辑映射：
+直接在 `deltas/mappings/` 下的六份文档中编辑映射：
 
 - 文档以 `# <skill>` 开头，用 `## <skill>/<file>` 指定有改动且位于白名单内的目标，用 `### <op-id>` 标识映射。ID 使用小写 kebab-case，在同一 skill 内唯一。每项映射包含简短理由和恰好一个反引号围栏的 `diff` 块。
 - 每行第一个字符为 `-`（原文）、`+`（替换文本）或空格（两者共有）。还原文本时只移除这一个字符，其余空白原样保留；空行也必须带标记。使用 LF 换行并保留文件末尾换行。如果 diff 内含 Markdown 代码围栏，使用更长且前后匹配的反引号围栏。
@@ -130,7 +141,7 @@ node deltas/build.mjs          # 重新生成 skills/ 下被列出的文件
 node deltas/build.mjs --check  # 校验它们与 upstream/ + deltas/ 一致
 ```
 
-更新上游快照是手动操作、不涉及 git：把较新上游 checkout 里的 `wayfinder/`、`setup-matt-pocock-skills/`、`to-tickets/`、`ask-matt/` 与 `code-review/` 整个目录覆盖到 `upstream/` 下的同名路径，然后运行 `node deltas/build.mjs`，提交前检查 `skills/` 的变化。当上游改写了某个 op 依赖的文本时，构建会大声失败并指出该 op；列表中的文件若被上游删除，构建同样会失败。
+更新上游快照是手动操作、不涉及 git：把较新上游 checkout 里的 `wayfinder/`、`setup-matt-pocock-skills/`、`to-spec/`、`to-tickets/`、`ask-matt/` 与 `code-review/` 整个目录覆盖到 `upstream/` 下的同名路径，然后运行 `node deltas/build.mjs`，提交前检查 `skills/` 的变化。当上游改写了某个 op 依赖的文本时，构建会大声失败并指出该 op；列表中的文件若被上游删除，构建同样会失败。
 
 ## 致谢
 
