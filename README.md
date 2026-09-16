@@ -4,7 +4,7 @@
 
 A fork of **[mattpocock/skills](https://github.com/mattpocock/skills)**, the engineering skills for AI agents. It is extended with new planning-quality skills and an automation extension for the **[Oh My Pi](https://github.com/can1357/oh-my-pi)** agent.
 
-This repository reworks six upstream skills (`wayfinder`, `setup-matt-pocock-skills`, `to-spec`, `to-tickets`, `ask-matt`, `code-review`) and ships them as **complete skill directories** (files that need no change are copied from upstream verbatim), plus the new `lighthouse` / `backtracer` / `traverse` / `to-contract` skills, the teaching-workspace pair `distill-dialogue` / `integrate-lesson`, and the Oh My Pi extension. Install Matt's skills first, then overlay this repo's files on top (see [Quick Start](#quick-start)).
+This repository reworks six upstream skills (`wayfinder`, `setup-matt-pocock-skills`, `to-spec`, `to-tickets`, `ask-matt`, `code-review`) and ships them as **complete skill directories** (files that need no change are copied from upstream verbatim), plus the new `lighthouse` / `backtracer` / `traverse` / `to-contract` skills, and the Oh My Pi extension. Install Matt's skills first, then overlay this repo's files on top (see [Quick Start](#quick-start)).
 
 ## Quick Start
 
@@ -24,8 +24,6 @@ Then run `/setup-matt-pocock-skills` once per repo, as with the upstream set.
 
 The planning loop they drive: `wayfinder` charts an effort too big for one session as a map of decision tickets on your issue tracker; every resolved ticket is captured in a **lighthouse** document; **backtracer** traces signals across the map to surface gaps; **traverse** audits the completed map end to end before it hands off to `to-spec`, which publishes the spec; `to-contract` then turns that spec into an approved contract (the promises the build is held to, and the seams at which they are observed), and `to-tickets` slices the contract.
 
-Two further skills serve teaching workspaces rather than the planning loop: `distill-dialogue` compresses a conversation into a proposition-anchored landing draft, and `integrate-lesson` lands that draft in the course documents from a fresh session.
-
 **Part 2: [Oh My Pi](https://github.com/can1357/oh-my-pi) automation extension** (`@oh-my-pi/pi-coding-agent` only)
 
 `/spec-to-code` turns a spec into implementation tickets and executes them with serial TDD subagents: one command, fully automatic. Irrelevant if you use another agent; ignore it.
@@ -38,8 +36,6 @@ Two further skills serve teaching workspaces rather than the planning loop: `dis
 | `backtracer` | **New** | Traces "so that" clauses, invariants, and dependencies from tickets and lighthouse documents across the whole map, surfacing missing tickets, layer gaps, and asymmetry before they become bugs. | Immediately after lighthouse, once per resolved ticket | **Auto** (invoked by wayfinder) |
 | `traverse` | **New** | Final audit of a completed map: builds the design tree and walks every branch, checking dependency coverage, peer symmetry, layer integrity, and boundary completeness. | After all wayfinder tickets are resolved, before to-spec | **Manual** |
 | `to-contract` | **New** | Turns a spec into an approved contract: the promise list and the seam decisions the build will be held to, written to `.scratch/<feature>/contract.md`. | Between to-spec and to-tickets | **Manual** |
-| `distill-dialogue` | **New** | Compresses a conversation into a one-off landing draft (Markdown) for a separate session to integrate: a user-fixed proposition, provenance, source status and gaps. | Saving discussion material to integrate into course documents later | **Manual** |
-| `integrate-lesson` | **New** | Integrates a landing draft into course HTML from a fresh session: reads the workspace rules and the document as a whole, places each section by the document's structure, merges or corrects, verifies, then reports where every section went. | Landing a draft in the course documents | **Manual** |
 | `wayfinder` | **Modified** | Upstream skill, reworked: mandates lighthouse + backtracer after every resolved ticket, separates decision tickets (`.scratch/<feature>/decision/`) from implementation tickets (`.scratch/<feature>/implementation/`), routes gap decisions through the user | When an effort is too big for one agent session | **Manual** |
 | `setup-matt-pocock-skills` | **Modified** | Upstream setup skill, lightly adapted (tracker options, triage labels, domain-doc layout) | Once per repo, before first use | **Manual** |
 | `to-spec` | **Modified** | Upstream skill, reworked: the seam sketch and the seam half of Testing Decisions move to `to-contract`; publishing a spec points at `/to-contract` as the next step. | Turning a conversation into a spec | **Manual** |
@@ -49,8 +45,6 @@ Two further skills serve teaching workspaces rather than the planning loop: `dis
 | `spec-to-code` + `tdd` agent | **Extension** (OMP only) | Spec → implementation tickets → serial TDD subagents, fully automatic after one command | When you have a spec you want implemented | **Manual kickoff**, then automatic |
 
 "Auto" means the calling skill mandates the step as part of its flow. It is an instruction-level guarantee, not a separate scheduler.
-
-`distill-dialogue` and `integrate-lesson` share `skills/distill-dialogue/HANDOFF-FORMAT.md` and leave the existing course flows untouched: they are an additional path, not a replacement.
 
 ## Supported trackers (for now)
 

@@ -4,7 +4,7 @@
 
 **[mattpocock/skills](https://github.com/mattpocock/skills) 的 fork**：为 AI 编程 agent 设计的工程技能集。本仓库在其基础上新增了规划质检类 skill，并为 **[Oh My Pi](https://github.com/can1357/oh-my-pi)** agent 编写了自动化扩展。
 
-本仓库改造上游的六个 skill（`wayfinder`、`setup-matt-pocock-skills`、`to-spec`、`to-tickets`、`ask-matt`、`code-review`），并以**完整目录**形式发布（无需改动的文件逐字取自上游），另加新增的 `lighthouse` / `backtracer` / `traverse` / `to-contract`、教学工作区的一对 skill（`distill-dialogue` / `integrate-lesson`）与 Oh My Pi 扩展。请先安装 Matt 的技能集，再把本仓库的文件覆盖上去（见 [快速开始](#快速开始)）。
+本仓库改造上游的六个 skill（`wayfinder`、`setup-matt-pocock-skills`、`to-spec`、`to-tickets`、`ask-matt`、`code-review`），并以**完整目录**形式发布（无需改动的文件逐字取自上游），另加新增的 `lighthouse` / `backtracer` / `traverse` / `to-contract` 与 Oh My Pi 扩展。请先安装 Matt 的技能集，再把本仓库的文件覆盖上去（见 [快速开始](#快速开始)）。
 
 ## 快速开始
 
@@ -24,8 +24,6 @@
 
 它们驱动的规划循环：`wayfinder` 把一次超出单个会话的工作量绘制成 issue tracker 上的决策票地图；每张票解决后由 **lighthouse** 固化为文档；**backtracer** 在地图上追踪信号、暴露缺口；**traverse** 在地图完成后做端到端终审，然后交给 `to-spec`；`to-spec` 产出 spec 后，`to-contract` 把它变成已批准的契约（承诺清单，以及观察这些承诺的 seam），`to-tickets` 再据此切片。
 
-另有两个 skill 服务于教学工作区而不属于规划循环：`distill-dialogue` 把对话材料围绕命题压缩成落地稿，`integrate-lesson` 在全新会话中把落地稿落进课程文档。
-
 **第二部分：[Oh My Pi](https://github.com/can1357/oh-my-pi) 自动化扩展**（仅 `@oh-my-pi/pi-coding-agent`）
 
 `/spec-to-code` 把一份 spec 自动切分为实现票，并用串行 TDD 子代理逐个实现。一条命令，全流程自动。使用其他 agent 的读者可以完全忽略这部分。
@@ -38,8 +36,6 @@
 | `backtracer` | **新增** | 把票与灯塔文档中的 "so that" 子句、不变量、依赖信号回溯到整张地图，在缺口变成 bug 之前暴露缺失票、层次缺口与不对称 | lighthouse 之后，每张已解决票执行一次 | **自动**（由 wayfinder 调用） |
 | `traverse` | **新增** | 已完成地图的终审：构建设计树并走查每条分支，检查依赖覆盖、同级对称、层次完整、边界完备 | 所有 wayfinder 票解决后、进入 to-spec 之前 | **手动** |
 | `to-contract` | **新增** | 把 spec 变成已批准的契约：承诺清单（本次实现必须兑现什么）与 seam 决策（在哪里被观察到），写入 `.scratch/<feature>/contract.md` | 介于 to-spec 与 to-tickets 之间 | **手动** |
-| `distill-dialogue` | **新增** | 把对话中有价值的材料围绕命题压缩成一次性落地稿（Markdown），供独立会话整合：含出处、来源状态与缺口 | 想把讨论材料先保存、稍后再写进课程文档时 | **手动** |
-| `integrate-lesson` | **新增** | 在全新会话中把落地稿整合进课程 HTML：读取工作区规则与文档整体结构，按文档结构插入、合并或纠错，验证后逐节报告落位与改判 | 把落地稿落到课程文档时 | **手动** |
 | `wayfinder` | **改造** | 上游 skill 的重构版：每张票解决后强制 lighthouse + backtracer，区分决策票（`.scratch/<feature>/decision/`）与实现票（`.scratch/<feature>/implementation/`），缺口决策交由用户拍板 | 当工作量超出单个 agent 会话时 | **手动** |
 | `setup-matt-pocock-skills` | **改造** | 上游设置 skill，轻量适配（issue tracker 选项、triage 标签、domain 文档布局） | 每个仓库一次，首次使用前 | **手动** |
 | `to-spec` | **改造** | 上游 skill 的重构版：seam 草图与 Testing Decisions 中的 seam 部分移交给 `to-contract`；发布 spec 后指向 `/to-contract` 作为下一步 | 把当前对话变成 spec 时 | **手动** |
@@ -49,8 +45,6 @@
 | `spec-to-code` + `tdd` agent | **扩展**（仅 OMP） | Spec → 实现票 → 串行 TDD 子代理，一条命令后全自动 | 有规格文档并希望实现它时 | **手动启动**，之后全自动 |
 
 「自动」指调用方 skill 在流程中强制触发该步骤，是 skill 指令层面的保证，而非独立的调度器。
-
-`distill-dialogue` 与 `integrate-lesson` 共用 `skills/distill-dialogue/HANDOFF-FORMAT.md`，不改动既有课程流程：它们是一条额外路径，不是替代。
 
 ## 暂不支持 GitHub / GitLab tracker
 
