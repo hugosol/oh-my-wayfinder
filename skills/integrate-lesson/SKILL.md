@@ -43,7 +43,6 @@ Done when: every section has a placement decision, or is marked for the user to 
 ## 4. Integrate
 
 - Place each section by the document's structure, keeping its existing narrative. Merge duplicate statements; correct text that is imprecise or contradicts the trusted source; keep terminology, anchors and links consistent. Rewriting for fit is expected; weakening a condition, boundary or counterexample is not.
-- A section marked **reconstructed (not checked against the original)** is re-verified against a trusted source before it joins the main line. If it cannot be verified, keep it out of the main line and report it.
 - A conflict with existing text is checked against the trusted source, never assuming the draft wins, and reported; so is a placement that separates the write-up across pages. Never pick a side silently; never drop material to make the page tidy.
 - When the draft and the document's organization rules cannot both hold, report the specific conflict and let the user decide.
 - Touch the target document and the companion pages the local rules maintain and this batch actually affects. Do not rewrite the course.
@@ -61,7 +60,7 @@ Done when: every required check has a result, or an explicit unverified note wit
 
 ## 6. Report placements, then wait
 
-- Report per section: added (where) / merged (into which passage) / already covered (evidence) / routed to a companion page (which) / unresolved (why) — plus split placements, conflicts, reconstructed sections kept out of the main line, and unverified items.
+- Report per section: added (where) / merged (into which passage) / already covered (evidence) / routed to a companion page (which) / unresolved (why) — plus split placements, conflicts, unverified items, and sections that entered as inference (no source line).
 - Report at the level of conditions, boundaries and counterexamples — not just topics.
 - Keep the draft until the user confirms; delete it only after confirmation. Partial integration, blocked verification, a section left unresolved, or an unclaimed gap: keep it and say so — deleting would erase the only record. Only the user can waive this, knowingly.
 
@@ -71,7 +70,6 @@ Done when: every section has a reported placement, and the user has decided the 
 
 - Appending material at the end without reading the document's structure.
 - Carrying conclusions while dropping the conditions, boundaries or counterexamples that make them hold.
-- Letting a reconstructed (not checked against the original) section into the main line unverified.
 - Rewriting existing text beyond this batch to make the page read smoothly.
 - Treating the draft as a second source of truth, or syncing changes back into it.
 - Quietly resolving conflicts or placement choices.
