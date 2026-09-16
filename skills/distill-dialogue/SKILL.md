@@ -1,82 +1,77 @@
 ---
 name: distill-dialogue
-description: Extract the valuable material from the current conversation into a one-off handoff package (Markdown), for a separate session to integrate into course documents.
+description: Compress the current conversation into a proposition-anchored landing draft (Markdown), for a separate session to integrate into course documents.
 disable-model-invocation: true
 ---
 
 # Distill Dialogue
 
-Turn what a conversation produced into a **handoff package**: a Markdown file that a session without this conversation's context can integrate into course documents.
+Turn what a conversation produced into a **landing draft**: a Markdown write-up that a session without this conversation's context can integrate into course documents.
 
-Extraction and delivery only. **Delivering the package completes this skill** — do not open, generate, modify or verify any HTML. To change a document inside this same conversation, use the workspace's own flow instead.
+Distillation and delivery only. **Delivering the draft completes this skill** — do not open, generate, modify or verify any HTML. To change a document inside this same conversation, use the workspace's own flow instead.
 
-The package is written in the language of the source discussion; code, identifiers and official terminology stay as they are.
+The draft is written in the language of the source discussion; code, identifiers and official terminology stay as they are.
 
 ## Loads
 
-Read [HANDOFF-FORMAT.md](HANDOFF-FORMAT.md) (in this skill's directory) before extracting. It defines the unit fields, the fidelity rules and the must-land contract this package will be checked against.
+Read [HANDOFF-FORMAT.md](HANDOFF-FORMAT.md) (in this skill's directory) before writing. It defines the fields a landing draft carries, the process rules it must hold to, and the obligations the integrating session will be checked against.
 
-## 1. Fix the scope
+## 1. Fix the target and the source range
 
-- Explicit instruction (topics, turns or messages named): go to step 2.
-- Vague instruction ("save what's valuable"): offer candidates first — one line each: topic, where it came from, why it is worth keeping. Wait for the selection; do not draft candidates into prose.
-- Scan beyond the direct answers. The material that made an answer hold — criteria, contrasts, official examples, boundary counterexamples, error diagnostics, the user's own corrections — is usually more durable than the conclusion.
+- Confirm the target document or topic, and the source range (turns or messages).
+- Never open the target document: the document's own rules, and the placement of material in it, belong to the integrating session.
 
-Done when: the selected topics and their range (turns or messages) are written down.
+Done when: the target and the source range are written down.
 
-## 2. Re-read the source
+## 2. Narrow first — the one interaction
 
-- Locate each selected topic in the original exchange. Work from the exchange, not from a summary of it.
-- Material comes from the source. A topic that cannot be located becomes a gap (step 5) — never reconstruct it.
-- Pull in unselected support material only when it appears in the exchange and the selected topic cannot be understood without it. A topic that could stand on its own is a new candidate to offer, not an automatic addition.
+- Build the **screening index**: one line per candidate — what it concludes, where it came from (turn or message), and, when already clear, a suggested destination (lesson main line / on-demand section / reference sheet / review page / learning record).
+- Present the index together with a candidate **proposition** (one line), then wait. The user selects from the index and fixes the proposition in that reply; the proposition must grow from the material — never force a framework onto it.
+- When the proposition and the selection do not fit each other, say so in the same turn and offer: rewrite the proposition / split the batch / demote the off-axis item to an appendix or its own batch. **Never drop a selected item on your own.**
+- Scan beyond the direct answers: the material that made an answer hold — criteria, contrasts, official examples, boundary counterexamples, error diagnostics, the user's own corrections — is usually more durable than the conclusion.
+- For a distillation that spans sessions: save the index to the workspace's own scratch location, `.tmp/distill-<target>.md` by default.
 
-Done when: every selected topic points at its source location.
+Done when: the selection, the proposition and the source range are written down.
 
-## 3. Extract the material
+## 3. Compress from the original
 
-- Take the claim **and** what makes it hold: prerequisites, reasoning chains, criteria, contrasts, examples, counterexamples, code, error diagnostics, diagram relationships.
-- Compress repeated expression; never merge evidence that plays a different role; never compress reasoning into a formula.
-- Keep the user's own extended reasoning in full, in its original wording.
-- Keep original wording and code; do not polish.
+- Locate each selected item in the exchange. Work from the exchange, not from a summary of it.
+- Take the claim **and** what makes it hold: prerequisites, reasoning chains, criteria, contrasts, examples, counterexamples, code, error diagnostics.
+- Keep original wording, code and examples; keep the user's own extended reasoning in full, in its original wording — never compressed into a formula.
+- Material comes from the source. A topic that cannot be located is a gap, never a reconstruction. When the original is unreachable, reconstruct from the index and mark the passage **reconstructed (not checked against the original)** — never present it as source-derived.
 
-Done when: every selected topic carries its supporting material.
+Done when: every selected item carries its material, or is marked unreachable.
 
-## 4. Make it self-contained
+## 4. Write around the proposition
 
-- Write out every "here", "the previous case", "this snippet" into what it actually refers to.
-- Add the types, inputs, conditions and definitions a reader needs to follow the examples.
-- Additions clarify; they never change meaning. What the source cannot confirm is an inference or a gap, never a silent patch.
+- The proposition **organizes, it never filters**: membership was decided at selection. It sets the order, the skeleton, which item carries the main line, and how far each item is compressed — paragraph → one line → table row → note → on-demand section.
+- Write one tutorial with a skeleton: ordered, not a pile of items. Fill adjacent gaps, deduplicate, check consistency, distinguish verified from unverified.
+- Compression may merge and shorten; it may not drop a condition, a boundary or a counterexample, and it may not widen a claim.
 
-Done when: the package reads without the source conversation.
+Done when: the draft reads on its own, and every selected item has a place in it or is named for the not-landed line.
 
-## 5. Mark status and gaps
+## 5. Check both directions
 
-- Per unit: claim and conditions, supporting material, provenance (a recognizable short quote), status (original / paraphrase / inference / corrected / open), verification (what was checked, under which conditions, with what result — an earlier check is not a fresh one).
-- Mark the **must-land** items: unique reasoning, conditions and boundaries, counterexamples, corrections, open questions.
-- Material known to exist but out of reach (compacted context, unavailable turns): list it as a gap, naming what is missing.
+- Forward: walk the index item by item and name the passage of the draft that carries it. An item you cannot name goes on the **not-landed** line with its reason.
+- Backward: every line of the draft traces to source material, to an explicit inference, or to a named adjacent-gap addition.
+- Re-check by name: conditions, unique counterexamples, corrections of existing text, the user's own reasoning, open questions.
 
-Done when: every unit has its fidelity fields, and gaps stand on their own.
+Done when: every selected item has a landing point or a not-landed reason, and no line floats free of the source.
 
-## 6. Check both directions
+## 6. Save and report
 
-- Forward: walk the selected topics and ask what did not make it into the package; check that support material was not over-compressed.
-- Backward: walk every line of the package and ask where it came from; nothing may exceed or float free of the source.
-- Re-check by name: conditions, unique counterexamples, the user's own reasoning, corrected statements, open questions.
-
-Done when: no selected material is missing, and no package content is unsourced.
-
-## 7. Save and stop
-
-- Save where the user says. With no preference, `.tmp/handoff-<target-or-topic>.md` in the workspace (the target document may not be known yet — the topic serves), creating the directory if needed; if the workspace names its own location for such material, use that.
-- Report: the package's location, the unit list (number and topic), the must-land count, and the gaps.
+- Save where the user says. With no preference, `.tmp/handoff-<target-or-topic>.md` in the workspace; if the workspace names its own location for such material, use that.
+- Report **in the conversation** the **coverage list** — one line per selected item: conclusion + provenance + landing (§N) or not-landed (reason) — plus the proposition, the gaps, and the draft's path. The user may ask to add material on the spot; add it, update the draft, and report the coverage list again.
 - Stop. No HTML work of any kind.
 
-Done when: the package is delivered — written to that file, or shown inline when the user asked for that — and a session holding only it can start integrating.
+Done when: the draft is saved and the coverage list is reported.
 
 ## Anti-patterns
 
 - **"Summarize the conversation" as a cold start** — that yields the average of the discussion and flattens its peaks.
-- **Deciding alone what matters** — offer candidates; the selection is the user's.
-- **Writing a finished tutorial, or locking the final section structure** — organization belongs to the integrating session, and writing prose early is where material dies.
-- **Dropping the awkward material** so the package reads smoothly.
+- **Deciding alone what matters** — offer the index; the selection and the proposition are the user's.
+- **Using the proposition as a filter** — it orders and compresses; the selection decides membership.
+- **Compressing the user's own extended reasoning into a formula.**
+- **Dropping conditions, counterexamples or diagnostics** so the write-up reads smoothly.
+- **Locking the final section structure** — the draft is a landing vehicle; placement belongs to the integrating session.
 - **Filling gaps from memory.**
