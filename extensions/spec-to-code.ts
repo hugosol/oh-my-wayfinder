@@ -357,6 +357,7 @@ export default function specToCode(pi: ExtensionAPI): void {
 			}
 
 			const spec = `.scratch/${slug}/spec.md`;
+			const contract = `.scratch/${slug}/contract.md`;
 			try {
 				await Bun.file(spec).text();
 			} catch {
@@ -389,7 +390,7 @@ export default function specToCode(pi: ExtensionAPI): void {
 			const success = await activateSkill(
 				pi,
 				"to-tickets",
-				`请分析以下spec，生成独立的 ticket 文件。spec 路径：${spec}`,
+				`请分析以下spec，生成独立的 ticket 文件。\nspec 路径：${spec}\ncontract 路径：${contract}`,
 			);
 
 			if (!success) {
