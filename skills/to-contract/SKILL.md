@@ -141,7 +141,7 @@ Close with checks, not prose:
 
 - **`to-spec`** — the seam sketch and the seam half of Testing Decisions move here. Leave in the spec: the narrative, the scope, the implementation decisions, and a pointer to prior art for tests.
 - **`to-tickets`** — each ticket gains one line, `Delivers: P1, P2` (or `enabling: unblocks P3`). Its quiz gains one question (does every promise have a ticket, and does every ticket either deliver a promise or earn its place as an enabling slice?) and, for a promise that spans tickets, a coverage-partition table naming the ticket that owns each coverage item and the tests. A promise completes only when every ticket declaring it is closed and its tests pass.
-- **`implement` and `tdd`** — unchanged. The contract's seams are the "pre-agreed seams"; the promise list is where acceptance tests are written from. If `/to-tickets` is run with no contract, it should stop and ask for one.
+- **`implement`** is unchanged. **`tdd`** is reworked in this repo to take its acceptance criteria, coverage IDs and seams from the assigned work; those approved seams are the contract's "pre-agreed seams", and the promise list is where acceptance tests are written from. If `/to-tickets` is run with no contract, it should stop and ask for one.
 
 ## What comes next
 

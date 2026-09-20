@@ -10,6 +10,9 @@
     "to-spec/SKILL.md",
     "to-tickets/SKILL.md",
     "ask-matt/SKILL.md",
-    "code-review/SKILL.md"
+    "code-review/SKILL.md",
+    "tdd/SKILL.md",
+    "tdd/tests.md",
+    "tdd/mocking.md"
   ]
 }
