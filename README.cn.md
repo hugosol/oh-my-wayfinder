@@ -96,7 +96,7 @@ flowchart TD
 
 ## 流程图 B：`/spec-to-code`：spec 到代码（仅 Oh My Pi）
 
-spec 位于 `.scratch/<slug>/spec.md`（由 `/to-spec` 发布）、已批准契约位于 `.scratch/<slug>/contract.md`（由 `/to-contract` 写入；Phase 1 的 `to-tickets` 强制要求它），运行 `/spec-to-code <slug>`。这一条命令是唯一的手动步骤。之后全部自动运行。
+spec 位于 `.scratch/<slug>/spec.md`（由 `/to-spec` 发布）、已批准契约位于 `.scratch/<slug>/contract.md`（由 `/to-contract` 写入；Phase 1 的 `to-tickets` 强制要求它），运行 `/spec-to-code <slug>`。这一条命令是唯一的手动步骤。之后全部自动运行。在 `to-tickets` 阶段，agent 的提问会被自动代答为「请你仔细思考后回答这些问题」，不再等待人工输入；每次自动代答或自动续跑都会消耗一个有界预算（15 次），用尽后停止该阶段并给出通知，而不是无限循环。
 
 ```mermaid
 flowchart TD
@@ -104,7 +104,7 @@ flowchart TD
     CT --> C["/spec-to-code &lt;slug&gt;<br/><b>手动启动</b>"]
     C --> A["激活 to-tickets<br/><b>自动</b>"]
     A --> Q{"tickets 已生成?"}
-    Q -->|"否"| QA["agent 提问 → 用户回答"] --> A
+    Q -->|"否"| QA["agent 提问自动代答<br/>（自行思考）"] --> A
     Q -->|"是"| P2["Phase 2<br/><b>自动</b>"]
     P2 --> ORD["按依赖关系排序"]
     ORD --> TD["逐个 task(agent=tdd)：串行<br/>每个等待前一个完成"]
