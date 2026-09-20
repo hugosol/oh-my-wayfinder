@@ -20,7 +20,7 @@ Characteristics:
 - Uses public API only
 - Survives internal refactors
 - Describes WHAT, not HOW
-- Tests one coherent behavior, with enough assertions to establish it
+- One logical assertion per test (which may require multiple checks to establish the same behavior)
 
 ## Preserve the acceptance criterion
 
@@ -54,7 +54,7 @@ Red flags:
 
 - Mocking internal collaborators
 - Testing private methods
-- Asserting internal call counts or order instead of observable behavior
+- Asserting on internal call counts/order instead of observable behavior
 - Test breaks when refactoring without behavior change
 - Test name describes HOW not WHAT
 - Verifying through external means instead of interface

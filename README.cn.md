@@ -42,7 +42,7 @@
 | `to-tickets` | **改造** | 上游 skill 的重构版：本地 tracker 的输出去向改为 `.scratch/<feature>/implementation/`，且必须输入已批准契约；票要声明 `Delivers`（或 enabling），quiz 增加覆盖度提问 | 把契约拆成票时 | **手动** |
 | `ask-matt` | **改造** | 路由文本：本地 tracker 路径改为 `.scratch/<feature>/implementation/` | 询问该用哪个 skill 时 | **手动** |
 | `code-review` | **改造** | 上游 skill 的重构版：默认 review 目标改为相对 `HEAD` 的未提交改动（含未跟踪文件、遵守 `.gitignore`）；传入固定点仍 review 已提交区间 | review 进行中的工作、分支或 PR 时 | **手动** |
-| `tdd` | **改造** | 上游 skill 的重构版：执行改为票驱动 —— 验收标准、覆盖归属与已批准 seam 来自被指派的工作 —— 走四步垂直切片（设计、red、green、校验证据），外加完成条件与范围纪律 | 以测试先行方式实现功能或修 bug 时 | **手动** |
+| `tdd` | **改造** | 上游 skill 的重构版：执行改为票驱动 —— 验收标准、覆盖归属与已批准 seam 来自被指派的工作 —— 循环新增 design-before-red、preserve-the-criterion、check-the-evidence 规则，并加上完成条件 | 以测试先行方式实现功能或修 bug 时 | **手动** |
 | `spec-to-code` + `tdd` agent | **扩展**（仅 OMP） | Spec → 实现票 → 串行 TDD 子代理，一条命令后全自动 | 有规格文档并希望实现它时 | **手动启动**，之后全自动 |
 
 「自动」指调用方 skill 在流程中强制触发该步骤，是 skill 指令层面的保证，而非独立的调度器。
@@ -136,7 +136,7 @@ node deltas/build.mjs          # 重新生成 skills/ 下被列出的文件
 node deltas/build.mjs --check  # 校验它们与 upstream/ + deltas/ 一致
 ```
 
-更新上游快照是手动操作、不涉及 git：把较新上游 checkout 里的 `wayfinder/`、`setup-matt-pocock-skills/`、`to-spec/`、`to-tickets/`、`ask-matt/`、`code-review/` 与 `tdd/` 整个目录覆盖到 `upstream/` 下的同名路径，然后运行 `node deltas/build.mjs`，提交前检查 `skills/` 的变化。当上游改写了某个 op 依赖的文本时，构建会大声失败并指出该 op；列表中的文件若被上游删除，构建同样会失败。覆盖到文件末尾的那两个 `tdd` op 是这一响亮失败的例外：上游在 `tdd/SKILL.md` 或 `tdd/mocking.md` 末尾追加的内容不会被判为定位缺失，因此请检查重新生成的 `skills/tdd/` diff，确认替换之后没有残留的上游文本。
+更新上游快照是手动操作、不涉及 git：把较新上游 checkout 里的 `wayfinder/`、`setup-matt-pocock-skills/`、`to-spec/`、`to-tickets/`、`ask-matt/`、`code-review/` 与 `tdd/` 整个目录覆盖到 `upstream/` 下的同名路径，然后运行 `node deltas/build.mjs`，提交前检查 `skills/` 的变化。当上游改写了某个 op 依赖的文本时，构建会大声失败并指出该 op；列表中的文件若被上游删除，构建同样会失败。唯一锚定到文件末尾的那个 `tdd` op 是这一响亮失败的例外：上游在 `tdd/SKILL.md` 末尾追加的内容不会被判为定位缺失，因此请检查重新生成的 `skills/tdd/` diff，确认替换之后没有残留的上游文本。
 
 ## 致谢
 
