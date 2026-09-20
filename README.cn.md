@@ -132,9 +132,16 @@ flowchart TD
 - 同一目标内按文档顺序执行映射，后项处理前项修改后的文本。还原出的原文必须恰好出现一次；定位缺失或有歧义、没有实际改动及格式损坏都会导致构建失败。
 
 ```bash
-node deltas/build.mjs          # 重新生成 skills/ 下被列出的文件
-node deltas/build.mjs --check  # 校验它们与 upstream/ + deltas/ 一致
+node deltas/build.mjs                         # 重新生成 skills/ 下被列出的文件
+node deltas/build.mjs --check                 # 校验它们与 upstream/ + deltas/ 一致
+node deltas/check-upstream.mjs                # 列出与上游 HEAD 有差异的 skill
+node deltas/check-upstream.mjs --verbose      # 同时列出具体差异文件
+node deltas/check-upstream.mjs --local <dir>  # 对比已有的上游 checkout
 ```
+
+`check-upstream.mjs`：默认通过 GitHub API 把白名单文件与上游 HEAD 逐一比较，任何一个 skill 有差异就以非零码退出。
+
+`check-upstream.mjs --local <dir>` 与本地仓库比较，例如 `--local ../mattpocock-skills`。
 
 更新上游快照是手动操作、不涉及 git：把较新上游 checkout 里的 `wayfinder/`、`setup-matt-pocock-skills/`、`to-spec/`、`to-tickets/`、`ask-matt/`、`code-review/` 与 `tdd/` 整个目录覆盖到 `upstream/` 下的同名路径，然后运行 `node deltas/build.mjs`，提交前检查 `skills/` 的变化。当上游改写了某个 op 依赖的文本时，构建会大声失败并指出该 op；列表中的文件若被上游删除，构建同样会失败。唯一锚定到文件末尾的那个 `tdd` op 是这一响亮失败的例外：上游在 `tdd/SKILL.md` 末尾追加的内容不会被判为定位缺失，因此请检查重新生成的 `skills/tdd/` diff，确认替换之后没有残留的上游文本。
 

@@ -132,9 +132,16 @@ Edit mappings directly in the seven documents under `deltas/mappings/`:
 - Mappings run in document order within each target, against the result of earlier mappings. The reconstructed original must occur exactly once; missing or ambiguous locators, no-ops and malformed mappings fail the build.
 
 ```bash
-node deltas/build.mjs          # regenerate the listed files under skills/
-node deltas/build.mjs --check  # verify they still match upstream/ + deltas/
+node deltas/build.mjs                         # regenerate the listed files under skills/
+node deltas/build.mjs --check                 # verify they still match upstream/ + deltas/
+node deltas/check-upstream.mjs                # list skills that differ from upstream HEAD
+node deltas/check-upstream.mjs --verbose      # also list the differing files
+node deltas/check-upstream.mjs --local <dir>  # compare against an existing upstream checkout
 ```
+
+`check-upstream.mjs`: by default compares the whitelisted files against upstream HEAD over the GitHub API and exits non-zero when any skill differs.
+
+`check-upstream.mjs --local <dir>` compares against a local repository, for example `--local ../mattpocock-skills`.
 
 Bumping the upstream snapshot is manual and needs no git: copy the whole `wayfinder/`, `setup-matt-pocock-skills/`, `to-spec/`, `to-tickets/`, `ask-matt/`, `code-review/` and `tdd/` directories from a newer upstream checkout over the same paths under `upstream/`, then run `node deltas/build.mjs` and review the changes under `skills/` before committing. When upstream rewrites text that an op depends on, the build fails loudly and names the op; a listed file that upstream removed fails the build too. The single `tdd` op anchored to the end of its file is the exception to that loud failure: text upstream appends at the end of `tdd/SKILL.md` is not a locator miss, so check the regenerated `skills/tdd/` diff for text that survived past the replacement.
 
