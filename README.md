@@ -96,7 +96,7 @@ Legend: blue outline = new skills in this repo · green = auto-invoked · orange
 
 ## Flow B: `/spec-to-code`: spec to code (Oh My Pi only)
 
-Run `/spec-to-code <slug>` with the spec at `.scratch/<slug>/spec.md` (published by `/to-spec`) and its approved contract at `.scratch/<slug>/contract.md` (written by `/to-contract`; phase 1's `to-tickets` requires it). That single command is the only manual step. Everything after it runs automatically.
+Run `/spec-to-code <slug>` with the spec at `.scratch/<slug>/spec.md` (published by `/to-spec`) and its approved contract at `.scratch/<slug>/contract.md` (written by `/to-contract`; phase 1's `to-tickets` requires it). That single command is the only manual step. Everything after it runs automatically. While `to-tickets` runs, any `ask` is answered automatically with a "think it through yourself" reply instead of waiting for a person, and every automatic answer or follow-up spends a bounded budget (15); exhausting it stops the phase with a notification instead of looping.
 
 ```mermaid
 flowchart TD
@@ -104,7 +104,7 @@ flowchart TD
     CT --> C["/spec-to-code &lt;slug&gt;<br/><b>manual kickoff</b>"]
     C --> A["to-tickets activated<br/><b>auto</b>"]
     A --> Q{"Tickets generated?"}
-    Q -->|"no"| QA["Agent asks questions →<br/>user answers"] --> A
+    Q -->|"no"| QA["Agent questions auto-answered<br/>(thinks it through)"] --> A
     Q -->|"yes"| P2["Phase 2<br/><b>auto</b>"]
     P2 --> ORD["Sort tickets by<br/>dependencies"]
     ORD --> TD["task(agent=tdd) per ticket<br/>serial: each waits<br/>for the previous"]
