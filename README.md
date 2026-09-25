@@ -96,14 +96,16 @@ Legend: blue outline = new skills in this repo · green = auto-invoked · orange
 
 ## Flow B: `/spec-to-code`: spec to code (Oh My Pi only)
 
-Run `/spec-to-code <slug>` with the spec at `.scratch/<slug>/spec.md` (published by `/to-spec`) and its approved contract at `.scratch/<slug>/contract.md` (written by `/to-contract`; phase 1's `to-tickets` requires it). That single command is the only manual step. Everything after it runs automatically. While `to-tickets` runs, any `ask` is auto-answered with "请你仔细思考后回答这个问题" instead of waiting for a person, and each turn ending sends one follow-up. By default that follow-up is the pre-Jev canned sequence ("请你仔细思考后回答这些问题", then "请生成文件"); with `specToCode.jev.enabled: true` the extension asks the `judge` role chain (TypeSafe Jev first) to choose the reply — round 1 offers only "请你仔细思考后回答这些问题" / "请生成文件", and "请继续" joins from round 2 on. Once ticket files exist, phase 2 starts when Jev picks "请继续" or after `specToCode.jev.forcePhase2Round` rounds (default 5). Every automatic answer or follow-up spends a bounded budget (15); exhausting it stops the phase with a notification instead of looping — unless ticket files already exist, in which case phase 2 starts.
+Run `/spec-to-code <slug>` with the spec at `.scratch/<slug>/spec.md` (published by `/to-spec`) and its approved contract at `.scratch/<slug>/contract.md` (written by `/to-contract`; phase 1's `to-tickets` requires it). That single command is the only manual step. Everything after it runs automatically. While `to-tickets` runs, any `ask` is auto-answered with "请你仔细思考后回答这个问题" instead of waiting for a person, and each turn ending sends one follow-up. By default that follow-up is the pre-Jev canned sequence ("请你仔细思考后回答这些问题", then "请生成文件"); with `jev.enabled: true` in `extensions/spec-to-code/config.json` the extension asks the `judge` role chain (TypeSafe Jev first) to choose the reply — round 1 offers only "请你仔细思考后回答这些问题" / "请生成文件", and "请继续" joins from round 2 on. Once ticket files exist, phase 2 starts when Jev picks "请继续" or after `jev.forcePhase2Round` rounds (default 5). Every automatic answer or follow-up spends a bounded budget (15); exhausting it stops the phase with a notification instead of looping — unless ticket files already exist, in which case phase 2 starts.
 
-```yaml
-# config.yml or .omp/config.yml (project config wins over global)
-specToCode:
-  jev:
-    enabled: true          # opt-in; needs a credentialed native judge (e.g. typesafe/jev-latest)
-    forcePhase2Round: 5    # optional; phase 2 forces after this many turn endings once tickets exist
+```jsonc
+// extensions/spec-to-code/config.json — read once at extension load
+{
+  "jev": {
+    "enabled": true,          // opt-in; needs a credentialed native judge (e.g. typesafe/jev-latest)
+    "forcePhase2Round": 5     // optional; phase 2 forces after this many turn endings once tickets exist
+  }
+}
 ```
 
 ```mermaid

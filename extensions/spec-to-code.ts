@@ -14,11 +14,11 @@
  * fixed budget so a stuck phase can never loop forever. Outside the workflow the
  * native `ask` tool is delegated to unchanged.
  *
- * When `specToCode.jev.enabled` is on and a native Jev judge is credentialed, every
- * `agent_end` asks Jev which canned reply to send. Round 1 only offers
- * "请你仔细思考后回答这些问题" / "请生成文件", so the first automatic reply is never
- * a bare "请继续"; from round 2 on "请继续" is offered too. Once ticket files exist,
- * phase 2 starts when Jev picks "请继续", or after `specToCode.jev.forcePhase2Round`
+ * When `jev.enabled` is on in `config.json` (beside the config module) and a native
+ * Jev judge is credentialed, every `agent_end` asks Jev which canned reply to send.
+ * Round 1 only offers "请你仔细思考后回答这些问题" / "请生成文件", so the first automatic
+ * reply is never a bare "请继续"; from round 2 on "请继续" is offered too. Once ticket
+ * files exist, phase 2 starts when Jev picks "请继续", or after `jev.forcePhase2Round`
  * rounds. Any failure in that chain falls back to the pre-Jev canned sequence.
  *
  * This module is the composition root: run state lives in `workflow-session.ts`,
@@ -28,12 +28,8 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import {
-	settings,
-	type ExtensionAPI,
-	type ExtensionCommandContext,
-} from "@oh-my-pi/pi-coding-agent";
-import { readSpecToCodeConfig, type SpecToCodeConfig } from "./spec-to-code/config";
+import { type ExtensionAPI, type ExtensionCommandContext } from "@oh-my-pi/pi-coding-agent";
+import { loadSpecToCodeConfig } from "./spec-to-code/config";
 import { activateSkill, hasSkill, hasTddAgent } from "./spec-to-code/host-integration";
 import { createJudgeDecider } from "./spec-to-code/jev-judge";
 import {
@@ -168,33 +164,15 @@ export default function specToCode(pi: ExtensionAPI): void {
 	const z = pi.zod;
 	const session = createWorkflowSession();
 
-	// `specToCode: { jev: { enabled, forcePhase2Round } }` in config.yml / .omp/config.yml.
-	// Unknown keys elsewhere in the layer are stripped by the schema, and project
-	// settings win over global settings.
-	const configSchema = z.object({
-		specToCode: z
-			.object({
-				jev: z
-					.object({
-						enabled: z.boolean().optional(),
-						forcePhase2Round: z.number().optional(),
-					})
-					.optional(),
-			})
-			.optional(),
+	// Config lives in `config.json` beside the config module (extensions/spec-to-code/).
+	// Read once at extension load: editing it requires an extension reload / omp restart.
+	const { config, error: configError } = loadSpecToCodeConfig();
+	let configErrorShown = false;
+	pi.on("session_start", (_event, ctx) => {
+		if (configError === undefined || configErrorShown) return;
+		configErrorShown = true;
+		ctx.ui.notify(configError, "warning");
 	});
-	const readConfig = (): SpecToCodeConfig => {
-		try {
-			const layers = [settings.getProjectSettings(), settings.getGlobalSettings()].map(layer => {
-				const parsed = configSchema.safeParse(layer);
-				return parsed.success ? parsed.data : undefined;
-			});
-			return readSpecToCodeConfig(layers);
-		} catch {
-			// Settings not initialized; fall through to the defaults.
-			return readSpecToCodeConfig([]);
-		}
-	};
 
 	// `ask` blocks inside tool execution, so `agent_end` cannot fire while its dialog
 	// waits. Re-registering the tool is the only in-process way to answer it: while this
@@ -269,7 +247,6 @@ export default function specToCode(pi: ExtensionAPI): void {
 		// OMP already scheduled a continuation (auto-retry, empty-stop recovery, ...); don't stack another.
 		if (event.willContinue) return;
 
-		const config = readConfig();
 		const round = session.advanceRound();
 		const ports: TurnPorts = {
 			decide: createJudgeDecider(pi, ctx, config),

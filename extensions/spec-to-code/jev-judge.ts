@@ -1,9 +1,14 @@
 /**
- * Jev judging chain (opt-in via `specToCode.jev.enabled`).
+ * Jev judging chain (opt-in via `jev.enabled` in `config.json`).
  *
  * `createJudgeDecider` is the judge port `planTurn` calls. It returns undefined
  * when the chain is off, has no native judge, or fails, so the caller then runs
  * the pre-Jev canned sequence.
+ *
+ * The request, result and error are logged at `debug` level to the host's shared
+ * rotating file log (`~/.omp/logs/omp.<date>.<pid>.log`) and never reach the TUI.
+ * Logging is a synchronous append on that shared sink and never spans the judge
+ * `await`, so it cannot deadlock against the request it describes.
  */
 import { settings, type ExtensionAPI, type ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { hasNativeJudge, resolveJudge } from "@oh-my-pi/pi-coding-agent/judgment";
@@ -34,9 +39,15 @@ export function createJudgeDecider(
 	config: SpecToCodeConfig,
 ): (lastReply: string, round: number) => Promise<string | undefined> {
 	return async (lastReply, round) => {
-		if (!config.jevEnabled) return undefined;
+		if (!config.jevEnabled) {
+			pi.logger.debug("spec-to-code: jev skipped", { round, reason: "disabled" });
+			return undefined;
+		}
 		try {
-			if (!hasNativeJudge(settings, ctx.modelRegistry)) return undefined;
+			if (!hasNativeJudge(settings, ctx.modelRegistry)) {
+				pi.logger.debug("spec-to-code: jev skipped", { round, reason: "no-native-judge" });
+				return undefined;
+			}
 			const judge = resolveJudge({
 				settings,
 				registry: ctx.modelRegistry,
@@ -46,33 +57,47 @@ export function createJudgeDecider(
 			const options = round <= 1 ? JEV_OPTIONS_ROUND1 : JEV_OPTIONS;
 			const criteria: Record<string, string> = {};
 			for (const option of options) criteria[option] = JEV_CRITERIA[option] ?? "";
-			const { answers } = await judge.judge(
-				{
-					state: lastReply,
-					questions: {
-						next_reply: {
-							type: "choice" as const,
-							instructions: JEV_INSTRUCTIONS,
-							criteria,
-						},
+			const request = {
+				state: lastReply,
+				questions: {
+					next_reply: {
+						type: "choice" as const,
+						instructions: JEV_INSTRUCTIONS,
+						criteria,
 					},
 				},
-				{ signal: AbortSignal.timeout(JEV_TIMEOUT_MS) },
-			);
-			const answer = answers.next_reply;
-			if (answer.type !== "choice") return undefined;
-			const chosen = pickJevOption(answer.probabilities, options);
-			pi.logger.debug("spec-to-code: jev auto-reply decision", {
-				round,
-				choice: chosen,
-				confidence: answer.confidence,
-				probabilities: answer.probabilities,
-			});
-			return chosen;
+			};
+			pi.logger.debug("spec-to-code: jev request", { round, options: [...options], request });
+			const started = performance.now();
+			try {
+				const result = await judge.judge(request, { signal: AbortSignal.timeout(JEV_TIMEOUT_MS) });
+				const answer = result.answers.next_reply;
+				const chosen = answer.type === "choice" ? pickJevOption(answer.probabilities, options) : undefined;
+				pi.logger.debug("spec-to-code: jev result", {
+					round,
+					durationMs: Math.round(performance.now() - started),
+					model: result.model,
+					api: result.api,
+					provider: result.provider,
+					usage: result.usage,
+					answers: result.answers,
+					chosen,
+					confidence: answer.type === "choice" ? answer.confidence : undefined,
+					probabilities: answer.type === "choice" ? answer.probabilities : undefined,
+				});
+				if (answer.type !== "choice") return undefined;
+				return chosen;
+			} catch (error) {
+				pi.logger.debug("spec-to-code: jev error", {
+					round,
+					durationMs: Math.round(performance.now() - started),
+					error: error instanceof Error ? error.message : String(error),
+					request,
+				});
+				return undefined;
+			}
 		} catch (error) {
-			pi.logger.debug("spec-to-code: jev decision failed; using fallback", {
-				error: error instanceof Error ? error.message : String(error),
-			});
+			pi.logger.debug("spec-to-code: jev error", { round, error: error instanceof Error ? error.message : String(error), lastReply });
 			return undefined;
 		}
 	};

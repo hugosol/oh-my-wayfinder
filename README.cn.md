@@ -96,14 +96,16 @@ flowchart TD
 
 ## 流程图 B：`/spec-to-code`：spec 到代码（仅 Oh My Pi）
 
-spec 位于 `.scratch/<slug>/spec.md`（由 `/to-spec` 发布）、已批准契约位于 `.scratch/<slug>/contract.md`（由 `/to-contract` 写入；Phase 1 的 `to-tickets` 强制要求它），运行 `/spec-to-code <slug>`。这一条命令是唯一的手动步骤。之后全部自动运行。在 `to-tickets` 阶段，agent 的 `ask` 会被自动代答为「请你仔细思考后回答这个问题」，不再等待人工输入；每次回合结束发送一条自动回复。默认走旧的原生序列（先「请你仔细思考后回答这些问题」，之后「请生成文件」）；开启 `specToCode.jev.enabled: true` 后，扩展改问 `judge` 角色链（优先 TypeSafe Jev）决定回复 —— 第一轮只提供「请你仔细思考后回答这些问题」/「请生成文件」，第二轮起加入「请继续」。当 ticket 文件已生成时，Jev 选中「请继续」或回合数超过 `specToCode.jev.forcePhase2Round`（默认 5）即进入 Phase 2。每次自动代答或自动续跑都会消耗一个有界预算（15 次），用尽后停止该阶段并给出通知，而不是无限循环；但若 ticket 文件已生成，则直接进入 Phase 2。
+spec 位于 `.scratch/<slug>/spec.md`（由 `/to-spec` 发布）、已批准契约位于 `.scratch/<slug>/contract.md`（由 `/to-contract` 写入；Phase 1 的 `to-tickets` 强制要求它），运行 `/spec-to-code <slug>`。这一条命令是唯一的手动步骤。之后全部自动运行。在 `to-tickets` 阶段，agent 的 `ask` 会被自动代答为「请你仔细思考后回答这个问题」，不再等待人工输入；每次回合结束发送一条自动回复。默认走旧的原生序列（先「请你仔细思考后回答这些问题」，之后「请生成文件」）；在 `extensions/spec-to-code/config.json` 里开启 `jev.enabled: true` 后，扩展改问 `judge` 角色链（优先 TypeSafe Jev）决定回复 —— 第一轮只提供「请你仔细思考后回答这些问题」/「请生成文件」，第二轮起加入「请继续」。当 ticket 文件已生成时，Jev 选中「请继续」或回合数超过 `jev.forcePhase2Round`（默认 5）即进入 Phase 2。每次自动代答或自动续跑都会消耗一个有界预算（15 次），用尽后停止该阶段并给出通知，而不是无限循环；但若 ticket 文件已生成，则直接进入 Phase 2。
 
-```yaml
-# config.yml 或 .omp/config.yml（项目配置优先于全局配置）
-specToCode:
-  jev:
-    enabled: true          # 可选开启；需要有凭证的原生 judge（如 typesafe/jev-latest）
-    forcePhase2Round: 5    # 可选；有票后回合数超过该值时强制进入 Phase 2
+```jsonc
+// extensions/spec-to-code/config.json —— 扩展加载时读取一次
+{
+  "jev": {
+    "enabled": true,          // 可选开启；需要有凭证的原生 judge（如 typesafe/jev-latest）
+    "forcePhase2Round": 5     // 可选；有票后回合数超过该值时强制进入 Phase 2
+  }
+}
 ```
 
 ```mermaid
