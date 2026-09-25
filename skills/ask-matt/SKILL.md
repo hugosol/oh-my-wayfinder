@@ -25,7 +25,7 @@ The route most work travels. You have an idea and want it built.
 
    Either way, **`/implement`** builds each issue by driving **`/tdd`** internally (one red-green slice at a time), then closes out by running **`/code-review`**, a two-axis review (Standards + Spec) of the diff, before committing. Reach for **`/tdd`** on its own when you just want to build a concrete behaviour test-first without a full spec, and **`/code-review`** on its own whenever you want to review your uncommitted changes (its default) or a branch or PR against a fixed point.
 
-   **Oh My Pi only:** once `.scratch/<slug>/spec.md` and its approved `contract.md` exist, **`/spec-to-code <slug>`** automates `/to-tickets` and then works the tickets in dependency order with serial TDD subagents. Install it by placing this repo's `extensions/spec-to-code.ts` in your OMP extension setup, with `extensions/agents/tdd.md` in the adjacent `agents/` directory. It is an automation tool, not a different flow: without OMP, call `/to-tickets` yourself, then `/implement` each ticket in dependency order.
+   **Oh My Pi only:** once `.scratch/<slug>/spec.md` and its approved `contract.md` exist, **`/spec-to-code <slug>`** automates `/to-tickets` and then works the tickets in dependency order with serial TDD subagents. Install it by placing this repo's `extensions/spec-to-code.ts` in your OMP extension setup, with `extensions/agents/tdd.md` in the adjacent `agents/` directory, and listing that directory under `extensions:` in `config.yml` (or passing it with `omp --extension`/`-e`). It is an automation tool, not a different flow: without OMP, call `/to-tickets` yourself, then `/implement` each ticket in dependency order.
 
 ### Context hygiene
 

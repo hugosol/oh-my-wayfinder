@@ -13,36 +13,39 @@
  * automatic intervention (an ask answer or an auto reply) burns one of a small,
  * fixed budget so a stuck phase can never loop forever. Outside the workflow the
  * native `ask` tool is delegated to unchanged.
+ *
+ * When `jev.enabled` is on in `config.json` (beside the config module) and a native
+ * Jev judge is credentialed, every `agent_end` asks Jev which canned reply to send.
+ * Round 1 only offers "请你仔细思考后回答这些问题" / "请生成文件", so the first automatic
+ * reply is never a bare "请继续"; from round 2 on "请继续" is offered too. Once ticket
+ * files exist, phase 2 starts when Jev picks "请继续", or after `jev.forcePhase2Round`
+ * rounds. Any failure in that chain falls back to the pre-Jev canned sequence.
+ *
+ * This module is the composition root: run state lives in `workflow-session.ts`,
+ * the turn decision in `turn-policy.ts`, the judge port in `jev-judge.ts`, config
+ * resolution in `config.ts`, and host access in `host-integration.ts`.
  */
 
 import * as fs from "node:fs/promises";
-import * as os from "node:os";
 import * as path from "node:path";
-import { fileURLToPath } from "node:url";
-import { discoverSkills, type ExtensionAPI, type ExtensionCommandContext } from "@oh-my-pi/pi-coding-agent";
-
-// ============================================================================
-// State
-// ============================================================================
-
-let currentPhase: "idle" | "phase1" = "idle";
-let currentSlug: string | undefined;
-let firstReplySent = false;
-/** Session that owns the running workflow; end events from other sessions must not drive it. */
-let autoSessionId: string | undefined;
-/** Automatic interventions spent by the running workflow: ask answers plus auto replies. */
-let autoActionCount = 0;
+import { type ExtensionAPI, type ExtensionCommandContext } from "@oh-my-pi/pi-coding-agent";
+import { loadSpecToCodeConfig } from "./spec-to-code/config";
+import { activateSkill, hasSkill, hasTddAgent } from "./spec-to-code/host-integration";
+import { createJudgeDecider } from "./spec-to-code/jev-judge";
+import {
+	lastAssistantStopReason,
+	lastAssistantText,
+	planTurn,
+	type TurnPorts,
+} from "./spec-to-code/turn-policy";
+import { createWorkflowSession, MAX_AUTO_ACTIONS } from "./spec-to-code/workflow-session";
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-const SKILL_PROMPT_TYPE = "skill-prompt";
-/** Auto follow-up for plain-text quizzes and the canned "Other" answer for the ask tool. */
-const AUTO_REPLY = "请你仔细思考后回答这些问题";
-const PUBLISH_REPLY = "请发布实现票文件";
-/** Hard ceiling on automatic interventions per workflow; reached => stop and hand back to the user. */
-const MAX_AUTO_ACTIONS = 15;
+/** Canned `ask` answer (one per question, so singular). */
+const ASK_REPLY = "请你仔细思考后回答这个问题";
 /** Model-facing description for the re-registered ask tool; mirrors the native prompt. */
 const ASK_DESCRIPTION = `Ask user for clarification/input during task execution.
 
@@ -73,39 +76,18 @@ const ASK_DESCRIPTION = `Ask user for clarification/input during task execution.
 // ============================================================================
 
 async function hasTicketFiles(slug: string): Promise<boolean> {
+	const dir = `.scratch/${slug}/implementation`;
 	try {
-		const entries = await fs.readdir(`.scratch/${slug}/implementation`);
-		return entries.some(e => e.endsWith(".md"));
+		const entries = await fs.readdir(dir);
+		for (const entry of entries) {
+			if (!entry.endsWith(".md")) continue;
+			const stat = await fs.stat(path.join(dir, entry));
+			if (stat.isFile() && stat.size > 0) return true;
+		}
+		return false;
 	} catch {
 		return false;
 	}
-}
-
-function resetWorkflow(): void {
-	currentPhase = "idle";
-	currentSlug = undefined;
-	firstReplySent = false;
-	autoSessionId = undefined;
-	autoActionCount = 0;
-}
-
-/** Spend one automatic intervention. False once the workflow budget is exhausted. */
-function spendAutoAction(): boolean {
-	if (autoActionCount >= MAX_AUTO_ACTIONS) return false;
-	autoActionCount += 1;
-	return true;
-}
-
-/** Stop reason of the newest assistant message in an agent_end payload. */
-function lastAssistantStopReason(messages: readonly unknown[]): string | undefined {
-	for (let i = messages.length - 1; i >= 0; i -= 1) {
-		const message = messages[i];
-		if (typeof message !== "object" || message === null) continue;
-		if (!("role" in message) || message.role !== "assistant") continue;
-		if (!("stopReason" in message)) return undefined;
-		return typeof message.stopReason === "string" ? message.stopReason : undefined;
-	}
-	return undefined;
 }
 
 interface AskAnswerQuestion {
@@ -113,10 +95,6 @@ interface AskAnswerQuestion {
 	question?: string;
 	options?: readonly { label?: string }[];
 	multi?: boolean;
-}
-
-function askOptionLabels(options: readonly { label?: string }[] | undefined): string[] {
-	return (options ?? []).map(option => option.label).filter((label): label is string => typeof label === "string");
 }
 
 /**
@@ -131,13 +109,15 @@ function buildAskAnswer(questions: readonly AskAnswerQuestion[]): {
 
 	if (questions.length <= 1) {
 		return {
-			content: [{ type: "text", text: `User provided custom input: ${AUTO_REPLY}` }],
+			content: [{ type: "text", text: `User provided custom input: ${ASK_REPLY}` }],
 			details: {
 				question: first?.question,
-				options: askOptionLabels(first?.options),
+				options: (first?.options ?? [])
+					.map(option => option.label)
+					.filter((label): label is string => typeof label === "string"),
 				multi: first?.multi === true,
 				selectedOptions: [],
-				customInput: AUTO_REPLY,
+				customInput: ASK_REPLY,
 			},
 		};
 	}
@@ -145,77 +125,22 @@ function buildAskAnswer(questions: readonly AskAnswerQuestion[]): {
 	const results = questions.map(question => ({
 		id: question.id ?? "",
 		question: question.question ?? "",
-		options: askOptionLabels(question.options),
+		options: (question.options ?? [])
+			.map(option => option.label)
+			.filter((label): label is string => typeof label === "string"),
 		multi: question.multi === true,
 		selectedOptions: [] as string[],
-		customInput: AUTO_REPLY,
+		customInput: ASK_REPLY,
 	}));
 	return {
 		content: [
 			{
 				type: "text",
-				text: `User answers:\n${results.map(result => `${result.id}: "${AUTO_REPLY}"`).join("\n")}`,
+				text: `User answers:\n${results.map(result => `${result.id}: "${ASK_REPLY}"`).join("\n")}`,
 			},
 		],
 		details: { results },
 	};
-}
-
-async function hasTddAgent(): Promise<boolean> {
-	// OMP auto-discovers agents from extension roots, project .omp/agents/, and ~/.omp/agent/agents/.
-	// Check the extension's own agents/ directory (resolved relative to this module) plus standard locations.
-	const extDir = path.dirname(fileURLToPath(import.meta.url));
-	const locations = [
-		path.join(extDir, "agents", "tdd.md"),
-		".omp/agents/tdd.md",
-		path.join(os.homedir(), ".omp/agent/agents/tdd.md"),
-	];
-	for (const loc of locations) {
-		try {
-			await fs.access(loc);
-			return true;
-		} catch {
-			// keep looking
-		}
-	}
-	return false;
-}
-
-/**
- * Build a skill-prompt message body matching OMP's internal format.
- * Skill body (without YAML frontmatter) + metadata footer.
- */
-async function buildSkillMessage(skillFilePath: string, userArgs: string): Promise<string> {
-	const content = await Bun.file(skillFilePath).text();
-	const body = content.replace(/^---\n[\s\S]*?\n---\n/, "").trim();
-	const metaLines = [`Skill: ${skillFilePath}`];
-	if (userArgs) metaLines.push(`User: ${userArgs}`);
-	return `${body}\n\n---\n\n${metaLines.join("\n")}`;
-}
-
-async function activateSkill(
-	pi: ExtensionAPI,
-	skillName: string,
-	userArgs: string,
-): Promise<boolean> {
-	const { skills } = await discoverSkills();
-	const skill = skills.find(s => s.name === skillName);
-	if (!skill) return false;
-
-	const message = await buildSkillMessage(skill.filePath, userArgs);
-
-	pi.sendMessage(
-		{
-			customType: SKILL_PROMPT_TYPE,
-			content: message,
-			display: false,
-			details: { name: skill.name, path: skill.filePath, args: userArgs || undefined },
-			attribution: "user",
-		},
-		{ triggerTurn: true },
-	);
-
-	return true;
 }
 
 // ============================================================================
@@ -236,11 +161,23 @@ async function startPhase2(pi: ExtensionAPI, slug: string): Promise<void> {
 export default function specToCode(pi: ExtensionAPI): void {
 	pi.setLabel("Spec-to-Code");
 
+	const z = pi.zod;
+	const session = createWorkflowSession();
+
+	// Config lives in `config.json` beside the config module (extensions/spec-to-code/).
+	// Read once at extension load: editing it requires an extension reload / omp restart.
+	const { config, error: configError } = loadSpecToCodeConfig();
+	let configErrorShown = false;
+	pi.on("session_start", (_event, ctx) => {
+		if (configError === undefined || configErrorShown) return;
+		configErrorShown = true;
+		ctx.ui.notify(configError, "warning");
+	});
+
 	// `ask` blocks inside tool execution, so `agent_end` cannot fire while its dialog
 	// waits. Re-registering the tool is the only in-process way to answer it: while this
 	// workflow owns the session the canned answer returns immediately, and everywhere
 	// else the native tool runs unchanged through ctx.invokeTool.
-	const z = pi.zod;
 	const askParameters = z.object({
 		questions: z
 			.array(
@@ -283,17 +220,13 @@ export default function specToCode(pi: ExtensionAPI): void {
 				};
 			};
 
-			if (
-				currentPhase !== "phase1" ||
-				autoSessionId === undefined ||
-				ctx.sessionManager.getSessionId() !== autoSessionId
-			) {
+			if (!session.isActive || !session.owns(ctx.sessionManager.getSessionId())) {
 				return await delegate();
 			}
 
-			if (!spendAutoAction()) {
-				const slug = currentSlug;
-				resetWorkflow();
+			if (!session.spendIntervention()) {
+				const slug = session.slug;
+				session.reset();
 				ctx.ui.notify(
 					`Spec-to-Code 自动模式已停止：达到 ${MAX_AUTO_ACTIONS} 次自动干预上限（${slug ?? "未知"}）。`,
 					"warning",
@@ -307,44 +240,59 @@ export default function specToCode(pi: ExtensionAPI): void {
 	});
 
 	pi.on("agent_end", async (event, ctx) => {
-		if (currentPhase !== "phase1" || currentSlug === undefined) return;
-		const slug = currentSlug;
+		if (!session.isActive || session.slug === undefined) return;
+		const slug = session.slug;
 		// End events fire for child sessions too; only the owning session may drive the workflow.
-		if (autoSessionId === undefined || ctx.sessionManager.getSessionId() !== autoSessionId) return;
+		if (!session.owns(ctx.sessionManager.getSessionId())) return;
 		// OMP already scheduled a continuation (auto-retry, empty-stop recovery, ...); don't stack another.
 		if (event.willContinue) return;
 
-		const stopReason = lastAssistantStopReason(event.messages);
-		if (stopReason === "aborted" || stopReason === "error") {
-			resetWorkflow();
-			ctx.ui.notify(`Spec-to-Code 自动模式已停止：agent 以 ${stopReason} 结束（${slug}）。`, "warning");
+		const round = session.advanceRound();
+		const ports: TurnPorts = {
+			decide: createJudgeDecider(pi, ctx, config),
+			hasTickets: hasTicketFiles,
+		};
+		const plan = await planTurn(
+			slug,
+			{
+				stopReason: lastAssistantStopReason(event.messages),
+				lastReply: lastAssistantText(event.messages),
+				round,
+				firstReplySent: session.firstReplySent,
+				canSpend: session.canSpend,
+				forcePhase2Round: config.forcePhase2Round,
+			},
+			ports,
+		);
+
+		if (plan.type === "reply") {
+			if (session.spendIntervention()) {
+				if (plan.fallback) session.markReplied();
+				pi.sendUserMessage(plan.text, { deliverAs: "followUp" });
+				return;
+			}
+			// The budget raced away between planning and applying; fall through to the budget stop.
+		} else if (plan.type === "phase2") {
+			session.reset();
+			await startPhase2(pi, plan.slug);
 			return;
 		}
 
-		if (await hasTicketFiles(slug)) {
-			resetWorkflow();
-			await startPhase2(pi, slug);
+		session.reset();
+		if (plan.type === "stop" && (plan.reason === "aborted" || plan.reason === "error")) {
+			ctx.ui.notify(`Spec-to-Code 自动模式已停止：agent 以 ${plan.reason} 结束（${slug}）。`, "warning");
 			return;
 		}
-
-		if (!spendAutoAction()) {
-			resetWorkflow();
-			ctx.ui.notify(
-				`Spec-to-Code 自动模式已停止：达到 ${MAX_AUTO_ACTIONS} 次自动干预上限，仍未检测到 .scratch/${slug}/implementation 下的票据。`,
-				"warning",
-			);
-			return;
-		}
-
-		const msg = firstReplySent ? PUBLISH_REPLY : AUTO_REPLY;
-		pi.sendUserMessage(msg, { deliverAs: "followUp" });
-		firstReplySent = true;
+		ctx.ui.notify(
+			`Spec-to-Code 自动模式已停止：达到 ${MAX_AUTO_ACTIONS} 次自动干预上限，仍未检测到 .scratch/${slug}/implementation 下的票据。`,
+			"warning",
+		);
 	});
 
 	pi.registerCommand("spec-to-code", {
 		description: "Autonomous Spec → Tickets → Code workflow",
 		handler: async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
-			if (currentPhase !== "idle") {
+			if (session.isActive) {
 				ctx.ui.notify("已有 Spec-to-Code 工作流在运行，等待其结束或停止后再启动。", "error");
 				return;
 			}
@@ -365,10 +313,9 @@ export default function specToCode(pi: ExtensionAPI): void {
 				return;
 			}
 
-			const { skills } = await discoverSkills();
-			const hasToTickets = skills.some(s => s.name === "to-tickets");
-			const hasTddSkill = skills.some(s => s.name === "tdd");
-			const tddAgentExists = hasTddSkill && (await hasTddAgent());
+			const hasToTickets = await hasSkill("to-tickets");
+			const hasTddSkill = await hasSkill("tdd");
+			const tddAgentExists = hasTddSkill && (await hasTddAgent(ctx.cwd));
 
 			if (!hasToTickets || !tddAgentExists) {
 				const missing = [
@@ -382,11 +329,7 @@ export default function specToCode(pi: ExtensionAPI): void {
 				return;
 			}
 
-			currentPhase = "phase1";
-			currentSlug = slug;
-			firstReplySent = false;
-			autoSessionId = ctx.sessionManager.getSessionId();
-			autoActionCount = 0;
+			session.begin(slug, ctx.sessionManager.getSessionId());
 			const success = await activateSkill(
 				pi,
 				"to-tickets",
@@ -394,7 +337,7 @@ export default function specToCode(pi: ExtensionAPI): void {
 			);
 
 			if (!success) {
-				resetWorkflow();
+				session.reset();
 				ctx.ui.notify("无法激活 to-tickets 技能", "error");
 			}
 		},

@@ -43,7 +43,7 @@ The planning loop they drive: `wayfinder` charts an effort too big for one sessi
 | `ask-matt` | **Modified** | Router text: the local tracker path is now `.scratch/<feature>/implementation/`, with guidance for the new skills and changes to the existing flow | Asking which skill fits | **Manual** |
 | `code-review` | **Modified** | Upstream skill, reworked: the default review target is the uncommitted changes against `HEAD` (untracked files included, `.gitignore` respected); supplying a fixed point still reviews the committed range | Reviewing work in progress, a branch, or a PR | **Manual** |
 | `tdd` | **Modified** | Upstream skill, reworked: execution is ticket-driven — the acceptance criteria, coverage ownership and approved seams come from the assigned work — and the loop adds design-before-red, preserve-the-criterion and check-the-evidence rules, plus completion requirements | Building a feature or fixing a bug test-first | **Manual** |
-| `spec-to-code` + `tdd` agent | **Extension** (OMP only) | Spec → implementation tickets → serial TDD subagents, fully automatic after one command | When you have a spec you want implemented | **Manual kickoff**, then automatic |
+| `spec-to-code` + `tdd` agent | **Extension** (OMP only) | Spec → implementation tickets → serial TDD subagents, fully automatic after one command; optional Jev-driven turn replies | When you have a spec you want implemented | **Manual kickoff**, then automatic |
 
 "Auto" means the calling skill mandates the step as part of its flow. It is an instruction-level guarantee, not a separate scheduler.
 
@@ -96,15 +96,25 @@ Legend: blue outline = new skills in this repo · green = auto-invoked · orange
 
 ## Flow B: `/spec-to-code`: spec to code (Oh My Pi only)
 
-Run `/spec-to-code <slug>` with the spec at `.scratch/<slug>/spec.md` (published by `/to-spec`) and its approved contract at `.scratch/<slug>/contract.md` (written by `/to-contract`; phase 1's `to-tickets` requires it). That single command is the only manual step. Everything after it runs automatically. While `to-tickets` runs, any `ask` is answered automatically with a "think it through yourself" reply instead of waiting for a person, and every automatic answer or follow-up spends a bounded budget (15); exhausting it stops the phase with a notification instead of looping.
+Run `/spec-to-code <slug>` with the spec at `.scratch/<slug>/spec.md` (published by `/to-spec`) and its approved contract at `.scratch/<slug>/contract.md` (written by `/to-contract`; phase 1's `to-tickets` requires it). That single command is the only manual step. Everything after it runs automatically. While `to-tickets` runs, any `ask` is auto-answered with "请你仔细思考后回答这个问题" instead of waiting for a person, and each turn ending sends one follow-up. By default that follow-up is the pre-Jev canned sequence ("请你仔细思考后回答这些问题", then "请生成文件"); with `jev.enabled: true` in `extensions/spec-to-code/config.json` the extension asks the `judge` role chain (TypeSafe Jev first) to choose the reply — round 1 offers only "请你仔细思考后回答这些问题" / "请生成文件", and "请继续" joins from round 2 on. Once ticket files exist, phase 2 starts when Jev picks "请继续" or after `jev.forcePhase2Round` rounds (default 5). Every automatic answer or follow-up spends a bounded budget (15); exhausting it stops the phase with a notification instead of looping — unless ticket files already exist, in which case phase 2 starts.
+
+```jsonc
+// extensions/spec-to-code/config.json — read once at extension load
+{
+  "jev": {
+    "enabled": true,          // opt-in; needs a credentialed native judge (e.g. typesafe/jev-latest)
+    "forcePhase2Round": 5     // optional; phase 2 forces after this many turn endings once tickets exist
+  }
+}
+```
 
 ```mermaid
 flowchart TD
     P["Spec at<br/>.scratch/&lt;slug&gt;/spec.md"] --> CT["Contract at<br/>.scratch/&lt;slug&gt;/contract.md"]
     CT --> C["/spec-to-code &lt;slug&gt;<br/><b>manual kickoff</b>"]
     C --> A["to-tickets activated<br/><b>auto</b>"]
-    A --> Q{"Tickets generated?"}
-    Q -->|"no"| QA["Agent questions auto-answered<br/>(thinks it through)"] --> A
+    A --> Q{"Tickets generated and<br/>(Jev says 请继续 or round &gt; B)?"}
+    Q -->|"no"| QA["Auto-answer the turn<br/>(ask: think it through;<br/>Jev or canned reply)"] --> A
     Q -->|"yes"| P2["Phase 2<br/><b>auto</b>"]
     P2 --> ORD["Sort tickets by<br/>dependencies"]
     ORD --> TD["task(agent=tdd) per ticket<br/>serial: each waits<br/>for the previous"]
