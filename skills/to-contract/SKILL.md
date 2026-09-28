@@ -65,6 +65,10 @@ Never list private modules, file paths, or internal helpers. Those are internal 
 
 ### 4. Propose, then ask for what only the human knows
 
+Run seam selection, boundary review, and acceptance-mode selection as sequential decision gates. Each message or question-tool call requests a decision for the current gate only. Stop and wait for the user's response; incorporate it before opening the next gate.
+
+Count only explicit confirmation of the decision presented as approval. Unanswered decisions remain pending. Hold any later-stage choice offered early as provisional until its prerequisites are confirmed and the choice still applies.
+
 For each seam decision, present one or two alternatives, the trade-off, a reversibility grade, and **your recommendation**. Be opinionated: the human wants a strong read, not a menu.
 
 Reversibility decides who has to look:
@@ -72,7 +76,7 @@ Reversibility decides who has to look:
 - **low reversibility** (public API, error semantics, ownership and resource bounds, concurrency and cost envelope) → the human decides;
 - **high reversibility** (internal seams, cheap to rewrite) → delegate, or approve in a batch.
 
-Proceed once the user selects or approves a seam proposal. Use it as the anchor for the following two interactions; revisit it if new constraints change the choice.
+This gate is complete when the user selects or approves a seam proposal. Use that selection—not an unapproved recommendation—to build the boundary summary in the next gate.
 
 #### Boundary review
 
@@ -80,7 +84,7 @@ Show a compact **boundary summary**: group the promises and six-surface findings
 
 Add a **trade-off note** only for a material future cost: the selected choice, the change that would force rework, what would be affected, and your recommendation. Use known evolution plans; ask about unknown plans only when the answer changes the choice. Obtain explicit approval for new high-impact trade-offs and resolve conflicts with the spec rather than silently changing scope.
 
-Ask: **“Does this match your expectations? Point out anything missing or worth changing; otherwise, confirm this direction.”** Proceed once the user confirms the summary and necessary decisions are resolved. Put deferred unknowns in *Not yet specified*.
+Ask: **“Does this match your expectations? Point out anything missing or worth changing; otherwise, confirm this direction.”** This gate is complete when the user confirms the summary incorporating their corrections and all decisions blocking approval are resolved. Put deferred unknowns in *Not yet specified*. If a correction invalidates the selected seam, return to seam selection and revise the summary before requesting confirmation.
 
 #### Acceptance mode
 
@@ -91,7 +95,7 @@ Ask the user to choose:
 
 For rapid iteration, identify the specific coverage items, why autonomous verification may be costly or misdirected, and what evidence the agent should prepare. The user approves, changes, or rejects the exceptions; none is a valid outcome. Reserve only the judgment that needs a human, keeping implementation and useful automated checks with the agent. The user evaluates results and guides revisions; the agent prepares evidence, adjusts, repairs, and rechecks.
 
-Both modes preserve the promises and quality constraints; they allocate verification responsibility, not permission to omit behavior or break compatibility. Proceed once the user has approved the promises and seams, chosen a mode, and confirmed any exceptions.
+Both modes preserve the promises and quality constraints; they allocate verification responsibility, not permission to omit behavior or break compatibility. Use the confirmed boundary summary to propose the acceptance mode and any human-led exceptions. This gate is complete when the user approves the mode and the specific exceptions, if any. Record the contract as approved only when all three gates are complete.
 
 ### 5. Record the decision
 
