@@ -1,6 +1,6 @@
 ---
 name: to-contract
-description: Turn a spec into an approved contract — the promise list and the seam decisions the build will be held to, for tickets, tests and QA to reference.
+description: Turn a spec into an approved contract of promises and seams.
 disable-model-invocation: true
 ---
 
@@ -15,11 +15,8 @@ Do not write code, and do not re-interview the user about the requirement — th
 ## Loads
 
 - Call the Skill tool with "codebase-design" before proposing any seam. It is the single owner of the **module / interface / seam / adapter / depth / leverage / locality** vocabulary and its principles — the deletion test, "the interface is the test surface", internal vs external seams, "one adapter means a hypothetical seam, two means a real one". Use its terms exactly; do not drift into "component", "service", "API" or "boundary".
-- When the promises cross an external dependency, use codebase-design's dependency categories to choose the stand-in / adapter / mock shape.
-- When two or more seam layouts are viable, use codebase-design's design-it-twice pattern to generate alternatives, then compare on depth, locality, and seam placement.
-- Reading `CONTEXT.md` for domain vocabulary is a one-line habit. Call the Skill tool with "domain-modeling" only when a term is being resolved or an ADR is being written.
-- **Seam placement rules live in this skill, deliberately:** prefer existing seams, take the highest seam that carries the promise, keep the count low (ideal one). They are not delegated to codebase-design. If a second skill ever needs them, move them then — lazy centralisation, not before.
-- This skill depends on codebase-design staying model-invoked.
+- Use codebase-design's dependency categories when the promises cross an external dependency, and its design-it-twice pattern when two or more seam layouts are viable; compare the alternatives on depth, locality, and seam placement.
+- Read `CONTEXT.md` for domain vocabulary; call the Skill tool with "domain-modeling" only when a term is being resolved or an ADR is being written.
 
 ## Prerequisites
 
@@ -42,7 +39,7 @@ Distill the User Stories into **promises**: one observable result per line, dedu
 For each promise record: the promise itself, its coverage, its source, the seam it is observed at, and — later, filled in by `/to-tickets` — what delivers it.
 
 - **Expected outcomes come from the promise, never from the implementation.** A value recomputed the way the code computes it is tautological and proves nothing; expected values are independent literals, worked examples, or the spec itself.
-- **Traverse past the literal spec.** For each capability, walk the existing system's symmetry (what does the sibling feature expose?), the dependencies it implies, and the six surfaces in step 3. Mark anything the spec did not say as `inferred`. Classify each inference: required to fulfill an existing promise, an internal implementation choice, or a new behavior or trade-off requiring approval. Draft the full promise list for the contract; bring only decision-relevant findings to the human gates.
+- **Traverse past the literal spec.** For each capability, walk the existing system's symmetry (what does the sibling feature expose?), the dependencies it implies, and the six surfaces in the boundary review. Mark anything the spec did not say as `inferred`. Classify each inference: required to fulfill an existing promise, an internal implementation choice, or a new behavior or trade-off requiring approval. Draft the full promise list for the contract; bring only decision-relevant findings to the human gates.
 - **Status is derived, not stored.** A promise is done when its delivering work is complete and all required checks pass, including user confirmation of any human-led coverage. Automated execution may finish while acceptance remains pending. Never hand-maintain a status column; generate a checklist from the contract and the tracker when the human asks for one.
 
 ### 3. Derive the seams
@@ -52,8 +49,7 @@ Promises are observed somewhere; that somewhere is a seam. Work in this order:
 1. **Observations.** For each promise ask: who observes this, and where? That boundary is a candidate seam.
 2. **Inventory.** List the seams the codebase already has — module interfaces, entry points, config, persistence, external dependencies, error surface.
 3. **Diff.** Prefer existing seams, and take the **highest** seam that carries the promise. A rendered value alone does not carry an independently specified data caliber or failure mechanism if a plausible violation cannot be distinguished there; observe that promise where the evidence is available. UI and payload may carry different promises from the same stories. Fewer seams is better; the ideal number is one.
-4. **Surface walk.** If the promise set touches them, walk the six surfaces so nothing operational is missed: **entry** (CLI / API / UI / library), **data and state** (schema, files, config), **external dependencies** (third party, time, randomness, filesystem), **errors and failure** (error types, exit codes, timeouts, retries), **output and observability** (stdout, reports, logs, metrics), **resources and concurrency** (ownership, resource bounds, cost envelope — usually attached to another seam rather than its own row).
-5. **Collapse.** Merge seams that carry the same promises. Every new seam must earn its keep: name what actually varies across it.
+4. **Collapse.** Merge seams that carry the same promises. Every new seam must earn its keep: name what actually varies across it.
 
 Stopping rules:
 
@@ -62,6 +58,8 @@ Stopping rules:
 - needing two seams to verify one promise means the seams are **too low** — take the common entry point.
 
 Never list private modules, file paths, or internal helpers. Those are internal seams, and they are the agent's business, not the contract's.
+
+**Seams are hypotheses.** When implementation disproves one, change the contract, and take it to an ADR if it is hard to reverse; keep code and contract from drifting silently.
 
 ### 4. Propose, then ask for what only the human knows
 
@@ -80,7 +78,7 @@ This gate is complete when the user selects or approves a seam proposal. Use tha
 
 #### Boundary review
 
-Walk all six surfaces against the selected seams and the full promise set internally. Account for applicable guarantees, inferred gaps, and why any remaining surface does not apply; retain the surface-by-surface check for the final coverage report and on request.
+Walk the six surfaces against the selected seams and the full promise set — **entry** (CLI / API / UI / library), **data and state** (schema, files, config), **external dependencies** (third party, time, randomness, filesystem), **errors and failure** (error types, exit codes, timeouts, retries), **output and observability** (stdout, reports, logs, metrics), and **resources and concurrency** (ownership, resource bounds, cost envelope — usually attached to another seam rather than its own row). Account for applicable guarantees, inferred gaps, and why any remaining surface does not apply. This check stays internal; retain it for the final coverage report and on request.
 
 Present only the **boundary findings** that affect approved guarantees or need human judgment: newly inferred guarantees needed to fulfill existing promises, conflicts with inherited decisions, and unresolved choices that would change behavior, scope, or a material trade-off. Incorporate implications required by existing approved promises without offering alternatives or requesting a separate approval; mention them briefly as findings. An approved seam's low reversibility alone does not turn such an implication into a new decision. Leave internal implementation choices with the build and out of the boundary-review message. Escalate only a new behavior, an inherited conflict, or a material trade-off. For each choice requiring human judgment, give the concrete scenario, consequence, alternatives where relevant, and your recommendation. If no such choice remains, say so. Offer the full promise list and surface walk on request; the boundary-review message contains findings rather than a per-surface report or a second guarantee list.
 
@@ -107,7 +105,7 @@ When a decision is hard to reverse, surprising without context, and the result o
 
 ### 6. Write the contract
 
-Write it to `.scratch/<feature-slug>/contract.md` (or beside wherever this repo keeps per-feature scratch), and link it from the spec issue. Template:
+The contract is not a plan: it says what is promised and where it is observable, never in what order to build. Write it to `.scratch/<feature-slug>/contract.md` (or beside wherever this repo keeps per-feature scratch), and link it from the spec issue. Template:
 
 <contract-template>
 
@@ -142,7 +140,7 @@ Record the chosen mode. For each human-led exception, use the existing **Coverag
 
 When exceptions exist, include this instruction in the contract: **“Complete implementation and all assigned automated checks before the human-led acceptance round. Planned human-led checks do not pause otherwise executable work. At the final handoff, report the remaining checks together with their prepared evidence; they remain unverified until the user confirms them. Report genuine blockers when encountered.”**
 
-One fact, one home: the spec owns the narrative and the scope; the contract owns the promises and the seams; the tickets own the slices. Do not restate user stories, prose rationale, or scope inside the contract.
+One fact, one home: the spec owns the narrative and the scope; the contract owns the promises and the seams; the tickets own the slices. Reference the spec and the stories by link and number; never copy them in.
 
 ### 7. Report coverage
 
@@ -150,23 +148,9 @@ Close with checks, not prose:
 
 - every promise maps to at least one seam — list any exception;
 - every seam carries at least one promise — list any exception;
-- all six surfaces walked — say which were not relevant, and why;
+- all six surfaces walked in the boundary review — say which were not relevant, and why;
 - what remains in **Not yet specified**, distinguishing deferred items from decisions blocking approval;
 - the acceptance mode and human-led coverage references, or **none**.
-
-## Rules
-
-- **Never decide what you cannot see.** Seams the next slice does not touch go to *Not yet specified* — a contract that pre-decides everything is a waterfall plan.
-- **Seams are hypotheses.** When implementation disproves one, change the contract, and take it to an ADR if it is hard to reverse. Never let code and contract drift silently.
-- **The contract is not a plan.** It says what is promised and where it is observable; it never says in what order to build.
-- **No paths, no private names.** They go stale, and they are not promises.
-- **No duplication.** Reference the spec and the stories by link and number; never copy them in.
-
-## Upstream deltas this skill assumes
-
-- **`to-spec`** — the seam sketch and the seam half of Testing Decisions move here. Leave in the spec: the narrative, the scope, the implementation decisions, and a pointer to prior art for tests.
-- **`to-tickets`** — each ticket gains one line, `Delivers: P1, P2` (or `enabling: unblocks P3`). Its quiz gains one question (does every promise have a ticket, and does every ticket either deliver a promise or earn its place as an enabling slice?) and, for a promise that spans tickets, a coverage-partition table naming the ticket that owns each coverage item and the tests. Promise completion follows step 2; ticket closure alone does not establish acceptance.
-- **`implement`** is unchanged. **`tdd`** is reworked in this repo to take its acceptance criteria, coverage IDs and seams from the assigned work; those approved seams are the contract's "pre-agreed seams", and the promise list is where acceptance tests are written from. If `/to-tickets` is run with no contract, it should stop and ask for one.
 
 ## What comes next
 
