@@ -42,7 +42,7 @@ Distill the User Stories into **promises**: one observable result per line, dedu
 For each promise record: the promise itself, its coverage, its source, the seam it is observed at, and — later, filled in by `/to-tickets` — what delivers it.
 
 - **Expected outcomes come from the promise, never from the implementation.** A value recomputed the way the code computes it is tautological and proves nothing; expected values are independent literals, worked examples, or the spec itself.
-- **Traverse past the literal spec.** For each capability, walk the existing system's symmetry (what does the sibling feature expose?), the dependencies it implies, and the six surfaces in step 3. Anything the spec did not say is marked `inferred` — that is where the human's attention goes.
+- **Traverse past the literal spec.** For each capability, walk the existing system's symmetry (what does the sibling feature expose?), the dependencies it implies, and the six surfaces in step 3. Mark anything the spec did not say as `inferred`. Classify each inference: required to fulfill an existing promise, an internal implementation choice, or a new behavior or trade-off requiring approval. Draft the full promise list for the contract; bring only decision-relevant findings to the human gates.
 - **Status is derived, not stored.** A promise is done when its delivering work is complete and all required checks pass, including user confirmation of any human-led coverage. Automated execution may finish while acceptance remains pending. Never hand-maintain a status column; generate a checklist from the contract and the tracker when the human asks for one.
 
 ### 3. Derive the seams
@@ -51,7 +51,7 @@ Promises are observed somewhere; that somewhere is a seam. Work in this order:
 
 1. **Observations.** For each promise ask: who observes this, and where? That boundary is a candidate seam.
 2. **Inventory.** List the seams the codebase already has — module interfaces, entry points, config, persistence, external dependencies, error surface.
-3. **Diff.** Prefer existing seams, and take the **highest** seam that carries the promise. Fewer seams is better; the ideal number is one.
+3. **Diff.** Prefer existing seams, and take the **highest** seam that carries the promise. A rendered value alone does not carry an independently specified data caliber or failure mechanism if a plausible violation cannot be distinguished there; observe that promise where the evidence is available. UI and payload may carry different promises from the same stories. Fewer seams is better; the ideal number is one.
 4. **Surface walk.** If the promise set touches them, walk the six surfaces so nothing operational is missed: **entry** (CLI / API / UI / library), **data and state** (schema, files, config), **external dependencies** (third party, time, randomness, filesystem), **errors and failure** (error types, exit codes, timeouts, retries), **output and observability** (stdout, reports, logs, metrics), **resources and concurrency** (ownership, resource bounds, cost envelope — usually attached to another seam rather than its own row).
 5. **Collapse.** Merge seams that carry the same promises. Every new seam must earn its keep: name what actually varies across it.
 
@@ -69,22 +69,24 @@ Run seam selection, boundary review, and acceptance-mode selection as sequential
 
 Count only explicit confirmation of the decision presented as approval. Unanswered decisions remain pending. Hold any later-stage choice offered early as provisional until its prerequisites are confirmed and the choice still applies.
 
-For each seam decision, present one or two alternatives, the trade-off, a reversibility grade, and **your recommendation**. Be opinionated: the human wants a strong read, not a menu.
+For each seam decision, present one or two alternatives, the trade-off, a reversibility grade, and **your recommendation**. Be opinionated: the human wants a strong read, not a menu. Present the promises that distinguish the seam alternatives, not the full draft promise list. Keep that list for the contract and show it on request.
 
 Reversibility decides who has to look:
 
 - **low reversibility** (public API, error semantics, ownership and resource bounds, concurrency and cost envelope) → the human decides;
 - **high reversibility** (internal seams, cheap to rewrite) → delegate, or approve in a batch.
 
-This gate is complete when the user selects or approves a seam proposal. Use that selection—not an unapproved recommendation—to build the boundary summary in the next gate.
+This gate is complete when the user selects or approves a seam proposal. Use that selection—not an unapproved recommendation—to review the boundary findings in the next gate.
 
 #### Boundary review
 
-Show a compact **boundary summary**: group the promises and six-surface findings into a few rows of concrete guarantees. Distinguish inherited decisions, inferred additions, and unresolved choices. Highlight material gaps and briefly explain relevant surfaces that do not apply. Compress the presentation, not the surface walk; the user should recognise omissions without recalling earlier decisions or checking every promise.
+Walk all six surfaces against the selected seams and the full promise set internally. Account for applicable guarantees, inferred gaps, and why any remaining surface does not apply; retain the surface-by-surface check for the final coverage report and on request.
+
+Present only the **boundary findings** that affect approved guarantees or need human judgment: newly inferred guarantees needed to fulfill existing promises, conflicts with inherited decisions, and unresolved choices that would change behavior, scope, or a material trade-off. Incorporate implications required by existing approved promises without offering alternatives or requesting a separate approval; mention them briefly as findings. An approved seam's low reversibility alone does not turn such an implication into a new decision. Leave internal implementation choices with the build and out of the boundary-review message. Escalate only a new behavior, an inherited conflict, or a material trade-off. For each choice requiring human judgment, give the concrete scenario, consequence, alternatives where relevant, and your recommendation. If no such choice remains, say so. Offer the full promise list and surface walk on request; the boundary-review message contains findings rather than a per-surface report or a second guarantee list.
 
 Add a **trade-off note** only for a material future cost: the selected choice, the change that would force rework, what would be affected, and your recommendation. Use known evolution plans; ask about unknown plans only when the answer changes the choice. Obtain explicit approval for new high-impact trade-offs and resolve conflicts with the spec rather than silently changing scope.
 
-Ask: **“Does this match your expectations? Point out anything missing or worth changing; otherwise, confirm this direction.”** This gate is complete when the user confirms the summary incorporating their corrections and all decisions blocking approval are resolved. Put deferred unknowns in *Not yet specified*. If a correction invalidates the selected seam, return to seam selection and revise the summary before requesting confirmation.
+Ask the human to approve the identified choices or correct a specific finding; invite additional hard constraints as an optional prompt, not as the coverage check. This gate is complete when each approval-blocking choice is resolved and the human confirms the resulting direction. Put deferred unknowns in *Not yet specified*. If a correction invalidates the selected seam, return to seam selection and review the findings again.
 
 #### Acceptance mode
 
@@ -95,7 +97,7 @@ Ask the user to choose:
 
 For rapid iteration, identify the specific coverage items, why autonomous verification may be costly or misdirected, and what evidence the agent should prepare. The user approves, changes, or rejects the exceptions; none is a valid outcome. Reserve only the judgment that needs a human, keeping implementation and useful automated checks with the agent. The user evaluates results and guides revisions; the agent prepares evidence, adjusts, repairs, and rechecks.
 
-Both modes preserve the promises and quality constraints; they allocate verification responsibility, not permission to omit behavior or break compatibility. Use the confirmed boundary summary to propose the acceptance mode and any human-led exceptions. This gate is complete when the user approves the mode and the specific exceptions, if any. Record the contract as approved only when all three gates are complete.
+Both modes preserve the promises and quality constraints; they allocate verification responsibility, not permission to omit behavior or break compatibility. Use the confirmed boundary findings to propose the acceptance mode and any human-led exceptions. This gate is complete when the user approves the mode and the specific exceptions, if any. Record the contract as approved only when all three gates are complete.
 
 ### 5. Record the decision
 
