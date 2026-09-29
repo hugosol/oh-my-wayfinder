@@ -16,11 +16,11 @@ Do not write code, and do not re-interview the user about the requirement — th
 
 - Call the Skill tool with "codebase-design" before proposing any seam. It is the single owner of the **module / interface / seam / adapter / depth / leverage / locality** vocabulary and its principles — the deletion test, "the interface is the test surface", internal vs external seams, "one adapter means a hypothetical seam, two means a real one". Use its terms exactly; do not drift into "component", "service", "API" or "boundary".
 - Use codebase-design's dependency categories when the promises cross an external dependency, and its design-it-twice pattern when two or more seam layouts are viable; compare the alternatives on depth, locality, and seam placement.
-- Read `CONTEXT.md` for domain vocabulary; call the Skill tool with "domain-modeling" only when a term is being resolved or an ADR is being written.
+- Read `GLOSSARY.md` for domain vocabulary; call the Skill tool with "domain-modeling" only when a term is being resolved or an ADR is being written.
 
 ## Prerequisites
 
-The issue tracker and triage vocabulary should have been provided by `/setup-matt-pocock-skills`. You need: the spec (issue or path), `CONTEXT.md`, the ADRs in the area you are touching, and the existing seams in the code.
+The issue tracker and triage vocabulary should have been provided by `/setup-matt-pocock-skills`. You need: the spec (issue or path), `GLOSSARY.md`, the ADRs in the area you are touching, and the existing seams in the code.
 
 If there is no spec, tell the user to run `/to-spec` first. Do not reconstruct one.
 

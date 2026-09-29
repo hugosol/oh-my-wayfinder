@@ -7,8 +7,8 @@
 The router names the local implementation-ticket directory, not upstream's `issues/`.
 
 ```diff
--   - **Yes** → **`/to-spec`** (turn the thread into a spec), then **`/to-tickets`** to split it into tracer-bullet tickets, each declaring its **blocking edges**. On a local tracker that's one file per ticket under `.scratch/<feature>/issues/`, worked blockers-first by hand; on a real tracker the edges become native blocking links, so any ticket whose blockers are done can be grabbed: kick off **`/implement`** per ticket, **`/clear`ing context between each one**. Each ticket is self-contained, so the last one's context is disposable.
-+   - **Yes** → **`/to-spec`** (turn the thread into a spec), then **`/to-tickets`** to split it into tracer-bullet tickets, each declaring its **blocking edges**. On a local tracker that's one file per ticket under `.scratch/<feature>/implementation/`, worked blockers-first by hand; on a real tracker the edges become native blocking links, so any ticket whose blockers are done can be grabbed: kick off **`/implement`** per ticket, **`/clear`ing context between each one**. Each ticket is self-contained, so the last one's context is disposable.
+-     - **`/implement`** per ticket, **`/clear`ing context between each one**. On a local tracker that's one file per ticket under `.scratch/<feature>/issues/`, worked blockers-first by hand; on a real tracker the edges become native blocking links, so any ticket whose blockers are done can be grabbed. Each ticket is self-contained, so the last one's context is disposable.
++     - **`/implement`** per ticket, **`/clear`ing context between each one**. On a local tracker that's one file per ticket under `.scratch/<feature>/implementation/`, worked blockers-first by hand; on a real tracker the edges become native blocking links, so any ticket whose blockers are done can be grabbed. Each ticket is self-contained, so the last one's context is disposable.
 ```
 
 ### review-default
@@ -16,8 +16,8 @@ The router names the local implementation-ticket directory, not upstream's `issu
 The router reflects code-review's new default target: the uncommitted changes.
 
 ```diff
--   Either way, **`/implement`** builds each issue by driving **`/tdd`** internally (one red-green slice at a time), then closes out by running **`/code-review`**, a two-axis review (Standards + Spec) of the diff, before committing. Reach for **`/tdd`** on its own when you just want to build a concrete behaviour test-first without a full spec, and **`/code-review`** on its own whenever you want to review a branch or PR against a fixed point.
-+   Either way, **`/implement`** builds each issue by driving **`/tdd`** internally (one red-green slice at a time), then closes out by running **`/code-review`**, a two-axis review (Standards + Spec) of the diff, before committing. Reach for **`/tdd`** on its own when you just want to build a concrete behaviour test-first without a full spec, and **`/code-review`** on its own whenever you want to review your uncommitted changes (its default) or a branch or PR against a fixed point.
+-   Either way, the code gets built by driving **`/tdd`** (one red-green slice at a time) and closes out with **`/code-review`**, a two-axis review (Standards + Spec) of the diff. `/implement` runs both per ticket; `/implement-spec`'s implementers each drive `/tdd`, and it runs one `/code-review` over the integration branch. Reach for **`/tdd`** on its own when you just want to build a concrete behaviour test-first without a full spec, and **`/code-review`** on its own whenever you want to review a branch or PR against a fixed point.
++   Either way, the code gets built by driving **`/tdd`** (one red-green slice at a time) and closes out with **`/code-review`**, a two-axis review (Standards + Spec) of the diff. `/implement` runs both per ticket; `/implement-spec`'s implementers each drive `/tdd`, and it runs one `/code-review` over the integration branch. Reach for **`/tdd`** on its own when you just want to build a concrete behaviour test-first without a full spec, and **`/code-review`** on its own whenever you want to review your uncommitted changes (its default) or a branch or PR against a fixed point.
 ```
 
 ### contract-gate
@@ -25,20 +25,18 @@ The router reflects code-review's new default target: the uncommitted changes.
 The multi-session route passes through an approved contract before tickets are cut.
 
 ```diff
--   - **Yes** → **`/to-spec`** (turn the thread into a spec), then **`/to-tickets`** to split it into tracer-bullet tickets, each declaring its **blocking edges**. On a local tracker that's one file per ticket under `.scratch/<feature>/implementation/`, worked blockers-first by hand; on a real tracker the edges become native blocking links, so any ticket whose blockers are done can be grabbed: kick off **`/implement`** per ticket, **`/clear`ing context between each one**. Each ticket is self-contained, so the last one's context is disposable.
-+   - **Yes** → **`/to-spec`** (turn the thread into a spec), then **`/to-contract`** to agree the promises and the seams where they will be observed. Once the contract is approved, **`/to-tickets`** splits it into tracer-bullet tickets, each declaring its **blocking edges**. On a local tracker that's one file per ticket under `.scratch/<feature>/implementation/`, worked blockers-first by hand; on a real tracker the edges become native blocking links, so any ticket whose blockers are done can be grabbed: kick off **`/implement`** per ticket, **`/clear`ing context between each one**. Each ticket is self-contained, so the last one's context is disposable.
+-   - **Yes** → **`/to-spec`** (turn the thread into a spec), then **`/to-tickets`** to split it into tracer-bullet tickets, each declaring its **blocking edges**. Then work the tickets one of two ways:
++   - **Yes** → **`/to-spec`** (turn the thread into a spec), then **`/to-contract`** to agree the promises and the seams where they will be observed. Once the contract is approved, **`/to-tickets`** splits it into tracer-bullet tickets, each declaring its **blocking edges**. Then work the tickets one of two ways:
 ```
 
 ### omp-automation
 
-The router offers the OMP extension as automation over the same route, not as a separate process.
+The router offers the OMP extension as the serial automation over the same route as `/implement-spec`, not as a separate process.
 
 ```diff
-    Either way, **`/implement`** builds each issue by driving **`/tdd`** internally (one red-green slice at a time), then closes out by running **`/code-review`**, a two-axis review (Standards + Spec) of the diff, before committing. Reach for **`/tdd`** on its own when you just want to build a concrete behaviour test-first without a full spec, and **`/code-review`** on its own whenever you want to review your uncommitted changes (its default) or a branch or PR against a fixed point.
+    When the work goes up as a pull request, **`/pr`** shapes the body: the smallest visual that shows the change, before/after evidence that it works, and a one-way or two-way door call. It's model-invoked, so the agent reaches for it whenever it writes a PR.
 +
-+   **Oh My Pi only:** once `.scratch/<slug>/spec.md` and its approved `contract.md` exist, **`/spec-to-code <slug>`** automates `/to-tickets` and then works the tickets in dependency order with serial TDD subagents. Install it by placing this repo's `extensions/spec-to-code.ts` in your OMP extension setup, with `extensions/agents/tdd.md` in the adjacent `agents/` directory, and listing that directory under `extensions:` in `config.yml` (or passing it with `omp --extension`/`-e`). It is an automation tool, not a different flow: without OMP, call `/to-tickets` yourself, then `/implement` each ticket in dependency order.
- 
- ### Context hygiene
++   **Oh My Pi only:** once `.scratch/<slug>/spec.md` and its approved `contract.md` exist, **`/spec-to-code <slug>`** automates `/to-tickets` and then works the tickets in dependency order with serial TDD subagents. It is the OMP-only counterpart to `/implement-spec`: the same route, but serial, with the contract gate and hands-off turn handling built in. Install it by placing this repo's `extensions/spec-to-code.ts` in your OMP extension setup, with `extensions/agents/tdd.md` in the adjacent `agents/` directory, and listing that directory under `extensions:` in `config.yml` (or passing it with `omp --extension`/`-e`). It is an automation tool, not a different flow: without OMP, call `/to-tickets` yourself, then work the tickets with `/implement` or `/implement-spec`.
 ```
 
 ### contract-context
@@ -46,8 +44,8 @@ The router offers the OMP extension as automation over the same route, not as a 
 The contract stays in the same context window as the thinking that produced it.
 
 ```diff
--Keep steps 1–3 in **one unbroken context window** (don't compact or clear until after `/to-tickets`) so the grilling, spec, and tickets all build on the same thinking. Each `/implement` then starts fresh, working from the ticket.
-+Keep steps 1–3 in **one unbroken context window** (don't compact or clear until after `/to-tickets`) so the grilling, spec, contract, and tickets all build on the same thinking. Each `/implement` then starts fresh, working from the ticket.
+-Keep steps 1–3 in **one unbroken context window** (don't compact or clear until after `/to-tickets`) so the grilling, spec, and tickets all build on the same thinking. Each `/implement` then starts fresh, working from the ticket. Run `/retro` in the session it's looking back on, before you clear; after clearing, point it at that session's log instead.
++Keep steps 1–3 in **one unbroken context window** (don't compact or clear until after `/to-tickets`) so the grilling, spec, contract, and tickets all build on the same thinking. Each `/implement` then starts fresh, working from the ticket. Run `/retro` in the session it's looking back on, before you clear; after clearing, point it at that session's log instead.
 ```
 
 ### wayfinder-quality-loop
