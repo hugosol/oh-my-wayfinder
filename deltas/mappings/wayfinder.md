@@ -93,3 +93,12 @@ Steps 5-7 make lighthouse and backtracer mandatory, replacing upstream's comment
 +   - If `backtracer` is unavailable, STOP. Do not proceed.
 +7. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. This includes any tickets backtracer surfaced and the user confirmed. If the answer reveals that a ticket (this one or another) sits beyond the destination, **rule it out of scope** rather than resolving it on the route. If the decision invalidates other parts of the map, update or delete those tickets.
 ```
+
+### prototype-worktree-asset
+
+The Prototype ticket type links a worktree asset and writes no spec.
+
+```diff
+-- **Prototype** (HITL): Raise the fidelity of the discussion by making a cheap, rough, concrete artifact to react to (an outline, a rough take, a stub, or UI/logic code) by calling the Skill tool with "prototype". Links the prototype as an asset. Use when "how should it look" or "how should it behave" is the key question.
++- **Prototype** (HITL): Raise the fidelity of the discussion by making a cheap, rough, concrete artifact to react to (an outline, a rough take, a stub, or UI/logic code) by calling the Skill tool with "prototype". It hands back a `prototype/<name>` worktree holding the chosen result and a `VERDICT.md`; link that worktree path as the asset. Use when "how should it look" or "how should it behave" is the key question.
+```

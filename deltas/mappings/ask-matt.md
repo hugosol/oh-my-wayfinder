@@ -62,3 +62,24 @@ The wayfinder on-ramp includes the local-track quality loop and its manual final
 +
 +  When the map clears and `/traverse` is accepted, **wayfinder hands off, it doesn't build**: merge onto the main flow at **`/to-spec`**, which collapses the map's linked decisions into a buildable plan, then `/to-contract`, `/to-tickets` and `/implement` as usual. Looping the map straight into `/implement` skips that collapse and throws the linked detail away, so go straight to `/implement` only when the effort turned out genuinely small.
 ```
+
+### prototype-worktree-detour
+
+The prototype detour hands back a worktree instead of a `/handoff` pair.
+
+```diff
+-2. **Branch: can you settle every question in conversation?** If a question needs a runnable answer (state, business logic, a UI you have to see), detour through a prototype, bridged by **`/handoff`** in both directions (a prototype lives in its own directory, which is exactly what `/handoff` is for; see Phase boundaries):
+-   - **`/handoff`** out, then open a fresh session against that file,
+-   - **`/prototype`** to answer the question with throwaway code,
+-   - **`/handoff`** back what you learned, and reference it from the original idea thread.
++2. **Branch: can you settle every question in conversation?** If a question needs a runnable answer (state, business logic, a UI you have to see), detour through a prototype. Run **`/prototype`** in the working tree; it hands back a `prototype/<name>` worktree holding the chosen result and a `VERDICT.md`, with the working tree restored. Take that worktree path back into this thread — it is the reference the spec will point at — and keep grilling.
+```
+
+### prototype-worktree-standalone
+
+The standalone section describes the worktree handoff and the no-spec rule.
+
+```diff
+-- **`/prototype`** is a small, throwaway program that answers one design question: does this state model feel right, or what should this UI look like. Throwaway is a constraint on how the code is written, not a promise to destroy it: the answer folds into the real code, and the prototype itself is kept as a **primary source** on a `prototype/<name>` branch out of main, pointed at from the implementation issue. It's the detour in step 2 of the main flow, but reach for it any time a design question is hard to settle on paper.
++- **`/prototype`** is a small, throwaway program that answers one design question: does this state model feel right, or what should this UI look like. It builds in the working tree so the question is judged against the real app, then hands back a `prototype/<name>` worktree in a sibling directory holding the chosen result and a `VERDICT.md`, and restores the working tree. It writes no spec, issue, or ticket; take the worktree path into the conversation that asked the question and run `/to-spec` there when you're ready. It's the detour in step 2 of the main flow, but reach for it any time a design question is hard to settle on paper.
+```

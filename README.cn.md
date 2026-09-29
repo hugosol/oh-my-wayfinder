@@ -4,7 +4,7 @@
 
 **[mattpocock/skills](https://github.com/mattpocock/skills) 的 fork**：为 AI 编程 agent 设计的工程技能集。本仓库在其基础上新增了规划质检类 skill，并为 **[Oh My Pi](https://github.com/can1357/oh-my-pi)** agent 编写了自动化扩展。
 
-本仓库改造上游的七个 skill（`wayfinder`、`setup-matt-pocock-skills`、`to-spec`、`to-tickets`、`ask-matt`、`code-review`、`tdd`），并以**完整目录**形式发布（无需改动的文件逐字取自上游），另加新增的 `lighthouse` / `backtracer` / `traverse` / `to-contract` 与 Oh My Pi 扩展。请先安装 Matt 的技能集，再把本仓库的文件覆盖上去（见 [快速开始](#快速开始)）。
+本仓库改造上游的八个 skill（`wayfinder`、`setup-matt-pocock-skills`、`to-spec`、`to-tickets`、`ask-matt`、`prototype`、`code-review`、`tdd`），并以**完整目录**形式发布（无需改动的文件逐字取自上游），另加新增的 `lighthouse` / `backtracer` / `traverse` / `to-contract` 与 Oh My Pi 扩展。请先安装 Matt 的技能集，再把本仓库的文件覆盖上去（见 [快速开始](#快速开始)）。
 
 ## 快速开始
 
@@ -41,6 +41,7 @@
 | `to-spec` | **改造** | 上游 skill 的重构版：seam 草图与 Testing Decisions 中的 seam 部分移交给 `to-contract`；发布 spec 后指向 `/to-contract` 作为下一步 | 把当前对话变成 spec 时 | **手动** |
 | `to-tickets` | **改造** | 上游 skill 的重构版：本地 tracker 的输出去向改为 `.scratch/<feature>/implementation/`，且必须输入已批准契约；票要声明 `Delivers`（或 enabling），quiz 增加覆盖度提问 | 把契约拆成票时 | **手动** |
 | `ask-matt` | **改造** | 路由文本：本地 tracker 路径改为 `.scratch/<feature>/implementation/`，并补充新增 skill 的说明与原有流程的改动 | 询问该用哪个 skill 时 | **手动** |
+| `prototype` | **改造** | 上游 skill 的重构版：问题回答完后交回一个 `prototype/<name>` worktree（内含所选结果与 `VERDICT.md`），并还原工作区；不再写 spec、issue 或 ticket | 用一次性代码回答一个设计问题时 | **手动** |
 | `code-review` | **改造** | 上游 skill 的重构版：默认 review 目标改为相对 `HEAD` 的未提交改动（含未跟踪文件、遵守 `.gitignore`）；传入固定点仍 review 已提交区间 | review 进行中的工作、分支或 PR 时 | **手动** |
 | `tdd` | **改造** | 上游 skill 的重构版：执行改为票驱动 —— 验收标准、覆盖归属与已批准 seam 来自被指派的工作 —— 循环新增 design-before-red、preserve-the-criterion、check-the-evidence 规则，并加上完成条件 | 以测试先行方式实现功能或修 bug 时 | **手动** |
 | `spec-to-code` + `tdd` agent | **扩展**（仅 OMP） | Spec → 实现票 → 串行 TDD 子代理，一条命令后全自动；可选 Jev 驱动回合回复 | 有规格文档并希望实现它时 | **手动启动**，之后全自动 |
@@ -127,14 +128,14 @@ flowchart TD
 
 ## 源文件与构建
 
-七个被改造的 skill 以完整目录发布，与上游的差异以数据形式保存：
+八个被改造的 skill 以完整目录发布，与上游的差异以数据形式保存：
 
-- `upstream/`：整目录拷贝进来的七个上游 skill 目录；里面多出来的文件（例如 `agents/openai.yaml`）无所谓，构建会忽略它们。
-- `deltas/manifest.json` 只保留 `files` 白名单，列出本仓库为这七个 skill 发布的全部十四个文件。只有列表中的文件会从 `upstream/` 读取并写入 `skills/`；这两个 `skills/<skill>/` 目录下的其他文件会被构建删除。
-- [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md)、[deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md)、[deltas/mappings/to-spec.md](deltas/mappings/to-spec.md)、[deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md)、[deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md)、[deltas/mappings/code-review.md](deltas/mappings/code-review.md)、[deltas/mappings/tdd.md](deltas/mappings/tdd.md) 同时是映射源文件和人类审核入口。每项映射把目标、ID、理由和 diff 放在一起；白名单中没有映射的文件原样继承。
-- `skills/`：安装产物。`lighthouse`、`backtracer`、`traverse`、`to-contract` 为手写；manifest 里列出的十四个文件为生成物，**不要手工编辑**。
+- `upstream/`：整目录拷贝进来的八个上游 skill 目录；里面多出来的文件（例如 `agents/openai.yaml`）无所谓，构建会忽略它们。
+- `deltas/manifest.json` 只保留 `files` 白名单，列出本仓库为这八个 skill 发布的全部十七个文件。只有列表中的文件会从 `upstream/` 读取并写入 `skills/`；这两个 `skills/<skill>/` 目录下的其他文件会被构建删除。
+- [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md)、[deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md)、[deltas/mappings/to-spec.md](deltas/mappings/to-spec.md)、[deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md)、[deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md)、[deltas/mappings/prototype.md](deltas/mappings/prototype.md)、[deltas/mappings/code-review.md](deltas/mappings/code-review.md)、[deltas/mappings/tdd.md](deltas/mappings/tdd.md) 同时是映射源文件和人类审核入口。每项映射把目标、ID、理由和 diff 放在一起；白名单中没有映射的文件原样继承。
+- `skills/`：安装产物。`lighthouse`、`backtracer`、`traverse`、`to-contract` 为手写；manifest 里列出的十七个文件为生成物，**不要手工编辑**。
 
-直接在 `deltas/mappings/` 下的七份文档中编辑映射：
+直接在 `deltas/mappings/` 下的八份文档中编辑映射：
 
 - 文档以 `# <skill>` 开头，用 `## <skill>/<file>` 指定有改动且位于白名单内的目标，用 `### <op-id>` 标识映射。ID 使用小写 kebab-case，在同一 skill 内唯一。每项映射包含简短理由和恰好一个反引号围栏的 `diff` 块。
 - 每行第一个字符为 `-`（原文）、`+`（替换文本）或空格（两者共有）。还原文本时只移除这一个字符，其余空白原样保留；空行也必须带标记。使用 LF 换行并保留文件末尾换行。如果 diff 内含 Markdown 代码围栏，使用更长且前后匹配的反引号围栏。

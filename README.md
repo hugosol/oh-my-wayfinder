@@ -4,7 +4,7 @@
 
 A fork of **[mattpocock/skills](https://github.com/mattpocock/skills)**, the engineering skills for AI agents. It is extended with new planning-quality skills and an automation extension for the **[Oh My Pi](https://github.com/can1357/oh-my-pi)** agent.
 
-This repository reworks seven upstream skills (`wayfinder`, `setup-matt-pocock-skills`, `to-spec`, `to-tickets`, `ask-matt`, `code-review`, `tdd`) and ships them as **complete skill directories** (files that need no change are copied from upstream verbatim), plus the new `lighthouse` / `backtracer` / `traverse` / `to-contract` skills, and the Oh My Pi extension. Install Matt's skills first, then overlay this repo's files on top (see [Quick Start](#quick-start)).
+This repository reworks eight upstream skills (`wayfinder`, `setup-matt-pocock-skills`, `to-spec`, `to-tickets`, `ask-matt`, `prototype`, `code-review`, `tdd`) and ships them as **complete skill directories** (files that need no change are copied from upstream verbatim), plus the new `lighthouse` / `backtracer` / `traverse` / `to-contract` skills, and the Oh My Pi extension. Install Matt's skills first, then overlay this repo's files on top (see [Quick Start](#quick-start)).
 
 ## Quick Start
 
@@ -41,6 +41,7 @@ The planning loop they drive: `wayfinder` charts an effort too big for one sessi
 | `to-spec` | **Modified** | Upstream skill, reworked: the seam sketch and the seam half of Testing Decisions move to `to-contract`; publishing a spec points at `/to-contract` as the next step. | Turning a conversation into a spec | **Manual** |
 | `to-tickets` | **Modified** | Upstream skill, reworked: local-tracker output moved to `.scratch/<feature>/implementation/`, an approved contract is required input, tickets declare `Delivers` (or enabling), and the quiz asks the coverage questions. | Splitting a spec or plan into tickets | **Manual** |
 | `ask-matt` | **Modified** | Router text: the local tracker path is now `.scratch/<feature>/implementation/`, with guidance for the new skills and changes to the existing flow | Asking which skill fits | **Manual** |
+| `prototype` | **Modified** | Upstream skill, reworked: when the question is answered it hands back a `prototype/<name>` worktree holding the chosen result and a `VERDICT.md`, restores the working tree, and writes no spec, issue, or ticket | Answering one design question with throwaway code | **Manual** |
 | `code-review` | **Modified** | Upstream skill, reworked: the default review target is the uncommitted changes against `HEAD` (untracked files included, `.gitignore` respected); supplying a fixed point still reviews the committed range | Reviewing work in progress, a branch, or a PR | **Manual** |
 | `tdd` | **Modified** | Upstream skill, reworked: execution is ticket-driven — the acceptance criteria, coverage ownership and approved seams come from the assigned work — and the loop adds design-before-red, preserve-the-criterion and check-the-evidence rules, plus completion requirements | Building a feature or fixing a bug test-first | **Manual** |
 | `spec-to-code` + `tdd` agent | **Extension** (OMP only) | Spec → implementation tickets → serial TDD subagents, fully automatic after one command; optional Jev-driven turn replies | When you have a spec you want implemented | **Manual kickoff**, then automatic |
@@ -127,14 +128,14 @@ The `tdd` agent (`extensions/agents/tdd.md`) is the only piece this repo adds to
 
 ## Sources & build
 
-The seven reworked skills ship complete, and the divergence from upstream is kept as data:
+The eight reworked skills ship complete, and the divergence from upstream is kept as data:
 
-- `upstream/` holds those seven upstream skill directories, copied in whole; extra files there (such as `agents/openai.yaml`) are fine and ignored by the build.
-- `deltas/manifest.json` holds only the `files` whitelist: the exact fourteen files this repo ships for the seven skills. Only listed files are read from `upstream/` and written to `skills/`; anything else under those `skills/<skill>/` directories is removed by the build.
-- [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md), [deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md), [deltas/mappings/to-spec.md](deltas/mappings/to-spec.md), [deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md), [deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md), [deltas/mappings/code-review.md](deltas/mappings/code-review.md) and [deltas/mappings/tdd.md](deltas/mappings/tdd.md) are the mapping sources and the human review entry points. Each mapping keeps its target, ID, reason and diff together. Listed files without mappings are inherited verbatim.
-- `skills/` is the install artifact. `lighthouse`, `backtracer`, `traverse` and `to-contract` are hand-written; the fourteen files listed in the manifest are generated, so do not edit them by hand.
+- `upstream/` holds those eight upstream skill directories, copied in whole; extra files there (such as `agents/openai.yaml`) are fine and ignored by the build.
+- `deltas/manifest.json` holds only the `files` whitelist: the exact seventeen files this repo ships for the eight skills. Only listed files are read from `upstream/` and written to `skills/`; anything else under those `skills/<skill>/` directories is removed by the build.
+- [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md), [deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md), [deltas/mappings/to-spec.md](deltas/mappings/to-spec.md), [deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md), [deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md), [deltas/mappings/prototype.md](deltas/mappings/prototype.md), [deltas/mappings/code-review.md](deltas/mappings/code-review.md) and [deltas/mappings/tdd.md](deltas/mappings/tdd.md) are the mapping sources and the human review entry points. Each mapping keeps its target, ID, reason and diff together. Listed files without mappings are inherited verbatim.
+- `skills/` is the install artifact. `lighthouse`, `backtracer`, `traverse` and `to-contract` are hand-written; the seventeen files listed in the manifest are generated, so do not edit them by hand.
 
-Edit mappings directly in the seven documents under `deltas/mappings/`:
+Edit mappings directly in the eight documents under `deltas/mappings/`:
 
 - Start with `# <skill>`. Use `## <skill>/<file>` for each changed, whitelisted target, then `### <op-id>` for each mapping. IDs use lowercase kebab-case and are unique within a skill. Each mapping has a short reason and exactly one backtick-fenced `diff` block.
 - Each diff line starts with `-` (original), `+` (replacement), or a space (both). Only that first character is removed when reconstructing the text; preserve all remaining whitespace. Even blank lines need a prefix. Keep LF line endings and a final newline. Use longer matching backtick fences if the diff contains Markdown code fences.
