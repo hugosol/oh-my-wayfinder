@@ -15,11 +15,12 @@
  * native `ask` tool is delegated to unchanged.
  *
  * When `jev.enabled` is on in `config.json` (beside the config module) and a native
- * Jev judge is credentialed, every `agent_end` asks Jev which canned reply to send.
- * Round 1 only offers "请你仔细思考后回答这些问题" / "请生成文件", so the first automatic
- * reply is never a bare "请继续"; from round 2 on "请继续" is offered too. Once ticket
- * files exist, phase 2 starts when Jev picks "请继续", or after `jev.forcePhase2Round`
- * rounds. Any failure in that chain falls back to the pre-Jev canned sequence.
+ * Jev judge is credentialed, `agent_end` asks Jev which canned reply to send. Round 1
+ * only offers "请你仔细思考后回答这些问题" / "请生成文件", so the first automatic reply is
+ * never a bare "请继续"; from round 2 on "请继续" is offered too. From round 2 on, a
+ * ticket already on disk ends phase 1 immediately without another judge call, so a
+ * published set is never re-nagged; the judge is only consulted while no ticket has
+ * landed. Any failure in that chain falls back to the pre-Jev canned sequence.
  *
  * This module is the composition root: run state lives in `workflow-session.ts`,
  * the turn decision in `turn-policy.ts`, the judge port in `jev-judge.ts`, config
@@ -260,7 +261,6 @@ export default function specToCode(pi: ExtensionAPI): void {
 				round,
 				firstReplySent: session.firstReplySent,
 				canSpend: session.canSpend,
-				forcePhase2Round: config.forcePhase2Round,
 			},
 			ports,
 		);

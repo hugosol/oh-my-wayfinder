@@ -2,7 +2,7 @@
  * Turn policy: what to do after one `agent_end` round.
  *
  * `planTurn` owns the whole decision — judge consult, ticket check, canned
- * fallback sequence, force round, and budget — and returns a `TurnPlan` for the
+ * fallback sequence, and budget — and returns a `TurnPlan` for the
  * extension entry point to apply. The judge and the ticket lookup are injected
  * ports, so the policy is testable without a session.
  */
@@ -25,7 +25,6 @@ export interface TurnSnapshot {
 	readonly round: number;
 	readonly firstReplySent: boolean;
 	readonly canSpend: boolean;
-	readonly forcePhase2Round: number;
 }
 
 export interface TurnPorts {
@@ -42,18 +41,6 @@ export function pickJevOption(probabilities: Record<string, number>, options: re
 		if ((probabilities[option] ?? 0) > (probabilities[chosen] ?? 0)) chosen = option;
 	}
 	return chosen;
-}
-
-/** Phase 2 starts when tickets exist and Jev says continue, or once the force round is exceeded. */
-export function shouldEnterPhase2(
-	tickets: boolean,
-	decision: string,
-	turnCount: number,
-	forcePhase2Round: number,
-): boolean {
-	if (!tickets) return false;
-	if (decision === CONTINUE_REPLY) return true;
-	return turnCount > forcePhase2Round;
 }
 
 /** Stop reason of the newest assistant message in an agent_end payload. */
@@ -89,13 +76,22 @@ export function lastAssistantText(messages: readonly unknown[]): string | undefi
 }
 
 /**
- * Decide what this `agent_end` round should do. Stop reasons short-circuit before
- * the judge; otherwise the judge picks a canned reply, and any failure falls back
- * to the pre-Jev sequence.
+ * Decide what this `agent_end` round should do. Stop reasons short-circuit first;
+ * from round 2 on, tickets already on disk end phase 1 without consulting the judge;
+ * otherwise the judge picks a canned reply, and any failure falls back to the
+ * pre-Jev sequence.
  */
 export async function planTurn(slug: string, snapshot: TurnSnapshot, ports: TurnPorts): Promise<TurnPlan> {
 	if (snapshot.stopReason === "aborted" || snapshot.stopReason === "error") {
 		return { type: "stop", reason: snapshot.stopReason };
+	}
+
+	// After the first automatic reply, deterministic evidence outranks the judge:
+	// tickets already on disk end phase 1 without another judge call. The judge only
+	// sees the assistant's text and cannot know a ticket file landed, so without this
+	// an already-published set would be re-nagged every round.
+	if (snapshot.round > 1 && (await ports.hasTickets(slug))) {
+		return { type: "phase2", slug };
 	}
 
 	const decision = snapshot.lastReply ? await ports.decide(snapshot.lastReply, snapshot.round) : undefined;
@@ -107,13 +103,9 @@ export async function planTurn(slug: string, snapshot: TurnSnapshot, ports: Turn
 		return { type: "reply", text: snapshot.firstReplySent ? PUBLISH_REPLY : AUTO_REPLY, fallback: true };
 	}
 
-	const tickets = await ports.hasTickets(slug);
-	if (shouldEnterPhase2(tickets, decision, snapshot.round, snapshot.forcePhase2Round)) {
-		return { type: "phase2", slug };
-	}
 	if (!snapshot.canSpend) {
 		// Budget spent but tickets are ready: don't throw the work away.
-		return tickets ? { type: "phase2", slug } : { type: "stop", reason: "budget" };
+		return (await ports.hasTickets(slug)) ? { type: "phase2", slug } : { type: "stop", reason: "budget" };
 	}
 	return { type: "reply", text: decision, fallback: false };
 }

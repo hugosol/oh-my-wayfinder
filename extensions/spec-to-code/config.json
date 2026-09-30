@@ -1,6 +1,5 @@
 {
   "jev": {
-    "enabled": true,
-    "forcePhase2Round": 5
+    "enabled": false
   }
 }
