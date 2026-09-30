@@ -60,20 +60,45 @@ Load the tracker vocabulary before choosing a ticket so decision and implementat
  1. Load the **map**: the low-res view, not every ticket body.
 ```
 
-### work-through-steps-4-to-6
+### grilling-opening-brief
 
-Steps 4-6 make lighthouse and backtracer mandatory, replacing upstream's comment-and-close step.
+Orient the human to the ticket and its settled constraints after claiming it, before the first grilling question. Shift resolution to step 4; the following mapping continues at step 5.
+
+```diff
+-3. Resolve it. **Zoom as needed**: fetch the full body of any related or closed ticket on demand; call the Skill tool for whichever skills the `## Notes` block names. If in doubt, call the Skill tool twice, for "grilling" and "domain-modeling".
++3. **Opening brief — grilling tickets only.** Before the first grilling question, read the ticket's Question and scan the map's Decisions-so-far for relevant decisions. Follow relevant links to the source tickets and lighthouse documents.
++
++   Present a short brief to the user:
++   - **Topic:** What this ticket must decide and how it serves the Destination.
++   - **Settled decisions:** Only confirmed decisions that constrain or inform this ticket, each with its source link and implication for this discussion. If none are relevant, say so.
++
++   Then ask the first grilling question.
++4. Resolve it. **Zoom as needed**: fetch the full body of any related or closed ticket on demand; call the Skill tool for whichever skills the `## Notes` block names. If in doubt, call the Skill tool twice, for "grilling" and "domain-modeling".
+```
+
+### work-through-steps-5-to-7
+
+Steps 5-7 make lighthouse and backtracer mandatory, replacing upstream's comment-and-close step after the opening brief and resolution.
 
 ```diff
 -4. Record the resolution: post the answer as a **resolution comment**, **close** the issue, and **append a context pointer** to the map's Decisions-so-far.
 -5. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. If the answer reveals that a ticket (this one or another) sits beyond the destination, **rule it out of scope** rather than resolving it on the route. If the decision invalidates other parts of the map, update or delete those tickets.
-+4. Write the discussion results to the decision ticket body. Then call the Skill tool with "lighthouse". This is MANDATORY and NON-BYPASSABLE. Close the decision ticket, and append a context pointer to the map's Decisions-so-far.
++5. Write the discussion results to the decision ticket body. Then call the Skill tool with "lighthouse". This is MANDATORY and NON-BYPASSABLE. Close the decision ticket, and append a context pointer to the map's Decisions-so-far.
 +   - The `lighthouse` skill reads the decision ticket body and the conversation context; confirm the draft with the user, then write it to `lighthouse/<NN>-<slug>.md`.
 +   - If `lighthouse` is unavailable, STOP. Do not proceed.
 +   - The one-line gist for the map's Decisions-so-far comes from the `## Decision` field.
-+5. **Call the Skill tool with "backtracer".** This is MANDATORY and NON-BYPASSABLE.
++6. **Call the Skill tool with "backtracer".** This is MANDATORY and NON-BYPASSABLE.
 +   - Backtracer reads the map, decision tickets, and lighthouse documents, checks coverage and symmetry, and reports gaps.
 +   - The user confirms which gaps become new tickets.
 +   - If `backtracer` is unavailable, STOP. Do not proceed.
-+6. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. This includes any tickets backtracer surfaced and the user confirmed. If the answer reveals that a ticket (this one or another) sits beyond the destination, **rule it out of scope** rather than resolving it on the route. If the decision invalidates other parts of the map, update or delete those tickets.
++7. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. This includes any tickets backtracer surfaced and the user confirmed. If the answer reveals that a ticket (this one or another) sits beyond the destination, **rule it out of scope** rather than resolving it on the route. If the decision invalidates other parts of the map, update or delete those tickets.
+```
+
+### prototype-worktree-asset
+
+The Prototype ticket type links a worktree asset and writes no spec.
+
+```diff
+-- **Prototype** (HITL): Raise the fidelity of the discussion by making a cheap, rough, concrete artifact to react to (an outline, a rough take, a stub, or UI/logic code) by calling the Skill tool with "prototype". Links the prototype as an asset. Use when "how should it look" or "how should it behave" is the key question.
++- **Prototype** (HITL): Raise the fidelity of the discussion by making a cheap, rough, concrete artifact to react to (an outline, a rough take, a stub, or UI/logic code) by calling the Skill tool with "prototype". It hands back a `prototype/<name>` worktree holding the chosen result and a `VERDICT.md`; link that worktree path as the asset. Use when "how should it look" or "how should it behave" is the key question.
 ```
