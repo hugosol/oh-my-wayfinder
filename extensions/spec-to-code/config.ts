@@ -11,17 +11,12 @@ import * as fs from "node:fs";
 
 export interface SpecToCodeConfig {
 	jevEnabled: boolean;
-	forcePhase2Round: number;
 }
-
-/** Default for `jev.forcePhase2Round`: force phase 2 after this many agent_end rounds once tickets exist. */
-export const DEFAULT_FORCE_PHASE2_ROUND = 5;
 
 /** `config.json` shape; every field is optional and falls back to the defaults. */
 interface SpecToCodeConfigFile {
 	jev?: {
 		enabled?: boolean;
-		forcePhase2Round?: number;
 	};
 }
 
@@ -35,7 +30,7 @@ export interface LoadedSpecToCodeConfig {
 const CONFIG_URL = new URL("config.json", import.meta.url);
 
 function defaults(): SpecToCodeConfig {
-	return { jevEnabled: false, forcePhase2Round: DEFAULT_FORCE_PHASE2_ROUND };
+	return { jevEnabled: false };
 }
 
 /** Validate parsed JSON, returning either a resolved config or a field-specific error. */
@@ -53,13 +48,6 @@ function validate(raw: unknown): { config?: SpecToCodeConfig; error?: string } {
 		if (jev.enabled !== undefined) {
 			if (typeof jev.enabled !== "boolean") return { error: '"jev.enabled" must be a boolean' };
 			config.jevEnabled = jev.enabled;
-		}
-		if (jev.forcePhase2Round !== undefined) {
-			const value = jev.forcePhase2Round;
-			if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
-				return { error: '"jev.forcePhase2Round" must be a positive number' };
-			}
-			config.forcePhase2Round = Math.floor(value);
 		}
 	}
 	return { config };
