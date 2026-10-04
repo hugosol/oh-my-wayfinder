@@ -89,7 +89,7 @@ Steps 5-7 make lighthouse and backtracer mandatory, replacing upstream's comment
 +   - The one-line gist for the map's Decisions-so-far comes from the `## Decision` field.
 +6. **Call the Skill tool with "backtracer".** This is MANDATORY and NON-BYPASSABLE.
 +   - Backtracer reads the map, decision tickets, and lighthouse documents, checks coverage and symmetry, and reports gaps.
-+   - The user confirms which gaps become new tickets.
++   - Backtracer asks once for the whole audit: grill now via /grilling, or create one follow-up decision ticket containing all questions. Honor its completed branch; do not create duplicate tickets in Step 7.
 +   - If `backtracer` is unavailable, STOP. Do not proceed.
 +7. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. This includes any tickets backtracer surfaced and the user confirmed. If the answer reveals that a ticket (this one or another) sits beyond the destination, **rule it out of scope** rather than resolving it on the route. If the decision invalidates other parts of the map, update or delete those tickets.
 ```

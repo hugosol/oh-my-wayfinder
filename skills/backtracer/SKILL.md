@@ -99,14 +99,14 @@ Group gaps by type. Don't merge. A signal that appears in both Intent and Layer 
 
 Completion criterion: every gap listed under exactly one or more of the four gap types above.
 
-### 5. Resolve gaps
+### 5. Choose the interaction mode
 
-For each gap, ask the user: "Create a ticket for this?" The user responds with one of:
+For the complete report, follow [Gap follow-up](GAP-FOLLOWUP.md): ask once whether to grill in the current conversation or create one ticket containing all questions. Wait for the user's choice.
 
-- **Yes**: create a child issue of the map, wire its blocking edges
-- **No**: record the reason, move on
-- **Fog**: add to the map's **Not yet specified** if it's in scope but not yet sharp enough to ticket
+Completion criterion: one mode selected for this audit, or no unresolved findings remain.
 
-After resolving all gaps, update the map: remove any **Not yet specified** entries that the new tickets have made specifiable.
+### 6. Execute the selected branch
 
-Completion criterion: every gap is in one of three terminal states: ticket created, user declined, or deferred to fog.
+Execute the selected branch using [Gap follow-up](GAP-FOLLOWUP.md).
+
+Completion criterion: the batch's confirmed outcomes are recorded, or all questions are handed off in one linked ticket.

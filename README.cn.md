@@ -68,13 +68,19 @@ flowchart TD
     T --> L["票循环：claim → 解析 →<br/>写 decision ticket"]
     L --> LH["lighthouse<br/><b>自动</b>"]
     LH --> BT["backtracer<br/><b>自动</b>"]
-    BT --> CG{"列出遗漏点<br/>用户决定"}
-    CG -->|"创建新票"| T
-    CG -->|"当前会话 grilling / 记为雾"| L
+    BT --> CG{"本轮整批问题<br/>只选一次方式"}
+    CG -->|"一张票：全部问题"| T
+    CG -->|"当前会话 grilling"| BG["调用 /grilling<br/>确认并记录结论"]
+    BG --> L
+    CG -->|"无缺口"| L
     L -->|"frontier 清空"| TR["traverse：终审<br/><b>手动</b>"]
-    TR --> CG2{"列出遗漏点<br/>用户决定"}
-    CG2 -->|"创建新票"| T
-    CG2 -->|"接受"| TS["to-spec<br/><b>手动</b>"]
+    TR --> CG2{"本轮整批问题<br/>只选一次方式"}
+    CG2 -->|"一张票：全部问题"| T
+    CG2 -->|"当前会话 grilling"| TG["调用 /grilling<br/>确认并记录结论"]
+    TG --> R{"无 open 票<br/>且无未决问题？"}
+    R -->|"是"| TS["to-spec<br/><b>手动</b>"]
+    R -->|"否：继续收口"| L
+    CG2 -->|"无缺口"| R
     TS --> TC["to-contract<br/><b>手动</b>"]
     TC -.->|"to-tickets / implement"| X["…"]
 
@@ -90,7 +96,7 @@ flowchart TD
 
 - wayfinder 循环内只有两个手动触发点：`wayfinder` 本身和 `traverse`（终审）；其后的交接 `to-spec` → `to-contract` 同样是手动。
 - `lighthouse` 与 `backtracer` 由 wayfinder 在每张票解决后自动调用。
-- `backtracer`（逐票）与 `traverse`（收尾）之后，skill 会列出它发现的遗漏点。skill 文件本身不规定如何处理：由用户决定。建议的处理方式：创建新票、就在当前会话用 grilling 消化、或记入地图的 **Not yet specified**（雾区）。
+- `backtracer`（逐票）与 `traverse`（收尾）之后，用户对本轮整批问题只选一次方式：**当前会话 grilling** 直接加载并执行 `/grilling`；**生成一张 ticket** 把全部问题及证据收进一张 open 的 grilling 决策票，关联地图并布线，不立即开始讨论。当前会话的结论确认后更新已有 decision/lighthouse 文档及地图；明确延期的问题记入 **Not yet specified**。traverse 终审收尾时，新增票未解决或仍有未决雾区就返回规划，而不进入 `/to-spec`；这不是 backtracer 的调用前提，backtracer 仍在每张决策票解决后执行。两个 skill 共用[同一份后续处理协议](skills/backtracer/GAP-FOLLOWUP.md)。
 - 管线依次交给 `to-spec` 与 `to-contract`，两者都由本仓库发布。`implement` 属于 mattpocock/skills；本仓库 vendoring `to-tickets` 与 `ask-matt`（本地票目录改名 + 契约门）。
 
 颜色图例：蓝色粗边框 = 本仓库新增的 skill · 绿色 = 自动调用 · 橙色 = 手动触发 · 紫色 = 一次性 setup · 灰色虚线 = 上游 / 本仓库之外。
