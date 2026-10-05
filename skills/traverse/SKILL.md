@@ -37,7 +37,7 @@ Completion criterion: every ticket placed as a node. All four edge types drawn.
 
 Four checks, applied to every node:
 
-**Dependency check.** For each node, walk its dependency edges. Every dependency must land on a node that provides it. A dependency with no provider → **gap**. Ask: the Postcondition "provides X" doesn't appear in any lighthouse document. Does X need a ticket?
+**Dependency check.** For each node, walk its dependency edges. Every dependency must land on a node that provides it. A dependency with no provider → **gap**. Record the unresolved prerequisite for the report; interaction follows the batch mode choice in Step 5.
 
 **Peer symmetry check.** For each pattern edge, collect the surface items of the pattern (from existing codebase: files, scripts, configs, dashboard entries). Collect the surface items claimed by the new node's tickets. Items in the pattern but not in the new node → **gap**. Most peers are found by reading the repository; only ask the user when the pattern's surface is ambiguous.
 
@@ -51,14 +51,14 @@ Completion criterion: every node checked against all four checks.
 
 ### 4. Report gaps
 
-Present the gaps one at a time. For each:
+Present the complete numbered report before asking how to proceed. For each finding, state what's missing, which nodes are involved, which check found it, and the source evidence. Include layer violations. If existing documents resolve a finding, explain its coverage and exclude it from the unresolved batch.
 
-- State the gap: what's missing, which nodes are involved, which check found it.
-- If the documents resolve it (a ticket already covers it but was missed by the tree), state that and move on.
-- If the documents don't resolve it, ask: "Create a ticket for this?"
+Completion criterion: every finding reported; all unresolved questions collected as one batch.
 
-The user responds with: **Yes** (create ticket), **No** (record reason), or **Fog** (add to Not yet specified).
+### 5. Follow up on the audit batch
 
-After all gaps are resolved, the map is ready for to-spec.
+For the unresolved batch, follow [Gap follow-up](../backtracer/GAP-FOLLOWUP.md) to select and execute its follow-up.
 
-Completion criterion: every gap in one of three terminal states.
+Completion criterion: the batch's confirmed outcomes are recorded or its questions are handed off in a linked ticket; an empty batch needs no follow-up.
+
+Hand off to /to-spec only after the map's decisions and audit questions are settled. A new open ticket or unresolved fog returns the map to planning.

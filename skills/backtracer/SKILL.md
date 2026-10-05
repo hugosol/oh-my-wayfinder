@@ -99,14 +99,14 @@ Group gaps by type. Don't merge. A signal that appears in both Intent and Layer 
 
 Completion criterion: every gap listed under exactly one or more of the four gap types above.
 
-### 5. Resolve gaps
+### 5. Reuse existing tickets
 
-For each gap, ask the user: "Create a ticket for this?" The user responds with one of:
+For findings the user confirms need follow-up, prefer an existing unresolved ticket whose decision scope owns the finding. Show the proposed owner and reason in the report. Append established constraints and unanswered questions with their source evidence; preserve the ticket's unresolved status. Related subject matter alone is not ownership. Assigning a finding is a handoff, not a resolution.
 
-- **Yes**: create a child issue of the map, wire its blocking edges
-- **No**: record the reason, move on
-- **Fog**: add to the map's **Not yet specified** if it's in scope but not yet sharp enough to ticket
+Completion criterion: every confirmed finding is recorded in a suitable existing ticket or retained in the remaining batch.
 
-After resolving all gaps, update the map: remove any **Not yet specified** entries that the new tickets have made specifiable.
+### 6. Follow up on the remaining batch
 
-Completion criterion: every gap is in one of three terminal states: ticket created, user declined, or deferred to fog.
+If findings remain without a suitable owner, follow [Gap follow-up](GAP-FOLLOWUP.md) to select and execute their follow-up. If all findings have been assigned or no findings need follow-up, finish without a mode prompt.
+
+Completion criterion: every finding needing follow-up has recorded outcomes or a ticket handoff, including assignments from Step 5.
