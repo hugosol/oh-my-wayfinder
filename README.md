@@ -68,12 +68,13 @@ flowchart TD
     T --> L["Ticket loop:<br/>claim → resolve →<br/>write decision ticket"]
     L --> LH["lighthouse<br/><b>auto</b>"]
     LH --> BT["backtracer<br/><b>auto</b>"]
-    BT --> CG{"Whole audit<br/>choose mode once"}
-    CG -->|"one ticket: all questions"| T
+    BT --> OWN["Append confirmed findings to<br/>suitable unresolved tickets"]
+    OWN -->|"remaining questions"| CG{"Remaining batch<br/>choose mode once"}
+    OWN -->|"all assigned or no findings"| L
+    CG -->|"one ticket: remaining batch"| T
     CG -->|"grill now"| BG["Invoke /grilling<br/>confirm + record outcomes"]
     BG --> L
-    CG -->|"no findings"| L
-    L -->|"frontier empty"| TR["traverse: final audit<br/><b>manual</b>"]
+    L -->|"all tickets resolved"| TR["traverse: final audit<br/><b>manual</b>"]
     TR --> CG2{"Whole audit<br/>choose mode once"}
     CG2 -->|"one ticket: all questions"| T
     CG2 -->|"grill now"| TG["Invoke /grilling<br/>confirm + record outcomes"]
@@ -96,7 +97,7 @@ flowchart TD
 
 - Inside wayfinder's loop the only manual triggers are `wayfinder` itself and `traverse` (the final audit); the handoff that follows, `to-spec` then `to-contract`, is manual too.
 - `lighthouse` and `backtracer` are invoked automatically by wayfinder after every resolved ticket.
-- After `backtracer` (per ticket) and `traverse` (at the end), choose once for the entire audit: **grill now** loads and executes `/grilling` in the current conversation; **create one ticket** puts all questions and their evidence in one open grilling decision ticket, wired into the map, without starting the discussion. Confirmed in-session resolutions update the existing decision/lighthouse documents and map; explicitly deferred findings go to **Not yet specified**. At traverse's final handoff, an open follow-up ticket or unresolved fog returns the map to planning instead of `/to-spec`; this does not restrict backtracer, which runs after each resolved decision ticket. Both skills use [one shared follow-up protocol](skills/backtracer/GAP-FOLLOWUP.md).
+- `backtracer` first appends confirmed findings to existing unresolved tickets that own the decision scope, preserving evidence and distinguishing established constraints from unanswered questions. Assignment is a handoff, not a resolution. Only its unassigned remainder enters [the shared follow-up protocol](skills/backtracer/GAP-FOLLOWUP.md); `traverse`, which starts after all tickets are resolved, supplies its unresolved audit batch directly. For the supplied batch, choose once: **grill now** loads and executes `/grilling` in the current conversation; **create one ticket** puts all questions and their evidence in one open grilling decision ticket, wired into the map, without starting the discussion. Confirmed in-session resolutions update the existing decision/lighthouse documents and map; explicitly deferred findings go to **Not yet specified**. At traverse's final handoff, an open follow-up ticket or unresolved fog returns the map to planning instead of `/to-spec`.
 - The pipeline hands off to `to-spec`, then `to-contract`; both ship in this repo. `implement` ships in mattpocock/skills; this repo vendors `to-tickets` and `ask-matt` as well (the local ticket directory rename, plus the contract gate).
 
 Legend: blue outline = new skills in this repo · green = auto-invoked · orange = manual trigger · purple = one-time setup · gray dashed = upstream / beyond this repo.

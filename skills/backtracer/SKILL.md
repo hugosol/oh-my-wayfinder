@@ -99,14 +99,14 @@ Group gaps by type. Don't merge. A signal that appears in both Intent and Layer 
 
 Completion criterion: every gap listed under exactly one or more of the four gap types above.
 
-### 5. Choose the interaction mode
+### 5. Reuse existing tickets
 
-For the complete report, follow [Gap follow-up](GAP-FOLLOWUP.md): ask once whether to grill in the current conversation or create one ticket containing all questions. Wait for the user's choice.
+For findings the user confirms need follow-up, prefer an existing unresolved ticket whose decision scope owns the finding. Show the proposed owner and reason in the report. Append established constraints and unanswered questions with their source evidence; preserve the ticket's unresolved status. Related subject matter alone is not ownership. Assigning a finding is a handoff, not a resolution.
 
-Completion criterion: one mode selected for this audit, or no unresolved findings remain.
+Completion criterion: every confirmed finding is recorded in a suitable existing ticket or retained in the remaining batch.
 
-### 6. Execute the selected branch
+### 6. Follow up on the remaining batch
 
-Execute the selected branch using [Gap follow-up](GAP-FOLLOWUP.md).
+If findings remain without a suitable owner, follow [Gap follow-up](GAP-FOLLOWUP.md) to select and execute their follow-up. If all findings have been assigned or no findings need follow-up, finish without a mode prompt.
 
-Completion criterion: the batch's confirmed outcomes are recorded, or all questions are handed off in one linked ticket.
+Completion criterion: every finding needing follow-up has recorded outcomes or a ticket handoff, including assignments from Step 5.

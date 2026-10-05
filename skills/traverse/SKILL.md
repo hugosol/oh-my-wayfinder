@@ -55,16 +55,10 @@ Present the complete numbered report before asking how to proceed. For each find
 
 Completion criterion: every finding reported; all unresolved questions collected as one batch.
 
-### 5. Choose the interaction mode
+### 5. Follow up on the audit batch
 
-For that batch, follow [Gap follow-up](../backtracer/GAP-FOLLOWUP.md): ask once whether to grill in the current conversation or create one ticket containing all questions. Wait for the user's choice.
+For the unresolved batch, follow [Gap follow-up](../backtracer/GAP-FOLLOWUP.md) to select and execute its follow-up.
 
-Completion criterion: one mode selected for this audit, or no unresolved findings remain.
-
-### 6. Execute the selected branch
-
-Execute the selected branch using [Gap follow-up](../backtracer/GAP-FOLLOWUP.md).
-
-Completion criterion: the batch's confirmed outcomes are recorded, or all questions are handed off in one linked ticket.
+Completion criterion: the batch's confirmed outcomes are recorded or its questions are handed off in a linked ticket; an empty batch needs no follow-up.
 
 Hand off to /to-spec only after the map's decisions and audit questions are settled. A new open ticket or unresolved fog returns the map to planning.
