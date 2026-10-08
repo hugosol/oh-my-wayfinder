@@ -154,6 +154,7 @@ flowchart TD
 - `find:` / `content:` 成对出现，把 `find` 替换为 `content`。每一对都针对 anchor 的原文求解，所以它们在块中的顺序无关紧要，且两个编辑不得重叠。`find` 必须在 anchor 内恰好命中一次；`content` 为空表示删除。让 `find` 尽量等于改动本身，而不是它周围的上下文：宽 `find` 不影响构建行为（门禁是 anchor），但会把上下文重复进 `content`、掩盖补丁真正拥有的内容。当 `find` 可证明地与其 `content` 共享词边界上下文时，构建会给出 warning。
 - `insert:` 把内容放到 anchor 中 `<oh-my-wayfinder:insert>` 标记处，每个 anchor 最多一个标记。匹配前会先剥掉标记，因此 anchor 读起来仍是插入点周围的字面上游文本。
 - 字段值使用块标量：`field: |` 保留一个末尾换行，`field: |-` 去掉它；很短的单行值可以内联（`find: on resolution`）。块标量的每一行缩进两个空格，使用 LF 换行并保留文件末尾换行。
+- Markdown 表格在原始文本中也要保持列对齐。对齐 `content:` / `insert:` 中编写的表格和手写 skill 中的表格；`anchor:` / `find:` 中的上游原文保持不变。
 - 同一目标内按文档顺序执行 op，后项处理前项修改后的文本。anchor 或编辑缺失、有歧义、相互重叠，以及无实际改动和格式损坏，都会导致构建失败。
 
 ```bash

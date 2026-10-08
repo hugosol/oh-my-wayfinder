@@ -47,10 +47,10 @@ insert: |
 
   Wayfinder tickets resolve planning questions; implementation tickets deliver production behavior. Follow the configured tracker for storage. Decision tickets use only these states:
 
-  | Status | Meaning |
-  |--------|---------|
-  | open | Unclaimed |
-  | claimed | Being worked |
+  | Status   | Meaning                                                 |
+  | -------- | ------------------------------------------------------- |
+  | open     | Unclaimed                                               |
+  | claimed  | Being worked                                            |
   | resolved | Decision or confirmed out-of-scope disposition recorded |
 
   Research and prototype code may support a decision. Production delivery is tracked by implementation tickets; it does not change this status. Triage applies only to implementation tickets.

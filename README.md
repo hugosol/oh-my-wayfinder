@@ -154,6 +154,7 @@ Edit mappings directly in the eight documents under `deltas/mappings/`:
 - A `find:`/`content:` pair replaces `find` with `content`. Every pair resolves against the anchor's original text, so their order in the block does not matter and two edits may not overlap. `find` must occur exactly once inside the anchor; an empty `content` deletes the match. Keep `find` to the change itself rather than the context around it: a wide `find` does not change what the build does (the anchor is the gate), but it repeats that context into `content` and hides what the patch owns. The build warns when a `find` provably shares word-boundary context with its `content`.
 - An `insert:` places its content where the anchor carries the `<oh-my-wayfinder:insert>` marker, at most one marker per anchor. The marker is stripped before the anchor is matched, so the anchor still reads as the literal upstream text around the insert point.
 - Field values use block scalars: `field: |` keeps one trailing newline, `field: |-` drops it, and a short single-line value may stay inline (`find: on resolution`). Indent every block-scalar line two spaces and keep LF line endings and a final newline.
+- Keep Markdown tables column-aligned in their raw source. Format authored tables in `content:` / `insert:` and hand-written skills; preserve upstream text in `anchor:` / `find:` verbatim.
 - Ops run in document order within each target, against the result of earlier ops. Missing, ambiguous or overlapping anchors and edits, no-ops and malformed ops all fail the build.
 
 ```bash

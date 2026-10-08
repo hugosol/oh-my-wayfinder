@@ -28,11 +28,11 @@ Extract three kinds of signals. These are mechanical extractions: pattern match,
 
 For each "so that" clause, extract the **key noun phrases and verb phrases**: the concrete things the user wants and the actions they enable. Examples:
 
-| "so that" clause | Extracted signals |
-|---|---|
-| "so that existing callers (CLI, scan, tests) need no changes" | `CLI`, `scan`, `tests`, `callers unchanged` |
-| "so that users can operate the strategy from the command line" | `command line`, `operate strategy` |
-| "so that the engine can iterate day-by-day and bar-by-bar" | `iterate day-by-day`, `iterate bar-by-bar` |
+| "so that" clause                                               | Extracted signals                           |
+| -------------------------------------------------------------- | ------------------------------------------- |
+| "so that existing callers (CLI, scan, tests) need no changes"  | `CLI`, `scan`, `tests`, `callers unchanged` |
+| "so that users can operate the strategy from the command line" | `command line`, `operate strategy`          |
+| "so that the engine can iterate day-by-day and bar-by-bar"     | `iterate day-by-day`, `iterate bar-by-bar`  |
 
 Discard connectors ("the", "a", "can", "is"). Keep only the nouns and verbs that would appear in a ticket title or body.
 
@@ -47,13 +47,13 @@ For each invariant that declares pattern alignment (e.g. "new engine types follo
 
 Scan each decision ticket's body for words that imply a prerequisite action. Key patterns:
 
-| If a ticket body contains… | It implies a dependency on… |
-|---|---|
+| If a ticket body contains…              | It implies a dependency on…                       |
+| --------------------------------------- | ------------------------------------------------- |
 | `scan`, `parameter scan`, `grid search` | a runnable backtest producing standardised output |
-| `generate`, `produce`, `output`, `save` | the thing being generated already exists |
-| `load`, `read`, `fetch`, `query` | the data source already exists |
-| `dashboard`, `UI`, `web` | a running service with an endpoint |
-| `analyse`, `report`, `summarise` | the raw results already exist |
+| `generate`, `produce`, `output`, `save` | the thing being generated already exists          |
+| `load`, `read`, `fetch`, `query`        | the data source already exists                    |
+| `dashboard`, `UI`, `web`                | a running service with an endpoint                |
+| `analyse`, `report`, `summarise`        | the raw results already exist                     |
 
 For each implied dependency, extract the dependency name as a signal.
 

@@ -116,15 +116,15 @@ Acceptance mode: Full automation | Rapid iteration
 
 ## Promises
 
-| # | Promise (one observable result) | Coverage | Source | Seam |
-|---|--------------------------------|----------|--------|------|
-| P1 | | | story 4 / inferred | |
+| #   | Promise (one observable result) | Coverage | Source             | Seam |
+| --- | ------------------------------- | -------- | ------------------ | ---- |
+| P1  |                                 |          | story 4 / inferred |      |
 
 ## Seam decisions
 
 | Seam | Exposes | Hides | Alternatives considered | Reversibility |
-|------|---------|-------|-------------------------|---------------|
-| | | | | |
+| ---- | ------- | ----- | ----------------------- | ------------- |
+|      |         |       |                         |               |
 
 ## Not yet specified
 
