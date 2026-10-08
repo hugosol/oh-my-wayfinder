@@ -66,7 +66,7 @@ Each ticket carries a `wayfinder:<type>` label, one of `research`, `prototype`, 
 
 A session **claims** a ticket by assigning it to the dev driving the map, **first**, before any work, so concurrent sessions skip it. That assignee _is_ the claim: an open, unassigned ticket is unclaimed.
 
-Blocking uses the tracker's **native** dependency relationship: essential because it renders the frontier _visually_ in the tracker's own UI, so the human sees what's takeable without opening the map. Only a tracker that lacks native blocking falls back to a body convention. A ticket is **unblocked** when every ticket blocking it is closed; the **frontier** is the open, unblocked, unclaimed children, the edge of the known.
+Use the tracker’s native dependency relationship where available, otherwise its body convention. A ticket is **unblocked** only when every blocker is resolved and its recorded outcome satisfies the prerequisite. A confirmed decision may remove an unnecessary dependency with its reason recorded. Apply the Out of scope dependency review before treating any disposed blocker as cleared. The **frontier** is the open, unblocked, unclaimed children.
 
 The answer isn't part of the body; it's recorded in the lighthouse document (see [Work through the map](#work-through-the-map)). Assets created while resolving a ticket are linked from the issue, not pasted in.
 
@@ -83,7 +83,7 @@ Every ticket is either **HITL** (human in the loop, worked _with_ a human who sp
 
 This map produces **decision tickets**: planning artifacts that capture decisions. Each asks "what should we decide?" Decision tickets live in `.scratch/<feature>/decision/` and use the Decision ticket status vocabulary (`open` → `claimed` → `resolved`).
 
-A `resolved` decision ticket means the decision is locked. **NO code has been written.** Implementation is a separate phase.
+A `resolved` decision ticket records a completed decision or confirmed out-of-scope disposition. It makes no claim about production delivery; research or prototype code may be evidence. Later implementation does not change this status.
 
 **Implementation tickets** are a different artifact, produced later by `/to-tickets` from the to-spec document. They live in `.scratch/<feature>/implementation/` and use the Implementation ticket status vocabulary (`ready-for-agent` → `in-progress` → `closed`). Implementation tickets are consumed by `/implement`.
 
@@ -93,10 +93,10 @@ A `resolved` decision ticket means the decision is locked. **NO code has been wr
 | Directory | `decision/` | `implementation/` |
 | Question | What should we decide? | What should we build? |
 | Statuses | `open` → `claimed` → `resolved` | `ready-for-agent` → `in-progress` → `closed` |
-| `resolved` means | Decision locked, no code | N/A; use `closed` |
+| `resolved` means | Decision or disposition recorded; delivery tracked separately | N/A; use `closed` |
 | `closed` means | N/A; use `resolved` | Code implemented, tested, merged |
 
-NEVER mark a decision ticket with an implementation ticket status, or vice versa. NEVER assume a resolved decision ticket means code exists.
+Decision tickets use only `open`, `claimed`, and `resolved`. Triage labels belong to implementation tickets, not decision tickets or the map.
 
 ## Fog of war
 
@@ -117,7 +117,9 @@ Fog only ever gathers _toward_ the destination. The destination fixes the scope,
 
 Out-of-scope work never graduates (the frontier stops at the destination), so it returns only if the destination is redrawn, and then as a fresh effort, not a resumption.
 
-Ruling something out of scope is a scoping act, not a step on the route. When a ticket that already exists turns out to sit past the destination (mis-scoped in while charting, or exposed by a lighthouse decision), **close it** (a closed ticket is unambiguously off the frontier) and leave one line in the **Out of scope** section: the gist plus why it's out of scope, linking the closed ticket. It stays out of **Decisions so far**, which records the route actually walked; a scope boundary isn't a step on it.
+When the user confirms an existing ticket is outside the destination or no longer needed, record that disposition and its reason in the ticket body. Run lighthouse to record the confirmed disposition, set `Status: resolved`, and link the ticket with its reason from the map’s **Out of scope**, not **Decisions so far**. Then run the mandatory backtracer step against that updated map. This resolves the disposition, not the original question.
+
+Before selecting the next frontier ticket, review every dependent: keep an unsatisfied prerequisite blocked, wire a replacement provider when available, or remove the dependency only when a confirmed decision makes it unnecessary. Record the reason on the dependent. If the dependent is itself no longer needed, obtain confirmation and apply this same disposition procedure. A resolved out-of-scope ticket never satisfies a prerequisite merely by its status.
 
 ## Invocation
 
@@ -138,10 +140,7 @@ User invokes with a loose idea.
 
 User invokes with a map (URL or number). A ticket is **optional**: without one, you pick the next decision, not the user.
 
-0. **Load the tracker vocabulary.** Read `docs/agents/triage-labels.md` and `docs/agents/issue-tracker.md`.
-   - This map produces **decision tickets**: use the Decision ticket status vocabulary.
-   - Key: `resolved` means "Decision made, implementation pending"; NOT "code implemented".
-   - Decision tickets (in `decision/`) and implementation tickets (in `implementation/`) are different systems with **non-overlapping status vocabularies**.
+0. **Load the tracker conventions.** Read `docs/agents/issue-tracker.md`. Use the decision-ticket lifecycle above, independently of whether implementation triage is installed.
 
 1. Load the **map**: the low-res view, not every ticket body.
 2. Choose the ticket. If the user named one, use it. Otherwise take the first frontier ticket in order. **Claim it**: assign it to yourself before any work.
@@ -153,7 +152,7 @@ User invokes with a map (URL or number). A ticket is **optional**: without one, 
 
    Then ask the first grilling question.
 4. Resolve it. **Zoom as needed**: fetch the full body of any related or closed ticket on demand; call the Skill tool for whichever skills the `## Notes` block names. If in doubt, call the Skill tool twice, for "grilling" and "domain-modeling".
-5. Write the discussion results to the decision ticket body. Then call the Skill tool with "lighthouse". This is MANDATORY and NON-BYPASSABLE. Close the decision ticket, and append a context pointer to the map's Decisions-so-far.
+5. Write the discussion results to the decision ticket body. Then call the Skill tool with "lighthouse". This is MANDATORY and NON-BYPASSABLE. Set the local decision ticket’s `Status: resolved`, and append a context pointer to the map’s Decisions-so-far. For a confirmed out-of-scope disposition, use the Out of scope procedure instead of recording an ordinary answer.
    - The `lighthouse` skill reads the decision ticket body and the conversation context; confirm the draft with the user, then write it to `lighthouse/<NN>-<slug>.md`.
    - If `lighthouse` is unavailable, STOP. Do not proceed.
    - The one-line gist for the map's Decisions-so-far comes from the `## Decision` field.

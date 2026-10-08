@@ -10,9 +10,9 @@ Decision tickets are **planning artifacts** produced by `/wayfinder`. They live 
 |--------|---------|
 | `open` | Not yet claimed by an agent |
 | `claimed` | Agent is actively working on this decision |
-| `resolved` | Decision made and recorded. **NO code has been written.** Code is written later from implementation tickets. |
+| `resolved` | Decision or confirmed out-of-scope disposition recorded; production delivery is tracked separately. |
 
-Decision tickets are NEVER implementation tasks. A `resolved` decision ticket means the decision is locked, not that code exists.
+These are the only decision-ticket states. Research and prototype code may be evidence; `resolved` makes no claim about production delivery and stays unchanged when implementation finishes. For an out-of-scope disposition, follow wayfinder’s Out of scope procedure, including dependency review.
 
 ## Implementation tickets (to-tickets)
 
@@ -25,7 +25,7 @@ Implementation tickets are produced by `/to-tickets`. They live in `.scratch/<fe
 | `in-progress` | Agent is actively implementing |
 | `closed` | Code implemented, tested, and merged |
 
-## Shared (both ticket types)
+### Implementation-only triage
 
 | Status | Meaning |
 |--------|---------|
@@ -35,4 +35,4 @@ Implementation tickets are produced by `/to-tickets`. They live in `.scratch/<fe
 
 ---
 
-When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from the appropriate ticket type's table above. Decision tickets and implementation tickets use **different** status vocabularies; never cross them.
+When a skill mentions a triage role (e.g. "apply the AFK-ready triage label"), use the implementation-ticket vocabulary above. Triage labels do not apply to decision tickets or their map.

@@ -56,6 +56,10 @@ That is a deliberate later step, not an oversight.
 
 **Local directory rename (breaking for local trackers).** Implementation tickets moved from `.scratch/<feature>/issues/` to `.scratch/<feature>/implementation/`, and the vocabulary changed from "task ticket" to "implementation ticket". Existing setups are not migrated.
 
+**Decision lifecycle:** local decision tickets use only `open → claimed → resolved`; `Type:` remains the processing method. `resolved` records a decision or confirmed out-of-scope disposition, independently of production delivery. Research and prototype code may be evidence. Triage applies only to implementation tickets. Out-of-scope dispositions go in the map’s **Out of scope**, not **Decisions so far**; review their dependents before advancing the frontier, since a disposition does not supply the abandoned answer.
+
+Existing project tracker docs are not automatically refreshed. Reconcile their decision statuses and blocking rule with the updated setup templates; review old triage-marked decision tickets individually rather than translating them mechanically to `resolved`.
+
 ## Flow A: the wayfinder planning pipeline
 
 ```mermaid

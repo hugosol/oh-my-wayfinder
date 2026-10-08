@@ -4,6 +4,16 @@ The OMP-only `/spec-to-code` workflow: turn an approved spec into implementation
 
 ## Language
 
+**Decision ticket**:
+A planning artifact that resolves a question or records a confirmed decision not to pursue it. Research and prototype evidence may support it; production delivery is a separate concern.
+_Avoid_: implementation ticket, implementation task
+
+**Resolved decision**:
+A recorded decision or confirmed out-of-scope disposition, not a claim about production delivery. A disposition does not supply the original question’s answer or satisfy dependencies on that answer.
+
+**Triage**:
+Classification and readiness assessment for implementation tickets, separate from the decision-ticket lifecycle.
+
 **Implementation ticket**:
 A tracer-bullet vertical slice cut from an approved contract; the unit phase 2 implements, one independent agent run per ticket.
 _Avoid_: issue, task (reserve those for a real tracker)

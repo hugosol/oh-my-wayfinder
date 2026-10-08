@@ -29,6 +29,8 @@ From these sources, build the tree. Every ticket is a node. The tree has four ki
 - **Layer edges**: from decision ticket bodies. Group tickets by their claimed layer: engine, strategy, config, output, scan.
 - **Boundary edges**: between tickets whose bodies describe adjacent concerns. If ticket 03 defines a strategy interface and ticket 09 defines a config format, they share a boundary at "strategy configuration".
 
+Keep Out of scope tickets as disposition evidence, not providers of their abandoned outcomes. Check that each affected in-scope dependent has a replacement provider or a confirmed reason the prerequisite is no longer needed; otherwise report a gap.
+
 Nodes without outgoing dependency edges are missing their prerequisites.
 
 Completion criterion: every ticket placed as a node. All four edge types drawn.

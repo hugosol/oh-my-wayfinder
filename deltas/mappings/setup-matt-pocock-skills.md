@@ -4,20 +4,20 @@
 
 ### triage-labels-bullet
 
-Two ticket vocabularies instead of five canonical roles.
+Triage vocabulary belongs to implementation tickets; decision lifecycle is fixed by the tracker.
 
 ```diff
 -- **Triage labels**: the strings used for the five canonical triage roles
-+- **Triage labels**: the strings used for issue statuses, with separate vocabularies for decision tickets and implementation tickets
++- **Triage labels**: the strings used for implementation-ticket triage; decision tickets use only `open` / `claimed` / `resolved`
 ```
 
 ### section-b-defaults
 
-Section B asks about the decision and implementation vocabularies plus the shared labels.
+Section B configures implementation triage, not decision-ticket lifecycle states.
 
 ```diff
 -The defaults are the five canonical roles, each label string equal to its name: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. On **yes**, write them as-is. Only if the user says no, usually because their tracker already uses other names (e.g. `bug:triage` for `needs-triage`), collect the overrides so `triage` applies existing labels instead of creating duplicates.
-+The defaults define two ticket systems with separate status vocabularies: Decision tickets (`open` / `claimed` / `resolved`) and Implementation tickets (`ready-for-agent` / `ready-for-human` / `in-progress` / `closed`), plus shared labels (`needs-triage` / `needs-info` / `wontfix`). On **yes**, write them as-is. Only if the user says no (usually because their tracker already uses other names) collect the overrides so `triage` applies existing labels instead of creating duplicates.
++Triage applies only to implementation tickets. Its defaults are `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`; implementation also tracks `in-progress` and `closed`. Decision tickets use only `open` / `claimed` / `resolved`, independently of triage. On **yes**, write the defaults as-is. Otherwise collect implementation triage-label overrides so `triage` uses existing labels instead of creating duplicates.
 ```
 
 ## setup-matt-pocock-skills/triage-labels.md
@@ -47,9 +47,9 @@ Use separate decision and implementation vocabularies rather than mapping every 
 +|--------|---------|
 +| `open` | Not yet claimed by an agent |
 +| `claimed` | Agent is actively working on this decision |
-+| `resolved` | Decision made and recorded. **NO code has been written.** Code is written later from implementation tickets. |
++| `resolved` | Decision or confirmed out-of-scope disposition recorded; production delivery is tracked separately. |
 +
-+Decision tickets are NEVER implementation tasks. A `resolved` decision ticket means the decision is locked, not that code exists.
++These are the only decision-ticket states. Research and prototype code may be evidence; `resolved` makes no claim about production delivery and stays unchanged when implementation finishes. For an out-of-scope disposition, follow wayfinder’s Out of scope procedure, including dependency review.
 +
 +## Implementation tickets (to-tickets)
 +
@@ -62,7 +62,7 @@ Use separate decision and implementation vocabularies rather than mapping every 
 +| `in-progress` | Agent is actively implementing |
 +| `closed` | Code implemented, tested, and merged |
 +
-+## Shared (both ticket types)
++### Implementation-only triage
 +
 +| Status | Meaning |
 +|--------|---------|
@@ -72,7 +72,7 @@ Use separate decision and implementation vocabularies rather than mapping every 
 +
 +---
 +
-+When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from the appropriate ticket type's table above. Decision tickets and implementation tickets use **different** status vocabularies; never cross them.
++When a skill mentions a triage role (e.g. "apply the AFK-ready triage label"), use the implementation-ticket vocabulary above. Triage labels do not apply to decision tickets or their map.
 ```
 
 ## setup-matt-pocock-skills/issue-tracker-local.md
@@ -84,9 +84,27 @@ decision/ and implementation/ are separate ticket directories.
 ```diff
 -- Implementation issues are one file per ticket at `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`, never a single combined tickets file
 +- **Decision tickets** (planning): `.scratch/<feature-slug>/decision/<NN>-<slug>.md`, numbered from `01`
-+  → Produced by `/wayfinder`. Use Decision ticket statuses from `triage-labels.md`.
++  → Produced by `/wayfinder`. Use only `open` / `claimed` / `resolved`, as defined under Wayfinding operations below; triage installation is not required.
 +- **Implementation tickets**: `.scratch/<feature-slug>/implementation/<NN>-<slug>.md`, numbered from `01`
 +  → Produced by `/to-tickets`. Use Implementation ticket statuses from `triage-labels.md`.
+```
+
+### local-status-field
+
+Keep lifecycle independent of implementation triage.
+
+```diff
+-- Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md` for the role strings)
++- Record a `Status:` line near the top of each ticket. Decision tickets use the lifecycle below; only implementation tickets use triage roles from `triage-labels.md`.
+```
+
+### local-blocking
+
+A resolved disposition is not evidence that a prerequisite was supplied.
+
+```diff
+-- **Blocking**: a `Blocked by: NN, NN` line near the top. A ticket is unblocked when every file it lists is `resolved`.
++- **Blocking**: a `Blocked by: NN, NN` line near the top. A ticket is unblocked when every listed decision ticket is `resolved` and its recorded outcome satisfies the prerequisite. For a blocker listed in the map’s Out of scope, follow wayfinder’s disposition dependency review; status alone never unblocks its dependents.
 ```
 
 ### local-publish
@@ -105,7 +123,7 @@ Child tickets are decision tickets with the open/claimed/resolved vocabulary.
 ```diff
  - **Map**: `.scratch/<effort>/map.md` (the Notes / Decisions-so-far / Fog body).
 -- **Child ticket**: `.scratch/<effort>/issues/NN-<slug>.md`, numbered from `01`, with the question in the body. A `Type:` line records the ticket type (`research`/`prototype`/`grilling`/`task`); a `Status:` line records `claimed`/`resolved`.
-+- **Decision ticket**: `.scratch/<effort>/decision/<NN>-<slug>.md`, numbered from `01`, with the question in the body. A `Type:` line records the ticket type (`research`/`prototype`/`grilling`/`task`); a `Status:` line records `open`/`claimed`/`resolved`.
++- **Decision ticket**: `.scratch/<effort>/decision/<NN>-<slug>.md`, numbered from `01`, with the question in the body. `Type:` records the processing method (`research`/`prototype`/`grilling`/`task`). `Status:` is only `open` (unclaimed), `claimed` (being worked), or `resolved` (decision or confirmed out-of-scope disposition recorded, independent of production delivery).
 ```
 
 ### local-frontier
@@ -123,5 +141,5 @@ Resolve runs lighthouse and records the discussion in the ticket body.
 
 ```diff
 -- **Resolve**: append the answer under an `## Answer` heading, set `Status: resolved`, then append a context pointer (gist + link) to the map's Decisions-so-far in `map.md`.
-+- **Resolve**: write the discussion results to the ticket body, then call the Skill tool with "lighthouse" to produce the lighthouse document in `lighthouse/`. Set `Status: resolved`, and append a context pointer (gist + link) to the map's Decisions-so-far in `map.md`.
++- **Resolve**: follow wayfinder’s mandatory lighthouse and backtracer steps after recording the outcome in the ticket body. Set `Status: resolved`. Ordinary answers go to the map’s Decisions-so-far; confirmed out-of-scope dispositions follow wayfinder’s Out of scope procedure, including dependency review.
 ```

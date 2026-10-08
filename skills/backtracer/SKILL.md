@@ -63,7 +63,7 @@ Completion criterion: every lighthouse document processed for intent and pattern
 
 For each extracted signal, search **all decision ticket bodies** (resolved and open). A signal is **covered** if at least one ticket body contains the signal's key terms. A signal with no match is a **gap**.
 
-Exception: if the signal appears only in the same ticket that produced it, it is NOT self-covered; the trace looks for a *different* ticket.
+Exception: if the signal appears only in the same ticket that produced it, it is NOT self-covered; the trace looks for a *different* ticket. A ticket listed in the map’s Out of scope is disposition evidence, not a provider of its original proposed outcome. Ignore its abandoned promises when tracing coverage; an in-scope dependency on them remains a gap unless a confirmed decision removes the requirement or another ticket provides it.
 
 **Peer symmetry trace**: for each pattern signal, collect all surface items from the pattern name (e.g. "daily engine" → bat, dashboard, CLI, config). Then collect all surface items from tickets belonging to the new concept (e.g. decision tickets tagged or titled with the new engine type). Items present in the pattern but absent from the new concept are **peer asymmetry gaps**.
 

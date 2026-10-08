@@ -56,6 +56,10 @@
 
 **本地目录改名（对本地 tracker 是破坏性变更）**：实现票从 `.scratch/<feature>/issues/` 移到 `.scratch/<feature>/implementation/`，术语也从「任务票」改为「实现票」；已配置过的仓库不会被自动迁移。
 
+**决策票生命周期**：本地决策票仅使用 `open → claimed → resolved`，`Type:` 仍表示处理方式。`resolved` 表示决策或经确认的范围外处置已记录，与生产实现是否交付无关；研究与原型代码可以作为证据。Triage 仅用于实现票。范围外处置记入地图的 **Out of scope**，不进入 **Decisions so far**；推进 frontier 前必须检查依赖，因为处置完成不等于原问题已获解答。
+
+已有项目的 tracker 文档不会自动更新。请按新版 setup 模板调整决策票状态与阻塞判定；旧的 triage 状态决策票需要逐张确认含义，不应机械转换为 `resolved`。
+
 ## 流程图 A：wayfinder 规划管线
 
 ```mermaid
