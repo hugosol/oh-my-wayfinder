@@ -37,8 +37,8 @@ Approval travels with the work: use the seams already supplied instead of asking
 Keeps the ask for the no-approval case and adds the mismatch report when an approved seam cannot expose the assigned behavior.
 
 ```diff
--Ask: "What's the public interface, and which seams should we test?"
-+If no seam has been approved, ask: "What's the public interface, and which seams should we test?" If an approved seam cannot expose the assigned behavior, report the mismatch rather than silently substituting an internal test surface.
+-Ask: "What's the public interface, and which seams should we test?" Give each proposed seam a one-line note on what it catches and what it misses.
++If no seam has been approved, ask: "What's the public interface, and which seams should we test?" Give each proposed seam a one-line note on what it catches and what it misses. If an approved seam cannot expose the assigned behavior, report the mismatch rather than silently substituting an internal test surface.
 ```
 
 ### loop-rules

@@ -11,6 +11,15 @@ The resolution is recorded in the lighthouse document, not as a tracker comment.
 +The answer isn't part of the body; it's recorded in the lighthouse document (see [Work through the map](#work-through-the-map)). Assets created while resolving a ticket are linked from the issue, not pasted in.
 ```
 
+### processing-type-storage
+
+Retain upstream’s type-only classification while using the local tracker’s Type field.
+
+```diff
+-Each ticket carries a `wayfinder:<type>` label, one of `research`, `prototype`, `grilling`, `task` (see [Ticket Types](#ticket-types)). `wayfinder:` labels are the only labels a map and its tickets carry, never a triage label like `ready-for-agent`: they are decisions, not implementation work.
++Each ticket records its processing type (`research`, `prototype`, `grilling`, or `task`; see [Ticket Types](#ticket-types)): a `Type:` field locally, a `wayfinder:<type>` label on remote trackers. A remote map and its tickets carry only `wayfinder:` labels; triage belongs to implementation work.
+```
+
 ### blocking-evidence
 
 Use recorded outcomes, not closure alone, to satisfy prerequisites.
@@ -72,15 +81,15 @@ Load the tracker vocabulary before choosing a ticket so decision and implementat
 Orient the human to the ticket and its settled constraints after claiming it, before the first grilling question. Shift resolution to step 4; the following mapping continues at step 5.
 
 ```diff
--3. Resolve it. **Zoom as needed**: fetch the full body of any related or closed ticket on demand; call the Skill tool for whichever skills the `## Notes` block names. If in doubt, call the Skill tool twice, for "grilling" and "domain-modeling".
-+3. **Opening brief — grilling tickets only.** Before the first grilling question, read the ticket's Question and scan the map's Decisions-so-far for relevant decisions. Follow relevant links to the source tickets and lighthouse documents.
+-3. Resolve it as the type its `wayfinder:<type>` label names (see [Ticket Types](#ticket-types)). Read the label, not just the body: the body never states the type. **Zoom as needed**: fetch the full body of any related or closed ticket on demand; call the Skill tool for whichever skills the `## Notes` block names. If in doubt, call the Skill tool twice, for "grilling" and "domain-modeling".
++3. **Read the processing type:** the local ticket’s `Type:` field, or its `wayfinder:<type>` label on a remote tracker (see [Ticket Types](#ticket-types)). For grilling tickets, present an **opening brief** before the first question: read the ticket’s Question and scan the map’s Decisions-so-far for relevant decisions. Follow relevant links to the source tickets and lighthouse documents.
 +
-+   Present a short brief to the user:
++   For that brief, show:
 +   - **Topic:** What this ticket must decide and how it serves the Destination.
 +   - **Settled decisions:** Only confirmed decisions that constrain or inform this ticket, each with its source link and implication for this discussion. If none are relevant, say so.
 +
-+   Then ask the first grilling question.
-+4. Resolve it. **Zoom as needed**: fetch the full body of any related or closed ticket on demand; call the Skill tool for whichever skills the `## Notes` block names. If in doubt, call the Skill tool twice, for "grilling" and "domain-modeling".
++   Then ask the first grilling question. Other ticket types skip the brief.
++4. Resolve it using its recorded type. **Zoom as needed**: fetch the full body of any related or closed ticket on demand; call the Skill tool for whichever skills the `## Notes` block names. If in doubt, call the Skill tool twice, for "grilling" and "domain-modeling".
 ```
 
 ### work-through-steps-5-to-7

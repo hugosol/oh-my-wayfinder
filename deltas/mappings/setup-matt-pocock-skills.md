@@ -39,7 +39,7 @@ Keep implementation triage roles and overrides here; point to tracker convention
 -
 -When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
 -
--Edit the right-hand column to match whatever vocabulary you actually use.
+-Edit the "Label in our tracker" column to match whatever vocabulary you actually use.
 +These labels apply only to implementation tickets. For decision-ticket states, read the Wayfinding operations in `issue-tracker.md`.
 +
 +| Role | Label in our tracker | Meaning |

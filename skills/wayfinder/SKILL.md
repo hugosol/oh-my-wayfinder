@@ -62,7 +62,7 @@ Each ticket is a **child issue** of the map; the tracker's issue id is its ident
 <the decision or investigation this ticket resolves>
 ```
 
-Each ticket carries a `wayfinder:<type>` label, one of `research`, `prototype`, `grilling`, `task` (see [Ticket Types](#ticket-types)).
+Each ticket records its processing type (`research`, `prototype`, `grilling`, or `task`; see [Ticket Types](#ticket-types)): a `Type:` field locally, a `wayfinder:<type>` label on remote trackers. A remote map and its tickets carry only `wayfinder:` labels; triage belongs to implementation work.
 
 A session **claims** a ticket by assigning it to the dev driving the map, **first**, before any work, so concurrent sessions skip it. That assignee _is_ the claim: an open, unassigned ticket is unclaimed.
 
@@ -130,8 +130,8 @@ User invokes with a loose idea.
 1. **Name the destination.** Call the Skill tool twice, for "grilling" and "domain-modeling", to pin down what this map is finding its way to: the spec, decision, or change. The destination fixes the scope, so it's settled first.
 2. **Map the frontier.** Grill again, **breadth-first** this time: fan out across the whole space rather than deep on any one thread, surfacing the open decisions and the first steps takeable now. **If this surfaces no fog** (the way to the destination is already clear, the whole journey small enough for one session), you don't need a map. Stop and ask the user how they'd like to proceed.
 3. **Create the map** (label `wayfinder:map`): Destination and Notes filled in, Decisions-so-far empty, the fog sketched into **Not yet specified**.
-4. **Create the tickets you can specify now** as child issues of the map, then wire blocking edges in a **second pass** (issues need ids before they can reference each other). Wiring sorts them into the frontier and the blocked; everything you can't yet specify stays in the fog: the **Not yet specified** section.
-5. **Fire the research subagents.** For each `research` ticket you just created, spin up a subagent that calls the Skill tool with "research" to resolve it in parallel, capturing its findings on a throwaway `research/<name>` branch with a context pointer from the ticket.
+4. **Create the tickets you can specify now** as child issues of the map, then wire blocking edges in a **second pass** (issues need ids before they can reference each other). Write cross-references in that pass too, with real ids: a placeholder `#<n>` auto-links to an unrelated issue. Wiring sorts them into the frontier and the blocked; everything you can't yet specify stays in the fog: the **Not yet specified** section.
+5. **Fire the research subagents.** For each `research` ticket you just created, spin up a subagent that calls the Skill tool with "research" to resolve it in parallel, capturing its findings on a throwaway `research/<name>` branch with a context pointer from the ticket. Push the branch but open no PR: it is never merged.
 6. Stop: charting is one session's work; it hand-resolves nothing.
 
 ### Work through the map
@@ -142,14 +142,14 @@ User invokes with a map (URL or number). A ticket is **optional**: without one, 
 
 1. Load the **map**: the low-res view, not every ticket body.
 2. Choose the ticket. If the user named one, use it. Otherwise take the first frontier ticket in order. **Claim it**: assign it to yourself before any work.
-3. **Opening brief — grilling tickets only.** Before the first grilling question, read the ticket's Question and scan the map's Decisions-so-far for relevant decisions. Follow relevant links to the source tickets and lighthouse documents.
+3. **Read the processing type:** the local ticket’s `Type:` field, or its `wayfinder:<type>` label on a remote tracker (see [Ticket Types](#ticket-types)). For grilling tickets, present an **opening brief** before the first question: read the ticket’s Question and scan the map’s Decisions-so-far for relevant decisions. Follow relevant links to the source tickets and lighthouse documents.
 
-   Present a short brief to the user:
+   For that brief, show:
    - **Topic:** What this ticket must decide and how it serves the Destination.
    - **Settled decisions:** Only confirmed decisions that constrain or inform this ticket, each with its source link and implication for this discussion. If none are relevant, say so.
 
-   Then ask the first grilling question.
-4. Resolve it. **Zoom as needed**: fetch the full body of any related or closed ticket on demand; call the Skill tool for whichever skills the `## Notes` block names. If in doubt, call the Skill tool twice, for "grilling" and "domain-modeling".
+   Then ask the first grilling question. Other ticket types skip the brief.
+4. Resolve it using its recorded type. **Zoom as needed**: fetch the full body of any related or closed ticket on demand; call the Skill tool for whichever skills the `## Notes` block names. If in doubt, call the Skill tool twice, for "grilling" and "domain-modeling".
 5. **Record the outcome.** Branch before updating the ticket or map:
    - **Confirmed out-of-scope disposition:** complete [Out of scope](#out-of-scope), then continue at Step 7; it includes Step 6.
    - **Ordinary answer:** write the discussion results to the ticket body, then call the Skill tool with "lighthouse". Confirm its draft with the user and write it to `lighthouse/<NN>-<slug>.md` before setting `Status: resolved`. Append the lighthouse's `## Decision` gist and link to the map's Decisions-so-far. If lighthouse is unavailable, stop before changing status.
