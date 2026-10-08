@@ -35,7 +35,7 @@ find: Blocking uses the tracker's **native** dependency relationship: essential 
 content: Use the tracker’s native dependency relationship where available, otherwise its body convention. A ticket is **unblocked** when every blocker is resolved and its recorded outcome satisfies the prerequisite. For an out-of-scope blocker, complete the dependency review in [Out of scope](#out-of-scope) before advancing. The **frontier** is the open, unblocked, unclaimed children.
 ```
 
-### decision-tickets-section
+### decision-ticket-lifecycle
 
 Keep the decision lifecycle here; leave storage and implementation vocabulary to the tracker.
 
@@ -57,9 +57,9 @@ insert: |
 
 ```
 
-### out-of-scope-lighthouse-decision
+### out-of-scope-disposition
 
-Record confirmed dispositions separately from answers, with a complete dependency review before advancing.
+Owns the confirmed scope-disposition branch and its dependent review. Lighthouse is called here for the disposition; the branch enters the shared tracing step supplied by `backtracer-on-resolution`, then returns to its caller. Record the disposition under Out of scope, not Decisions-so-far.
 
 ```op
 anchor: |
@@ -76,7 +76,7 @@ content: |-
   Complete when every affected dependent has a recorded dependency outcome. Unmet prerequisites remain blocked. Return to the calling step; when called from Step 5, continue at Step 7.
 ```
 
-### work-through-step-0
+### tracker-conventions
 
 Load the tracker vocabulary before choosing a ticket so decision and implementation statuses stay separate.
 
@@ -90,40 +90,80 @@ insert: |
 
 ### grilling-opening-brief
 
-Orient the human to the ticket and its settled constraints after claiming it, before the first grilling question. Shift resolution to step 4; the following mapping continues at step 5.
+Owns the grilling-only opening brief after claiming the ticket and before resolution. Read the recorded type to select this branch; show the ticket question and settled constraints. Anchor on the claim, independently of the following `recorded-type-resolution` edit.
 
 ```op
-anchor: |
-  3. Resolve it as the type its `wayfinder:<type>` label names (see [Ticket Types](#ticket-types)). Read the label, not just the body: the body never states the type. **Zoom as needed**: fetch the full body of any related or closed ticket on demand; call the Skill tool for whichever skills the `## Notes` block names. If in doubt, call the Skill tool twice, for "grilling" and "domain-modeling".
-find: Resolve it as the type its `wayfinder:<type>` label names (see [Ticket Types](#ticket-types)). Read the label, not just the body: the body never states the
-content: |-
-  **Read the processing type:** the local ticket’s `Type:` field, or its `wayfinder:<type>` label on a remote tracker (see [Ticket Types](#ticket-types)). For grilling tickets, present an **opening brief** before the first question: read the ticket’s Question and scan the map’s Decisions-so-far for relevant decisions. Follow relevant links to the source tickets and lighthouse documents.
+anchor: |-
+  **Claim it**: assign it to yourself before any work.
+  <oh-my-wayfinder:insert>
+insert: |
+  3. **Read the processing type:** the local ticket’s `Type:` field, or its `wayfinder:<type>` label on a remote tracker (see [Ticket Types](#ticket-types)). For grilling tickets, present an **opening brief** before the first question: read the ticket’s Question and scan the map’s Decisions-so-far for relevant decisions. Follow relevant links to the source tickets and lighthouse documents.
 
      For that brief, show:
      - **Topic:** What this ticket must decide and how it serves the Destination.
      - **Settled decisions:** Only confirmed decisions that constrain or inform this ticket, each with its source link and implication for this discussion. If none are relevant, say so.
 
      Then ask the first grilling question. Other ticket types skip the brief.
-  4. Resolve it using its recorded
 ```
 
-### work-through-steps-5-to-7
+### recorded-type-resolution
 
-Branch before recording outcomes; both paths complete lighthouse and share one backtracer step.
+Resolve using the recorded processing type, leaving upstream’s Zoom and skill-selection guidance untouched. Resolution becomes step 4 because `grilling-opening-brief` adds the preceding step.
 
 ```op
-anchor: |
+anchor: |-
+  3. Resolve it as the type its `wayfinder:<type>` label names (see [Ticket Types](#ticket-types)). Read the label, not just the body: the body never states the type.
+find: |-
+  3.
+content: |-
+  4.
+find: |-
+  as the type its `wayfinder:<type>` label names (see [Ticket Types](#ticket-types)). Read the label, not just the body: the body never states the
+content: |-
+  using its recorded
+```
+
+### lighthouse-on-resolution
+
+Owns the ordinary-resolution lighthouse gate: record the discussion, confirm and write the lighthouse before setting resolved, then update Decisions-so-far. Confirmed scope dispositions dispatch to `out-of-scope-disposition`. Shared tracing is owned by `backtracer-on-resolution`, not this op.
+
+```op
+anchor: |-
   4. Record the resolution: post the answer as a **resolution comment**, **close** the issue, and **append a context pointer** to the map's Decisions-so-far.
-  5. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. If the answer reveals that a ticket (this one or another) sits beyond the destination, **rule it out of scope** rather than resolving it on the route. If the decision invalidates other parts of the map, update or delete those tickets.
 find: |-
   4. Record the resolution: post the answer as a **resolution comment**, **close** the issue, and **append a context pointer** to the map's Decisions-so-far.
-  5. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. If the answer reveals that a ticket (this one or another) sits beyond the destination, **rule it out of scope** rather than resolving it on the route.
 content: |-
   5. **Record the outcome.** Branch before updating the ticket or map:
      - **Confirmed out-of-scope disposition:** complete [Out of scope](#out-of-scope), then continue at Step 7; it includes Step 6.
      - **Ordinary answer:** write the discussion results to the ticket body, then call the Skill tool with "lighthouse". Confirm its draft with the user and write it to `lighthouse/<NN>-<slug>.md` before setting `Status: resolved`. Append the lighthouse's `## Decision` gist and link to the map's Decisions-so-far. If lighthouse is unavailable, stop before changing status.
+```
+
+### backtracer-on-resolution
+
+Owns the mandatory backtracer call after the outcome is recorded on the map, including unavailable-skill stopping and completed gap follow-up. Both ordinary resolutions and `out-of-scope-disposition` reach this shared step. Insert before the upstream follow-up step is edited by `follow-up-ticket-handoffs`, which consumes the trace outcomes without retracing.
+
+```op
+anchor: |-
+  <oh-my-wayfinder:insert>5. Add newly-surfaced tickets (create-then-wire);
+insert: |
   6. **Trace the updated map.** Call the Skill tool with "backtracer"; if unavailable, stop. Complete its gap follow-up before proceeding. Carry its recorded outcomes and ticket handoffs into Step 7 rather than creating duplicate tickets.
-  7. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. This includes any tickets backtracer surfaced and the user confirmed. If this reveals another out-of-scope ticket, obtain the user's confirmation, complete [Out of scope](#out-of-scope) for that ticket, and resume this step.
+```
+
+### follow-up-ticket-handoffs
+
+Owns reconciliation of backtracer handoffs with newly surfaced tickets and the return from further scope dispositions. Preserve upstream’s fog graduation and invalidation guidance. This becomes step 7 after the opening brief and shared tracing insertions.
+
+```op
+anchor: |-
+  5. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. If the answer reveals that a ticket (this one or another) sits beyond the destination, **rule it out of scope** rather than resolving it on the route.
+find: |-
+  5.
+content: |-
+  7.
+find: |-
+  If the answer reveals that a ticket (this one or another) sits beyond the destination, **rule it out of scope** rather than resolving it on the route.
+content: |-
+  This includes any tickets backtracer surfaced and the user confirmed. If this reveals another out-of-scope ticket, obtain the user's confirmation, complete [Out of scope](#out-of-scope) for that ticket, and resume this step.
 ```
 
 ### prototype-worktree-asset
