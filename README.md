@@ -159,6 +159,7 @@ Edit mappings directly in the eight documents under `deltas/mappings/`:
 ```bash
 node deltas/build.mjs                         # regenerate the listed files under skills/
 node deltas/build.mjs --check                 # verify they still match upstream/ + deltas/
+node deltas/preview.mjs                       # write deltas/preview.html, a browsable diff of every op
 node deltas/check-upstream.mjs                # list skills that differ from upstream HEAD
 node deltas/check-upstream.mjs --verbose      # also list the differing files
 node deltas/check-upstream.mjs --local <dir>  # compare against an existing upstream checkout
@@ -167,6 +168,8 @@ node deltas/check-upstream.mjs --local <dir>  # compare against an existing upst
 `check-upstream.mjs`: by default compares the whitelisted files against upstream HEAD over the GitHub API and exits non-zero when any skill differs.
 
 `check-upstream.mjs --local <dir>` compares against a local repository, for example `--local ../mattpocock-skills`.
+
+`preview.mjs` writes `deltas/preview.html` (gitignored) so the mappings can be reviewed without reading the op blocks by hand: one self-contained page, no server and no dependencies, showing every op as a GitHub-style diff of `upstream/` against the regenerated `skills/`. Each changed block is tagged with the op(s) that produced it, and clicking a tag shows that op's reason, anchor and edits. It replays the ops through `deltas/ops.mjs`, the same code the build uses, and compares the result against the committed `skills/` files, so it cannot disagree with the build about what an op does.
 
 The current snapshot is from mattpocock/skills commit `f3fc5632f401156837ee3872f14fe33ccf1024ea`. To update it, first copy all eight complete skill directories (`wayfinder`, `setup-matt-pocock-skills`, `to-spec`, `to-tickets`, `ask-matt`, `prototype`, `code-review`, `tdd`) from the selected upstream checkout into `upstream/`. Next adapt mapping anchors and edits against that new baseline, preserving both upstream fixes and the fork’s approved semantics. Then run `node deltas/build.mjs`, inspect the generated changes, run `node deltas/build.mjs --check`, compare with `check-upstream.mjs --local <checkout>`, and exercise affected workflow branches. A passing build check alone does not prove the snapshot is current. When upstream rewrites text an op's anchor depends on, the build fails loudly and names the op; a listed file that upstream removed fails the build too. One blind spot remains: an op whose anchor reaches the end of its file cannot detect text upstream appends after that anchor, so check the regenerated `skills/` diff for text that survived past the replacement.
 
