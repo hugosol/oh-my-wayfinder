@@ -161,9 +161,9 @@ flowchart TD
 - 同一目标内按文档顺序执行 op，后项处理前项修改后的文本。anchor 或编辑缺失、有歧义、相互重叠，以及无实际改动和格式损坏，都会导致构建失败。
 
 ```bash
-node deltas/build.mjs                         # 重新生成 skills/ 下被列出的文件
-node deltas/build.mjs --check                 # 校验它们与 upstream/ + deltas/ 一致
-node deltas/preview.mjs                       # 生成 deltas/preview.html，以网页形式审阅每个 op 的改动
+node deltas/build.mjs                         # 重新生成 skills/，并刷新 deltas/preview.html
+node deltas/build.mjs --check                 # 只校验 skills/，不写文件或刷新 preview
+node deltas/preview.mjs                       # 仅刷新 deltas/preview.html
 node deltas/check-upstream.mjs                # 列出与上游 HEAD 有差异的 skill
 node deltas/check-upstream.mjs --verbose      # 同时列出具体差异文件
 node deltas/check-upstream.mjs --local <dir>  # 对比已有的上游 checkout
@@ -172,6 +172,8 @@ node deltas/check-upstream.mjs --local <dir>  # 对比已有的上游 checkout
 `check-upstream.mjs`：默认通过 GitHub API 把白名单文件与上游 HEAD 逐一比较，任何一个 skill 有差异就以非零码退出。
 
 `check-upstream.mjs --local <dir>` 与本地仓库比较，例如 `--local ../mattpocock-skills`。
+
+`build.mjs` 成功完成技能构建后会自动刷新 `deltas/preview.html`，即使 skill 文件没有变化也会刷新。Preview 生成失败时，build 同样以失败退出。`build.mjs --check` 保持只读，不生成或刷新 preview；仍可单独运行 `preview.mjs`。
 
 `preview.mjs` 生成 `deltas/preview.html`（已加入 `.gitignore`），不必手工阅读 op 块即可审阅 mapping：单个自包含页面，无需起服务、无依赖，把每个 op 呈现为 `upstream/` 与重新生成的 `skills/` 之间的 GitHub 风格 diff。每个变更块都标注了产生它的 op，点击标注即可看到该 op 的理由、anchor 与编辑。它通过与构建共用的 `deltas/ops.mjs` 重放这些 op，并与已提交的 `skills/` 文件比对，因此不会与构建对某个 op 的理解产生分歧。
 

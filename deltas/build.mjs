@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Regenerate the overlay files listed in deltas/manifest.json from upstream/.
 //
-//   node deltas/build.mjs          write the generated files
-//   node deltas/build.mjs --check  verify the committed files match the sources
+//   node deltas/build.mjs          write the generated skills and refresh preview.html
+//   node deltas/build.mjs --check  verify the committed files match the sources (read-only)
 //
 // The build is pure text processing: it never shells out and never touches git.
 // manifest.json holds the files whitelist: only these paths are read from upstream/
@@ -204,4 +204,7 @@ if (check) {
 }
 
 if (check) console.log(`\n${verified} file(s) verified against upstream/ + deltas/`);
-else console.log(`\n${written} file(s) written`);
+else {
+  console.log(`\n${written} file(s) written`);
+  await import('./preview.mjs');
+}

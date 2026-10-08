@@ -161,9 +161,9 @@ Edit mappings directly in the eight documents under `deltas/mappings/`:
 - Ops run in document order within each target, against the result of earlier ops. Missing, ambiguous or overlapping anchors and edits, no-ops and malformed ops all fail the build.
 
 ```bash
-node deltas/build.mjs                         # regenerate the listed files under skills/
-node deltas/build.mjs --check                 # verify they still match upstream/ + deltas/
-node deltas/preview.mjs                       # write deltas/preview.html, a browsable diff of every op
+node deltas/build.mjs                         # regenerate skills/ and refresh deltas/preview.html
+node deltas/build.mjs --check                 # verify skills/ without writing files or refreshing preview
+node deltas/preview.mjs                       # refresh only deltas/preview.html
 node deltas/check-upstream.mjs                # list skills that differ from upstream HEAD
 node deltas/check-upstream.mjs --verbose      # also list the differing files
 node deltas/check-upstream.mjs --local <dir>  # compare against an existing upstream checkout
@@ -172,6 +172,8 @@ node deltas/check-upstream.mjs --local <dir>  # compare against an existing upst
 `check-upstream.mjs`: by default compares the whitelisted files against upstream HEAD over the GitHub API and exits non-zero when any skill differs.
 
 `check-upstream.mjs --local <dir>` compares against a local repository, for example `--local ../mattpocock-skills`.
+
+A successful `build.mjs` run automatically refreshes `deltas/preview.html`, even when the skill files are unchanged. Preview-generation failure makes the build fail. `build.mjs --check` remains read-only and does not generate or refresh the preview; `preview.mjs` can still run independently.
 
 `preview.mjs` writes `deltas/preview.html` (gitignored) so the mappings can be reviewed without reading the op blocks by hand: one self-contained page, no server and no dependencies, showing every op as a GitHub-style diff of `upstream/` against the regenerated `skills/`. Each changed block is tagged with the op(s) that produced it, and clicking a tag shows that op's reason, anchor and edits. It replays the ops through `deltas/ops.mjs`, the same code the build uses, and compares the result against the committed `skills/` files, so it cannot disagree with the build about what an op does.
 
