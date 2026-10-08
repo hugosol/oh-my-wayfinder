@@ -7,7 +7,7 @@ Issues and specs for this repo live as markdown files in `.scratch/`.
 - One feature per directory: `.scratch/<feature-slug>/`
 - The spec is `.scratch/<feature-slug>/spec.md`
 - **Decision tickets** (planning): `.scratch/<feature-slug>/decision/<NN>-<slug>.md`, numbered from `01`
-  → Produced by `/wayfinder`. Use only `open` / `claimed` / `resolved`, as defined under Wayfinding operations below; triage installation is not required.
+  → Produced by `/wayfinder`; see Wayfinding operations below.
 - **Implementation tickets**: `.scratch/<feature-slug>/implementation/<NN>-<slug>.md`, numbered from `01`
   → Produced by `/to-tickets`. Use Implementation ticket statuses from `triage-labels.md`.
 - Record a `Status:` line near the top of each ticket. Decision tickets use the lifecycle below; only implementation tickets use triage roles from `triage-labels.md`.
@@ -30,4 +30,4 @@ Used by `/wayfinder`. The **map** is a file with one **child** file per ticket.
 - **Blocking**: a `Blocked by: NN, NN` line near the top. A ticket is unblocked when every listed decision ticket is `resolved` and its recorded outcome satisfies the prerequisite. For a blocker listed in the map’s Out of scope, follow wayfinder’s disposition dependency review; status alone never unblocks its dependents.
 - **Frontier**: scan `.scratch/<effort>/decision/` for files that are open, unblocked, and unclaimed; first by number wins.
 - **Claim**: set `Status: claimed` and save before any work.
-- **Resolve**: follow wayfinder’s mandatory lighthouse and backtracer steps after recording the outcome in the ticket body. Set `Status: resolved`. Ordinary answers go to the map’s Decisions-so-far; confirmed out-of-scope dispositions follow wayfinder’s Out of scope procedure, including dependency review.
+- **Resolve**: follow wayfinder’s Work through the map procedure. For a confirmed out-of-scope disposition, use its Out of scope branch.

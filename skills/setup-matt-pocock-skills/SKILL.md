@@ -9,7 +9,7 @@ disable-model-invocation: true
 Scaffold the per-repo configuration that the engineering skills assume:
 
 - **Issue tracker**: where issues live (GitHub by default; local markdown is also supported out of the box)
-- **Triage labels**: the strings used for implementation-ticket triage; decision tickets use only `open` / `claimed` / `resolved`
+- **Triage labels**: the implementation-ticket triage vocabulary
 - **Domain docs**: where `GLOSSARY.md` and ADRs live, and the consumer rules for reading them
 
 This is a prompt-driven skill, not a deterministic script. Explore, present what you found, confirm with the user, then write.
@@ -54,7 +54,7 @@ If it is installed, ask exactly one question:
 
 > Do you want to keep the default triage labels? (recommended: **yes**)
 
-Triage applies only to implementation tickets. Its defaults are `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`; implementation also tracks `in-progress` and `closed`. Decision tickets use only `open` / `claimed` / `resolved`, independently of triage. On **yes**, write the defaults as-is. Otherwise collect implementation triage-label overrides so `triage` uses existing labels instead of creating duplicates.
+For implementation tickets, the default triage labels are `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`. On **yes**, write them as-is. Otherwise map those roles to the tracker’s existing labels.
 
 **Section C: Domain docs.** Default to **single-context** (one `GLOSSARY.md` + `docs/adr/` at the repo root). This fits almost every repo; write it without asking.
 

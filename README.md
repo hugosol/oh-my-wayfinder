@@ -145,6 +145,8 @@ The eight reworked skills ship complete, and the divergence from upstream is kep
 - [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md), [deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md), [deltas/mappings/to-spec.md](deltas/mappings/to-spec.md), [deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md), [deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md), [deltas/mappings/prototype.md](deltas/mappings/prototype.md), [deltas/mappings/code-review.md](deltas/mappings/code-review.md) and [deltas/mappings/tdd.md](deltas/mappings/tdd.md) are the mapping sources and the human review entry points. Each mapping keeps its target, ID, reason and diff together. Listed files without mappings are inherited verbatim.
 - `skills/` is the install artifact. `lighthouse`, `backtracer`, `traverse` and `to-contract` are hand-written; the seventeen files listed in the manifest are generated, so do not edit them by hand.
 
+The ticket rules have distinct owners: wayfinder defines the decision lifecycle and completion branches; the local tracker template defines storage and fields and points back to wayfinder for resolution; the triage template contains only implementation vocabulary. Keep scope-disposition dependency review before rejoining the main flow, with one backtracer call per resolved ticket.
+
 Edit mappings directly in the eight documents under `deltas/mappings/`:
 
 - Start with `# <skill>`. Use `## <skill>/<file>` for each changed, whitelisted target, then `### <op-id>` for each mapping. IDs use lowercase kebab-case and are unique within a skill. Each mapping has a short reason and exactly one backtick-fenced `diff` block.
