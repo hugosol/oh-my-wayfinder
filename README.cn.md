@@ -142,17 +142,19 @@ flowchart TD
 
 - `upstream/`：整目录拷贝进来的八个上游 skill 目录；里面多出来的文件（例如 `agents/openai.yaml`）无所谓，构建会忽略它们。
 - `deltas/manifest.json` 只保留 `files` 白名单，列出本仓库为这八个 skill 发布的全部十七个文件。只有列表中的文件会从 `upstream/` 读取并写入 `skills/`；这两个 `skills/<skill>/` 目录下的其他文件会被构建删除。
-- [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md)、[deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md)、[deltas/mappings/to-spec.md](deltas/mappings/to-spec.md)、[deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md)、[deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md)、[deltas/mappings/prototype.md](deltas/mappings/prototype.md)、[deltas/mappings/code-review.md](deltas/mappings/code-review.md)、[deltas/mappings/tdd.md](deltas/mappings/tdd.md) 同时是映射源文件和人类审核入口。每项映射把目标、ID、理由和 diff 放在一起；白名单中没有映射的文件原样继承。
+- [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md)、[deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md)、[deltas/mappings/to-spec.md](deltas/mappings/to-spec.md)、[deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md)、[deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md)、[deltas/mappings/prototype.md](deltas/mappings/prototype.md)、[deltas/mappings/code-review.md](deltas/mappings/code-review.md)、[deltas/mappings/tdd.md](deltas/mappings/tdd.md) 同时是映射源文件和人类审核入口。每个 op 把目标、ID、理由和编辑放在一起；白名单中没有映射的文件原样继承。
 - `skills/`：安装产物。`lighthouse`、`backtracer`、`traverse`、`to-contract` 为手写；manifest 里列出的十七个文件为生成物，**不要手工编辑**。
 
 票规则按职责维护：wayfinder 定义决策生命周期与完成分支；本地 tracker 模板定义存储和字段，完成步骤指回 wayfinder；triage 模板只维护实现票词汇。范围外处置必须完成依赖检查后再回到主流程，每张已解决票只调用一次 backtracer。
 
 直接在 `deltas/mappings/` 下的八份文档中编辑映射：
 
-- 文档以 `# <skill>` 开头，用 `## <skill>/<file>` 指定有改动且位于白名单内的目标，用 `### <op-id>` 标识映射。ID 使用小写 kebab-case，在同一 skill 内唯一。每项映射包含简短理由和恰好一个反引号围栏的 `diff` 块。
-- 每行第一个字符为 `-`（原文）、`+`（替换文本）或空格（两者共有）。还原文本时只移除这一个字符，其余空白原样保留；空行也必须带标记。使用 LF 换行并保留文件末尾换行。如果 diff 内含 Markdown 代码围栏，使用更长且前后匹配的反引号围栏。
-- 每个块表达一次连续替换，纯插入必须带已有上下文。这是项目内的精简 diff 格式，没有文件头或 `@@` 行号，不是供 `git apply` 使用的补丁。
-- 同一目标内按文档顺序执行映射，后项处理前项修改后的文本。还原出的原文必须恰好出现一次；定位缺失或有歧义、没有实际改动及格式损坏都会导致构建失败。
+- 文档以 `# <skill>` 开头，用 `## <skill>/<file>` 指定有改动且位于白名单内的目标，用 `### <op-id>` 标识每个 op。ID 使用小写 kebab-case，在同一 skill 内唯一。每个 op 包含简短理由和恰好一个反引号围栏的 `op` 块。
+- 一个 op = 一个 `anchor:` 加上作用在它内部的若干编辑。anchor 是上游文件中的一段文本，必须恰好命中一次；这一次命中为整个 op 把关：只要它还匹配，所有编辑自动生效；一旦上游改动了它，构建失败，由人重新指定 anchor。
+- `find:` / `content:` 成对出现，把 `find` 替换为 `content`。每一对都针对 anchor 的原文求解，所以它们在块中的顺序无关紧要，且两个编辑不得重叠。`find` 必须在 anchor 内恰好命中一次；`content` 为空表示删除。让 `find` 尽量等于改动本身，而不是它周围的上下文：宽 `find` 不影响构建行为（门禁是 anchor），但会把上下文重复进 `content`、掩盖补丁真正拥有的内容。当 `find` 可证明地与其 `content` 共享词边界上下文时，构建会给出 warning。
+- `insert:` 把内容放到 anchor 中 `<oh-my-wayfinder:insert>` 标记处，每个 anchor 最多一个标记。匹配前会先剥掉标记，因此 anchor 读起来仍是插入点周围的字面上游文本。
+- 字段值使用块标量：`field: |` 保留一个末尾换行，`field: |-` 去掉它；很短的单行值可以内联（`find: on resolution`）。块标量的每一行缩进两个空格，使用 LF 换行并保留文件末尾换行。
+- 同一目标内按文档顺序执行 op，后项处理前项修改后的文本。anchor 或编辑缺失、有歧义、相互重叠，以及无实际改动和格式损坏，都会导致构建失败。
 
 ```bash
 node deltas/build.mjs                         # 重新生成 skills/ 下被列出的文件
@@ -166,7 +168,7 @@ node deltas/check-upstream.mjs --local <dir>  # 对比已有的上游 checkout
 
 `check-upstream.mjs --local <dir>` 与本地仓库比较，例如 `--local ../mattpocock-skills`。
 
-当前快照来自 mattpocock/skills 提交 `f3fc5632f401156837ee3872f14fe33ccf1024ea`。更新时，先将选定上游 checkout 的八个完整 skill 目录（`wayfinder`、`setup-matt-pocock-skills`、`to-spec`、`to-tickets`、`ask-matt`、`prototype`、`code-review`、`tdd`）同步到 `upstream/`；再基于新基线调整 mapping 的定位原文与替换内容，同时保留上游修复和已确认的 fork 语义。随后运行 `node deltas/build.mjs`，检查生成差异，执行 `node deltas/build.mjs --check`、`check-upstream.mjs --local <checkout>`，并演练受影响的流程分支。仅通过构建一致性检查，不代表上游快照已更新。当上游改写了某个 op 依赖的文本时，构建会大声失败并指出该 op；列表中的文件若被上游删除，构建同样会失败。唯一锚定到文件末尾的那个 `tdd` op 是这一响亮失败的例外：上游在 `tdd/SKILL.md` 末尾追加的内容不会被判为定位缺失，因此请检查重新生成的 `skills/tdd/` diff，确认替换之后没有残留的上游文本。
+当前快照来自 mattpocock/skills 提交 `f3fc5632f401156837ee3872f14fe33ccf1024ea`。更新时，先将选定上游 checkout 的八个完整 skill 目录（`wayfinder`、`setup-matt-pocock-skills`、`to-spec`、`to-tickets`、`ask-matt`、`prototype`、`code-review`、`tdd`）同步到 `upstream/`；再基于新基线调整 mapping 的 anchor 与编辑，同时保留上游修复和已确认的 fork 语义。随后运行 `node deltas/build.mjs`，检查生成差异，执行 `node deltas/build.mjs --check`、`check-upstream.mjs --local <checkout>`，并演练受影响的流程分支。仅通过构建一致性检查，不代表上游快照已更新。当上游改写了某个 op 的 anchor 依赖的文本时，构建会大声失败并指出该 op；列表中的文件若被上游删除，构建同样会失败。仍有一个盲区：anchor 触及文件末尾的 op 无法察觉上游在该 anchor 之后追加的内容，因此请检查重新生成的 `skills/` diff，确认替换之后没有残留的上游文本。
 
 ## 致谢
 
