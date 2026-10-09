@@ -14,7 +14,7 @@
 
 1. 安装 Matt 的技能集：`npx skills@latest add mattpocock/skills`。
 2. 把本仓库的 `skills/` 目录复制并覆盖到已安装的 skill 目录：同名文件自动替换上游版本，其余文件为纯新增。
-3. Oh My Pi 用户：把 `extensions/spec-to-code.ts` 和 `extensions/agents/tdd.md` 放入扩展位置（扩展会自动发现同目录下的 `tdd` agent）。
+3. Oh My Pi 用户：把 `extensions/spec-to-code.ts`、整个 `extensions/spec-to-code/` 配套目录和 `extensions/agents/tdd.md` 一起放入扩展位置，保留相对布局（扩展会自动发现同目录下的 `tdd` agent）。后台复盘使用已安装的上游 `retro` 与 `writing-for-agents`，无需覆盖或修改它们。
 
 然后与上游一致，每个仓库运行一次 `/setup-matt-pocock-skills`。
 
@@ -44,9 +44,9 @@
 | `prototype` | **改造** | 上游 skill 的重构版：问题回答完后交回一个 `prototype/<name>` worktree（内含所选结果与 `VERDICT.md`），并还原工作区；不再写 spec、issue 或 ticket | 用一次性代码回答一个设计问题时 | **手动** |
 | `code-review` | **改造** | 上游 skill 的重构版：默认 review 目标改为相对 `HEAD` 的未提交改动（含未跟踪文件、遵守 `.gitignore`）；传入固定点仍 review 已提交区间 | review 进行中的工作、分支或 PR 时 | **手动** |
 | `tdd` | **改造** | 上游 skill 的重构版：执行改为票驱动 —— 验收标准、覆盖归属与已批准 seam 来自被指派的工作 —— 循环新增 design-before-red、preserve-the-criterion、check-the-evidence 规则，并加上完成条件 | 以测试先行方式实现功能或修 bug 时 | **手动** |
-| `spec-to-code` + `tdd` agent | **扩展**（仅 OMP） | Spec → 实现票 → 串行 TDD 子代理，一条命令后全自动；可选 Jev 驱动回合回复 | 有规格文档并希望实现它时 | **手动启动**，之后全自动 |
+| `spec-to-code` + `tdd` agent | **扩展**（仅 OMP） | Spec → 实现票 → 串行 TDD，每次执行后台 retro、分别记录结果；可选 Jev 驱动回合回复 | 有规格文档并希望实现它时 | **手动启动**，之后全自动 |
 
-「自动」指调用方 skill 在流程中强制触发该步骤，是 skill 指令层面的保证，而非独立的调度器。
+skill 行的「自动」指调用方 skill 在流程中强制触发该步骤，是指令层面的保证，而非独立调度器。OMP 扩展另外通过宿主代码调度后台 retro，并约束最终收尾。
 
 ## 暂不支持 GitHub / GitLab tracker
 
@@ -129,12 +129,32 @@ flowchart TD
     Q -->|"是"| P2["Phase 2<br/><b>自动</b>"]
     P2 --> ORD["按依赖关系排序"]
     ORD --> TD["逐个 task(agent=tdd)：串行<br/>每个等待前一个完成"]
-    TD --> DONE["输出完成摘要"]
+    TD --> RT["每次 TDD 结束后：原会话后台 retro<br/>失败和 retry 分别记录，不阻塞下一次 TDD"]
+    TD --> FIN["全部 TDD 与 retry 结束<br/>spec_to_code_finish"]
+    RT --> FIN
+    FIN --> DONE["等待所有 retro 终态<br/>输出实现与复盘的独立摘要"]
 
     style C fill:#fff3e0,stroke:#dd6b20
 ```
 
-`tdd` agent（`extensions/agents/tdd.md`）是本仓库为这条流程新增的唯一部分。`to-tickets` 与 `tdd` 两个 skill 来自上游、在本仓库被改造：`to-tickets` 强制要求契约，`tdd` 则从被指派的工作中取得验收标准、覆盖 ID 与 seam。前置条件（`to-tickets` skill、`tdd` skill 或 `tdd` agent）由扩展自动检查、立即报错，无需手动确认。
+扩展中的 `tdd` agent（`extensions/agents/tdd.md`）执行实现；宿主在每次 task 返回后启动原会话的后台 retro，不要求 TDD agent 自行加载 retro。`to-tickets` 与 `tdd` 两个 skill 来自上游、在本仓库被改造：`to-tickets` 强制要求契约，`tdd` 则从被指派的工作中取得验收标准、覆盖 ID 与 seam。前置条件（`to-tickets` skill、`tdd` skill 或 `tdd` agent）由扩展自动检查、立即报错，无需手动确认。
+
+### 后台复盘与状态留存
+
+每次 TDD 执行（包括失败及独立 retry）对应一份复盘。父 session 按依赖排序、串行派发单票 task；`task.name` 必须是 implementation 中的完整票据文件名，retry 复用名称但获得新的执行标识。retro 与后续 TDD 并行，暂不限制并发。父 session 在全部 TDD 与 retry 结束后调用 `spec_to_code_finish`，等待所有复盘达到成功或失败终态后汇总；复盘失败不阻塞 TDD，不自动重试，也不改变实现结果。
+
+宿主加载未修改的上游 retro 和写作指导，原 TDD 会话返回复盘正文，宿主写入：
+
+```text
+.scratch/<feature>/retro/<ticket-file>/<run-id>.json
+.scratch/<feature>/retro/<ticket-file>/<run-id>.md
+```
+
+JSON 留存本次 TDD 结果、独立 retro 状态和错误；成功的 Markdown 包含 `agent`、`agent_id`、本地 `session_id`、`session_file`、父会话、`workspace`、`execution_cwd`、ticket、执行标识及时间。运行中状态保存在内存，文件只供追溯，不是重启恢复队列。进程异常退出后遗留的 running/pending 只是最后记录状态，不会自动续跑。
+
+缺少 retro/写作指导、原会话无法恢复、隔离执行、正文为空或截断、文档写入失败时，报告复盘未交付；记录写入失败也会明确报告。每轮 retro 的执行上限为 5 分钟。切换或关闭所属 session 会取消后台复盘。当前只依据对话历史，不增加工作区快照或 worktree 改造。原 TDD 输出在启动复盘前单独保存，复盘不覆盖其执行器产物。详见 [宿主编排说明](docs/tdd-subagent-retro-host-orchestration.md)。
+
+验证：`bun test extensions/spec-to-code/retro-workflow.test.ts`。
 
 ## 源文件与构建
 

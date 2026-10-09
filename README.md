@@ -14,7 +14,7 @@ This repo is a delta on top of Matt's set, so: install upstream first, then over
 
 1. Install Matt's skills: `npx skills@latest add mattpocock/skills`.
 2. Copy this repo's `skills/` directory over the installed skill directory. Files with the same name replace upstream's; the rest are plain additions.
-3. Oh My Pi users: copy `extensions/spec-to-code.ts` and `extensions/agents/tdd.md` into your extension setup (the extension finds the `tdd` agent next to itself).
+3. Oh My Pi users: copy `extensions/spec-to-code.ts`, the entire companion `extensions/spec-to-code/` directory, and `extensions/agents/tdd.md` into your extension setup, preserving their relative layout. Background retrospectives use the installed upstream `retro` and `writing-for-agents` skills without modifying them.
 
 Then run `/setup-matt-pocock-skills` once per repo, as with the upstream set.
 
@@ -44,9 +44,9 @@ The planning loop they drive: `wayfinder` charts an effort too big for one sessi
 | `prototype` | **Modified** | Upstream skill, reworked: when the question is answered it hands back a `prototype/<name>` worktree holding the chosen result and a `VERDICT.md`, restores the working tree, and writes no spec, issue, or ticket | Answering one design question with throwaway code | **Manual** |
 | `code-review` | **Modified** | Upstream skill, reworked: the default review target is the uncommitted changes against `HEAD` (untracked files included, `.gitignore` respected); supplying a fixed point still reviews the committed range | Reviewing work in progress, a branch, or a PR | **Manual** |
 | `tdd` | **Modified** | Upstream skill, reworked: execution is ticket-driven — the acceptance criteria, coverage ownership and approved seams come from the assigned work — and the loop adds design-before-red, preserve-the-criterion and check-the-evidence rules, plus completion requirements | Building a feature or fixing a bug test-first | **Manual** |
-| `spec-to-code` + `tdd` agent | **Extension** (OMP only) | Spec → implementation tickets → serial TDD subagents, fully automatic after one command; optional Jev-driven turn replies | When you have a spec you want implemented | **Manual kickoff**, then automatic |
+| `spec-to-code` + `tdd` agent | **Extension** (OMP only) | Spec → implementation tickets → serial TDD with per-attempt background retro and independent outcome records; optional Jev-driven turn replies | When you have a spec you want implemented | **Manual kickoff**, then automatic |
 
-"Auto" means the calling skill mandates the step as part of its flow. It is an instruction-level guarantee, not a separate scheduler.
+In the skill rows, "Auto" means the calling skill mandates the step as part of its flow: an instruction-level guarantee, not a separate scheduler. The OMP extension additionally schedules background retro and gates final draining in host code.
 
 ## Supported trackers (for now)
 
@@ -129,12 +129,32 @@ flowchart TD
     Q -->|"yes"| P2["Phase 2<br/><b>auto</b>"]
     P2 --> ORD["Sort tickets by<br/>dependencies"]
     ORD --> TD["task(agent=tdd) per ticket<br/>serial: each waits<br/>for the previous"]
-    TD --> DONE["Completion summary"]
+    TD --> RT["After each TDD attempt: background retro<br/>original session; failures and retries kept separately"]
+    TD --> FIN["All TDD attempts and retries ended<br/>spec_to_code_finish"]
+    RT --> FIN
+    FIN --> DONE["Wait for every retro terminal outcome<br/>summarize implementation and retro separately"]
 
     style C fill:#fff3e0,stroke:#dd6b20
 ```
 
-The `tdd` agent (`extensions/agents/tdd.md`) is the only piece this repo adds to this loop. The `to-tickets` and `tdd` skills are upstream, reworked here: `to-tickets` requires the contract, and `tdd` takes its acceptance criteria, coverage IDs and seams from the assigned work. The extension fails fast if the `to-tickets` skill, the `tdd` skill, or the `tdd` agent is missing; it checks automatically, with nothing to confirm manually.
+The `tdd` agent (`extensions/agents/tdd.md`) implements each ticket; the host starts a background retro in its original session after every task returns. The implementation agent does not have to load retro itself. The `to-tickets` and `tdd` skills are upstream, reworked here: `to-tickets` requires the contract, and `tdd` takes its acceptance criteria, coverage IDs and seams from the assigned work. The extension fails fast if the `to-tickets` skill, the `tdd` skill, or the `tdd` agent is missing; it checks automatically, with nothing to confirm manually.
+
+### Background retrospectives and retained state
+
+Every TDD execution attempt, including failures and independent retries, gets its own retro. The parent session orders tickets by dependency and dispatches one TDD task at a time. `task.name` must be the complete implementation ticket filename; retries reuse the name but receive a new execution identity. Retro runs alongside subsequent TDD, with no concurrency cap for now. Once all TDD attempts and retries end, the parent calls `spec_to_code_finish` to drain every retro to a successful or failed terminal outcome before the final summary. Retro failures do not stop TDD, are not automatically retried, and do not change implementation outcomes.
+
+The host loads unchanged upstream retro and writing guidance. The original TDD session returns Markdown analysis; the host writes:
+
+```text
+.scratch/<feature>/retro/<ticket-file>/<run-id>.json
+.scratch/<feature>/retro/<ticket-file>/<run-id>.md
+```
+
+JSON retains the original TDD result, independent retro state, and errors. Successfully delivered Markdown includes `agent`, `agent_id`, the local `session_id`, `session_file`, parent session, `workspace`, `execution_cwd`, ticket, execution identity, and timestamps. Scheduling state lives in memory; files are audit records, not a restart queue. A pending/running record left by a crashed process is only its last observed state and is never automatically resumed.
+
+Missing retro/writing skills, an unavailable original session, isolated execution, empty/truncated output, and document write errors produce an undelivered retro. Record-write failures are reported too. Each monitored retro turn has a five-minute runtime cap. Switching or closing the owning session cancels its background retros. This change uses conversation history; it does not add workspace snapshots or worktree orchestration. The implementation result is saved before retro starts, and retro never overwrites its executor artifact. See the [host orchestration notes](docs/tdd-subagent-retro-host-orchestration.md).
+
+Verification: `bun test extensions/spec-to-code/retro-workflow.test.ts`.
 
 ## Sources & build
 

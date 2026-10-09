@@ -15,7 +15,7 @@ A recorded decision or confirmed out-of-scope disposition, not a claim about pro
 Classification and readiness assessment for implementation tickets, separate from the decision-ticket lifecycle.
 
 **Implementation ticket**:
-A tracer-bullet vertical slice cut from an approved contract; the unit phase 2 implements, one independent agent run per ticket.
+A tracer-bullet vertical slice cut from an approved contract; the unit phase 2 implements. Failed attempts may be followed by independent retries.
 _Avoid_: issue, task (reserve those for a real tracker)
 
 **Publish**:
@@ -30,7 +30,18 @@ _Avoid_: tickets generated
 Turn the spec and its approved contract into published implementation tickets.
 
 **Phase 2**:
-Execute the published tickets in dependency order, one TDD subagent per ticket.
+Execute the published tickets in dependency order, then collect the outcomes of their execution attempts and retrospectives.
+
+**Execution attempt**:
+One TDD execution of one implementation ticket, with its own outcome and source session. A retry is a new execution attempt of the same ticket.
+_Avoid_: ticket completion (an ended attempt need not satisfy acceptance)
+
+**Retrospective**:
+An additional, history-based assessment of one execution attempt, independent of that attempt's implementation outcome.
+_Avoid_: review, acceptance verification
+
+**Workflow settled**:
+Every dispatched execution attempt and its retrospective has reached a known outcome, including failures or undelivered retrospectives. Settlement does not mean every ticket passed acceptance.
 
 **Jev mode**:
 Turn-reply selection delegated to the judge chain instead of the built-in canned sequence. Off by default; the canned sequence is the deterministic alternative.
