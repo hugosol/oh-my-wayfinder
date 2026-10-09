@@ -150,7 +150,7 @@ User invokes with a map (URL or number). A ticket is **optional**: without one, 
 
    Then ask the first grilling question. Other ticket types skip the brief.
 4. Resolve it using its recorded type. **Zoom as needed**: fetch the full body of any related or closed ticket on demand; call the Skill tool for whichever skills the `## Notes` block names. If in doubt, call the Skill tool twice, for "grilling" and "domain-modeling".
-5. **Record the outcome.** Branch before updating the ticket or map:
+5. **Record the outcome.** Before updating the ticket or map, choose the matching procedure:
    - **Confirmed out-of-scope disposition:** complete [Out of scope](#out-of-scope), then continue at Step 7; it includes Step 6.
    - **Ordinary answer:** write the discussion results to the ticket body, then call the Skill tool with "lighthouse". Confirm its draft with the user and write it to `lighthouse/<NN>-<slug>.md` before setting `Status: resolved`. Append the lighthouse's `## Decision` gist and link to the map's Decisions-so-far. If lighthouse is unavailable, stop before changing status.
 6. **Trace the updated map.** Call the Skill tool with "backtracer"; if unavailable, stop. Complete its gap follow-up before proceeding. Carry its recorded outcomes and ticket handoffs into Step 7 rather than creating duplicate tickets.

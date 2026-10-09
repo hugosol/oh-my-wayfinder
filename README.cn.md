@@ -34,7 +34,7 @@
 |---|---|---|---|---|
 | `lighthouse` | **新增** | 把已解决的 wayfinder 票固化为灯塔文档：决策、用户故事、前置条件、后置条件、不变量，是 backtracer 追踪的信号源 | 每张 wayfinder 票解决后立即执行 | **自动**（由 wayfinder 调用） |
 | `backtracer` | **新增** | 把票与灯塔文档中的 "so that" 子句、不变量、依赖信号回溯到整张地图，在缺口变成 bug 之前暴露缺失票、层次缺口与不对称 | lighthouse 之后，每张已解决票执行一次 | **自动**（由 wayfinder 调用） |
-| `traverse` | **新增** | 已完成地图的终审：构建设计树并走查每条分支，检查依赖覆盖、同级对称、层次完整、边界完备 | 所有 wayfinder 票解决后、进入 to-spec 之前 | **手动** |
+| `traverse` | **新增** | 已完成地图的终审：构建设计树并走查整棵树的每个分支，检查依赖覆盖、同级对称、层次完整、边界完备 | 所有 wayfinder 票解决后、进入 to-spec 之前 | **手动** |
 | `to-contract` | **新增** | 把 spec 变成已批准的契约：承诺清单与轻量测试 seam 草图，优先沿用既有 seam；重大 interface 重设计先获用户授权。写入 `.scratch/<feature>/contract.md` | 介于 to-spec 与 to-tickets 之间 | **手动** |
 | `wayfinder` | **改造** | 上游 skill 的重构版：每张票解决后强制 lighthouse + backtracer，区分决策票（`.scratch/<feature>/decision/`）与实现票（`.scratch/<feature>/implementation/`），缺口决策交由用户拍板 | 当工作量超出单个 agent 会话时 | **手动** |
 | `setup-matt-pocock-skills` | **改造** | 上游设置 skill，轻量适配（issue tracker 选项、triage 标签、domain 文档布局） | 每个仓库一次，首次使用前 | **手动** |
@@ -165,9 +165,9 @@ JSON 留存本次 TDD 结果、独立 retro 状态和错误；成功的 Markdown
 - [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md)、[deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md)、[deltas/mappings/to-spec.md](deltas/mappings/to-spec.md)、[deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md)、[deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md)、[deltas/mappings/prototype.md](deltas/mappings/prototype.md)、[deltas/mappings/code-review.md](deltas/mappings/code-review.md)、[deltas/mappings/tdd.md](deltas/mappings/tdd.md) 同时是映射源文件和人类审核入口。每个 op 把目标、ID、理由和编辑放在一起；白名单中没有映射的文件原样继承。
 - `skills/`：安装产物。`lighthouse`、`backtracer`、`traverse`、`to-contract` 为手写；manifest 里列出的十七个文件为生成物，**不要手工编辑**。
 
-票规则按职责维护：wayfinder 定义决策生命周期与完成分支；本地 tracker 模板定义存储和字段，完成步骤指回 wayfinder；triage 模板只维护实现票词汇。范围外处置必须完成依赖检查后再回到主流程，每张已解决票只调用一次 backtracer。
+票规则按职责维护：wayfinder 定义决策生命周期与完成流程；本地 tracker 模板定义存储和字段，完成步骤指回 wayfinder；triage 模板只维护实现票词汇。范围外处置必须完成依赖检查后再回到主流程，每张已解决票只调用一次 backtracer。
 
-[wayfinder mappings](deltas/mappings/wayfinder.md) 中的完成 hooks：[lighthouse-on-resolution](deltas/mappings/wayfinder.md#lighthouse-on-resolution) 负责普通答案；[out-of-scope-disposition](deltas/mappings/wayfinder.md#out-of-scope-disposition) 负责范围外处置分支；[backtracer-on-resolution](deltas/mappings/wayfinder.md#backtracer-on-resolution) 负责两条分支共享的 tracing；[follow-up-ticket-handoffs](deltas/mappings/wayfinder.md#follow-up-ticket-handoffs) 整理后续票交接。
+[wayfinder mappings](deltas/mappings/wayfinder.md) 中的完成 hooks：[lighthouse-on-resolution](deltas/mappings/wayfinder.md#lighthouse-on-resolution) 负责普通答案；[out-of-scope-disposition](deltas/mappings/wayfinder.md#out-of-scope-disposition) 负责范围外处置流程；[backtracer-on-resolution](deltas/mappings/wayfinder.md#backtracer-on-resolution) 负责两条流程共享的 tracing；[follow-up-ticket-handoffs](deltas/mappings/wayfinder.md#follow-up-ticket-handoffs) 整理后续票交接。
 
 直接在 `deltas/mappings/` 下的八份文档中编辑映射：
 
@@ -177,6 +177,7 @@ JSON 留存本次 TDD 结果、独立 retro 状态和错误；成功的 Markdown
 - `find:` / `content:` 成对出现，把 `find` 替换为 `content`。同一个 op 内，连续的改动用一组替换表达，必要的步骤编号调整一并包含；分散的改动才使用多组，中间不变的文本留在替换之外。每一对都针对 anchor 的原文求解，所以它们在块中的顺序无关紧要，且两个编辑不得重叠。`find` 必须在 anchor 内恰好命中一次；`content` 为空表示删除。让 `find` 尽量等于改动本身，而不是它周围的上下文：宽 `find` 不影响构建行为（门禁是 anchor），但会把上下文重复进 `content`、掩盖补丁真正拥有的内容。当 `find` 可证明地与其 `content` 共享词边界上下文时，构建会给出 warning。
 - `insert:` 把内容放到 anchor 中 `<oh-my-wayfinder:insert>` 标记处，每个 anchor 最多一个标记。匹配前会先剥掉标记，因此 anchor 读起来仍是插入点周围的字面上游文本。
 - 字段值使用块标量：`field: |` 保留一个末尾换行，`field: |-` 去掉它；很短的单行值可以内联（`find: on resolution`）。块标量的每一行缩进两个空格，使用 LF 换行并保留文件末尾换行。
+- 当 `branch` 容易被误读为 Git 操作时，按用途命名流程选择，例如原型 `mode` 或结果处理 `procedure`。mapping 的 anchor 和 find 中引用的上游原文保持不变。
 - Markdown 表格在原始文本中也要保持列对齐。对齐 `content:` / `insert:` 中编写的表格和手写 skill 中的表格；`anchor:` / `find:` 中的上游原文保持不变。
 - 同一目标内按文档顺序执行 op，后项处理前项修改后的文本。anchor 或编辑缺失、有歧义、相互重叠，以及无实际改动和格式损坏，都会导致构建失败。
 

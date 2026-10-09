@@ -2,6 +2,17 @@
 
 ## setup-matt-pocock-skills/SKILL.md
 
+### setup-choice-wording
+
+Describe meaningful choices directly rather than using Git-adjacent terminology.
+
+```op
+anchor: |-
+  Give a one-line explainer only when the choice genuinely branches;
+find: choice genuinely branches;
+content: options have meaningfully different consequences;
+```
+
 ### triage-labels-bullet
 
 Triage vocabulary belongs to implementation tickets; decision lifecycle is fixed by the tracker.
@@ -156,5 +167,5 @@ Delegate completion to wayfinder instead of duplicating its step order.
 anchor: |
   - **Resolve**: append the answer under an `## Answer` heading, set `Status: resolved`, then append a context pointer (gist + link) to the map's Decisions-so-far in `map.md`.
 find: append the answer under an `## Answer` heading, set `Status: resolved`, then append a context pointer (gist + link) to the map's Decisions-so-far in `map.md`.
-content: follow wayfinder’s Work through the map procedure. For a confirmed out-of-scope disposition, use its Out of scope branch.
+content: follow wayfinder’s Work through the map procedure. For a confirmed out-of-scope disposition, use its Out of scope procedure.
 ```

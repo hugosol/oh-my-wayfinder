@@ -2,6 +2,30 @@
 
 ## prototype/SKILL.md
 
+### prototype-mode-heading
+
+Distinguish choosing a prototype mode from creating its eventual Git branch.
+
+```op
+anchor: |-
+  ## Pick a branch
+find: Pick a branch
+content: Choose a prototype mode
+```
+
+### prototype-mode-choice
+
+Call logic and UI modes consistently; Git branches are hand-back artifacts.
+
+```op
+anchor: |-
+  The two branches produce very different artifacts, so getting this wrong wastes the whole prototype. If the question is genuinely ambiguous and the user isn't reachable, default to whichever branch better matches the surrounding code (a backend module → logic; a page or component → UI) and state the assumption at the top of the prototype.
+find: branches
+content: modes
+find: whichever branch
+content: whichever mode
+```
+
 ### skill-hand-back-worktree
 
 Replace the capture step with a worktree hand-back: record the verdict, export the prototype, write nothing else.
@@ -38,6 +62,17 @@ content: |-
 
 ## prototype/LOGIC.md
 
+### logic-mode-routing
+
+Route to the appropriate prototype guide, not a Git branch.
+
+```op
+anchor: |-
+  If the question is "what should this look like," this is the wrong branch. Use [UI.md](UI.md).
+find: this is the wrong branch. Use
+content: use
+```
+
 ### logic-module-liftability
 
 Disambiguate §2's "lifts into the real module on its own": state readiness, not a timing, so it stops pulling toward folding the logic in at answer time.
@@ -51,7 +86,7 @@ content: is ready to lift into the real module as-is.
 
 ### logic-hand-back-worktree
 
-The logic branch hands the same worktree back; nothing lifts into the real module yet.
+The logic mode hands the same worktree back; nothing lifts into the real module yet.
 
 ```op
 anchor: |
@@ -70,9 +105,20 @@ content: |-
 
 ## prototype/UI.md
 
+### ui-mode-routing
+
+Route to the appropriate prototype guide, not a Git branch.
+
+```op
+anchor: |-
+  If the question is about logic/state rather than what something looks like, this is the wrong branch. Use [LOGIC.md](LOGIC.md).
+find: this is the wrong branch. Use
+content: use
+```
+
 ### ui-hand-back-worktree
 
-The UI branch keeps only the winning variant and hands it back; the losing variants and the switcher are dropped.
+The UI mode keeps only the winning variant and hands it back; the losing variants and the switcher are dropped.
 
 ```op
 anchor: |

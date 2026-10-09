@@ -59,7 +59,7 @@ insert: |
 
 ### out-of-scope-disposition
 
-Owns the confirmed scope-disposition branch and its dependent review. Lighthouse is called here for the disposition; the branch enters the shared tracing step supplied by `backtracer-on-resolution`, then returns to its caller. Record the disposition under Out of scope, not Decisions-so-far.
+Owns the confirmed scope-disposition procedure and its dependent review. Lighthouse is called here for the disposition; the procedure enters the shared tracing step supplied by `backtracer-on-resolution`, then returns to its caller. Record the disposition under Out of scope, not Decisions-so-far.
 
 ```op
 anchor: |
@@ -90,7 +90,7 @@ insert: |
 
 ### grilling-opening-brief
 
-Owns the grilling-only opening brief after claiming the ticket and before resolution. Read the recorded type to select this branch; show the ticket question and settled constraints. Anchor on the claim, independently of the following `recorded-type-resolution` edit.
+Owns the grilling-only opening brief after claiming the ticket and before resolution. Read the recorded type to determine whether this brief is required; show the ticket question and settled constraints. Anchor on the claim, independently of the following `recorded-type-resolution` edit.
 
 ```op
 anchor: |-
@@ -133,7 +133,7 @@ anchor: |-
 find: |-
   4. Record the resolution: post the answer as a **resolution comment**, **close** the issue, and **append a context pointer** to the map's Decisions-so-far.
 content: |-
-  5. **Record the outcome.** Branch before updating the ticket or map:
+  5. **Record the outcome.** Before updating the ticket or map, choose the matching procedure:
      - **Confirmed out-of-scope disposition:** complete [Out of scope](#out-of-scope), then continue at Step 7; it includes Step 6.
      - **Ordinary answer:** write the discussion results to the ticket body, then call the Skill tool with "lighthouse". Confirm its draft with the user and write it to `lighthouse/<NN>-<slug>.md` before setting `Status: resolved`. Append the lighthouse's `## Decision` gist and link to the map's Decisions-so-far. If lighthouse is unavailable, stop before changing status.
 ```

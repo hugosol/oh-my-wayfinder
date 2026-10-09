@@ -93,6 +93,39 @@ find: |-
 content: prototype. Run **`/prototype`** in the working tree; it hands back a `prototype/<name>` worktree holding the chosen result and a `VERDICT.md`, with the working tree restored. Take that worktree path back into this thread — it is the reference the spec will point at — and keep grilling.
 ```
 
+### conversation-choice-wording
+
+State the routing question directly, without suggesting a Git operation.
+
+```op
+anchor: |-
+  2. **Branch: can you settle every question in conversation?**
+find: Branch: can
+content: Can
+```
+
+### build-scope-choice-wording
+
+State the build-scope question directly, without suggesting a Git operation.
+
+```op
+anchor: |-
+  3. **Branch: is this a multi-session build?**
+find: Branch: is
+content: Is
+```
+
+### phase-choice-wording
+
+Describe context-management choices separately from Git terminology.
+
+```op
+anchor: |-
+  the reasoning behind each branch,
+find: branch,
+content: choice,
+```
+
 ### prototype-worktree-standalone
 
 The standalone section describes the worktree handoff and the no-spec rule.

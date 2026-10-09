@@ -4,7 +4,7 @@ description: "Audit a completed wayfinder map end-to-end: dependency coverage, p
 disable-model-invocation: true
 ---
 
-All the facts are already in the map, the decision ticket bodies, and the lighthouse documents. Traverse reads them all, builds the design tree, and walks every branch to find gaps: things the map needs but no ticket covers. Only ask the user about gaps the documents can't resolve.
+All the facts are already in the map, the decision ticket bodies, and the lighthouse documents. Traverse reads them all, builds the design tree, and walks every branch of the entire tree to find gaps: things the map needs but no ticket covers. Only ask the user about gaps the documents can't resolve.
 
 Do not act on it until the user confirms the gaps.
 
