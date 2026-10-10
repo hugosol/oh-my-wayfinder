@@ -15,7 +15,7 @@ Do not write code, and do not re-interview the user about the requirement — th
 ## Loads
 
 - Call the Skill tool with "codebase-design" before proposing any seam. It is the single owner of the **module / interface / seam / adapter / depth / leverage / locality** vocabulary and its principles — the deletion test, "the interface is the test surface", internal vs external seams, "one adapter means a hypothetical seam, two means a real one". Use its terms exactly; do not drift into "component", "service", "API" or "boundary".
-- Use codebase-design's dependency categories when the promises cross an external dependency, and its design-it-twice pattern when two or more seam layouts are viable; compare the alternatives on depth, locality, and seam placement.
+- Use codebase-design's dependency categories when the promises cross an external dependency.
 - Read `GLOSSARY.md` for domain vocabulary; call the Skill tool with "domain-modeling" only when a term is being resolved or an ADR is being written.
 
 ## Prerequisites
@@ -39,25 +39,20 @@ Distill the User Stories into **promises**: one observable result per line, dedu
 For each promise record: the promise itself, its coverage, its source, the seam it is observed at, and — later, filled in by `/to-tickets` — what delivers it.
 
 - **Expected outcomes come from the promise, never from the implementation.** A value recomputed the way the code computes it is tautological and proves nothing; expected values are independent literals, worked examples, or the spec itself.
-- **Traverse past the literal spec.** For each capability, walk the existing system's symmetry (what does the sibling feature expose?), the dependencies it implies, and the six surfaces in the boundary review. Mark anything the spec did not say as `inferred`. Classify each inference: required to fulfill an existing promise, an internal implementation choice, or a new behavior or trade-off requiring approval. Draft the full promise list for the contract; bring only decision-relevant findings to the human gates.
+- **Traverse past the literal spec.** Use known system symmetry and relevant dependencies to draft implied promises; the full six-surface check belongs to the boundary-review gate. Mark anything the spec did not say as `inferred`. Classify each inference: required to fulfill an existing promise, an internal implementation choice, or a new behavior or trade-off requiring approval. Draft the full promise list for the contract; bring only decision-relevant findings to the human gates.
 - **Status is derived, not stored.** A promise is done when its delivering work is complete and all required checks pass, including user confirmation of any human-led coverage. Automated execution may finish while acceptance remains pending. Never hand-maintain a status column; generate a checklist from the contract and the tracker when the human asks for one.
 
-### 3. Derive the seams
+### 3. Sketch the test seams
 
-Promises are observed somewhere; that somewhere is a seam. Work in this order:
+Sketch where the feature's promises will be tested. The main agent uses inherited codebase understanding and targeted inspection of relevant interfaces and existing tests. Investigate a missing fact only when it changes the sketch.
 
-1. **Observations.** For each promise ask: who observes this, and where? That boundary is a candidate seam.
-2. **Inventory.** List the seams the codebase already has — module interfaces, entry points, config, persistence, external dependencies, error surface.
-3. **Diff.** Prefer existing seams, and take the **highest** seam that carries the promise. A rendered value alone does not carry an independently specified data caliber or failure mechanism if a plausible violation cannot be distinguished there; observe that promise where the evidence is available. UI and payload may carry different promises from the same stories. Fewer seams is better; the ideal number is one.
-4. **Collapse.** Merge seams that carry the same promises. Every new seam must earn its keep: name what actually varies across it.
+Prefer existing seams, taking the **highest** seam that carries the promise. Fewer seams is better; the ideal number is one. The observation must distinguish a plausible violation: a rendered value alone may not carry an independently specified data caliber or failure mechanism. Keep separate observations where those promises require different evidence.
 
-Stopping rules:
+If existing seams are insufficient, propose a new seam at the highest point that carries the uncovered promise, naming what actually varies across it. New functionality or additional test cases can use existing seams; they do not by themselves require a new interface.
 
-- a promise with no seam is **untestable** — fix the promise, or raise the seam;
-- a seam carrying no promise is implementation detail or speculation — move it out;
-- needing two seams to verify one promise means the seams are **too low** — take the common entry point.
+The sketch is ready when every draft promise has an observation at a relevant seam, with evidence for reused interfaces and a concrete gap for any proposed addition or change. Present it at the first gate; complete the boundary check at the second.
 
-Never list private modules, file paths, or internal helpers. Those are internal seams, and they are the agent's business, not the contract's.
+Never list private modules, file paths, or internal helpers in the contract. Those are internal seams, and they are the agent's business, not the contract's.
 
 **Seams are hypotheses.** When implementation disproves one, change the contract, and take it to an ADR if it is hard to reverse; keep code and contract from drifting silently.
 
@@ -67,12 +62,11 @@ Run seam selection, boundary review, and acceptance-mode selection as sequential
 
 Count only explicit confirmation of the decision presented as approval. Unanswered decisions remain pending. Hold any later-stage choice offered early as provisional until its prerequisites are confirmed and the choice still applies.
 
-For each seam decision, present one or two alternatives, the trade-off, a reversibility grade, and **your recommendation**. Be opinionated: the human wants a strong read, not a menu. Present the promises that distinguish the seam alternatives, not the full draft promise list. Keep that list for the contract and show it on request.
+#### Seam selection
 
-Reversibility decides who has to look:
+Present a concise **recommended sketch**: which existing seams to reuse, the key promises observed there, and any necessary additions or changes. Offer an alternative only for a material trade-off, with its reversibility and your recommendation. Keep the full draft promise list for the contract and show it on request.
 
-- **low reversibility** (public API, error semantics, ownership and resource bounds, concurrency and cost envelope) → the human decides;
-- **high reversibility** (internal seams, cheap to rewrite) → delegate, or approve in a batch.
+If a concrete gap requires substantial module-interface design or redesign, explain the gap and the impact on existing callers and tests, then ask whether to enter that design work. After explicit user approval, use codebase-design's design-it-twice pattern for alternative interfaces. Routine seam reuse and simple additions stay with the main agent's sketch; internal construction stays with the build.
 
 This gate is complete when the user selects or approves a seam proposal. Use that selection—not an unapproved recommendation—to review the boundary findings in the next gate.
 
@@ -116,15 +110,15 @@ Acceptance mode: Full automation | Rapid iteration
 
 ## Promises
 
-| # | Promise (one observable result) | Coverage | Source | Seam |
-|---|--------------------------------|----------|--------|------|
-| P1 | | | story 4 / inferred | |
+| #   | Promise (one observable result) | Coverage | Source             | Seam |
+| --- | ------------------------------- | -------- | ------------------ | ---- |
+| P1  |                                 |          | story 4 / inferred |      |
 
 ## Seam decisions
 
 | Seam | Exposes | Hides | Alternatives considered | Reversibility |
-|------|---------|-------|-------------------------|---------------|
-| | | | | |
+| ---- | ------- | ----- | ----------------------- | ------------- |
+|      |         |       |                         |               |
 
 ## Not yet specified
 

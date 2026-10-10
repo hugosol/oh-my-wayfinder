@@ -49,6 +49,7 @@ export function createJudgeDecider(
 				return undefined;
 			}
 			const judge = resolveJudge({
+				purpose: "spec-to-code",
 				settings,
 				registry: ctx.modelRegistry,
 				sessionModel: ctx.model,

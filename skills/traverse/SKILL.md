@@ -4,7 +4,7 @@ description: "Audit a completed wayfinder map end-to-end: dependency coverage, p
 disable-model-invocation: true
 ---
 
-All the facts are already in the map, the decision ticket bodies, and the lighthouse documents. Traverse reads them all, builds the design tree, and walks every branch to find gaps: things the map needs but no ticket covers. Only ask the user about gaps the documents can't resolve.
+All the facts are already in the map, the decision ticket bodies, and the lighthouse documents. Traverse reads them all, builds the design tree, and walks every branch of the entire tree to find gaps: things the map needs but no ticket covers. Only ask the user about gaps the documents can't resolve.
 
 Do not act on it until the user confirms the gaps.
 
@@ -28,6 +28,8 @@ From these sources, build the tree. Every ticket is a node. The tree has four ki
 - **Pattern edges**: from lighthouse Invariants. If ticket A says "follows the same conventions as daily engine", draw A → daily engine (the existing pattern).
 - **Layer edges**: from decision ticket bodies. Group tickets by their claimed layer: engine, strategy, config, output, scan.
 - **Boundary edges**: between tickets whose bodies describe adjacent concerns. If ticket 03 defines a strategy interface and ticket 09 defines a config format, they share a boundary at "strategy configuration".
+
+Keep Out of scope tickets as disposition evidence, not providers of their abandoned outcomes. Check that each affected in-scope dependent has a replacement provider or a confirmed reason the prerequisite is no longer needed; otherwise report a gap.
 
 Nodes without outgoing dependency edges are missing their prerequisites.
 

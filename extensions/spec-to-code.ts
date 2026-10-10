@@ -2,7 +2,7 @@
  * Spec-to-Code Extension: Autonomous two-phase workflow.
  *
  * Phase 1: /to-tickets  → generate ticket files from spec
- * Phase 2: /tdd          → develop based on ticket files
+ * Phase 2: serial TDD attempts with independent background retro and final draining
  *
  * Usage: /spec-to-code <slug>
  *   Spec at:  .scratch/<slug>/spec.md
@@ -22,14 +22,15 @@
  * published set is never re-nagged; the judge is only consulted while no ticket has
  * landed. Any failure in that chain falls back to the pre-Jev canned sequence.
  *
- * This module is the composition root: run state lives in `workflow-session.ts`,
+ * This module is the composition root: planning state lives in `workflow-session.ts`,
+ * execution/retro state and persistence in `retro-workflow.ts`, host continuation in `retro-host.ts`,
  * the turn decision in `turn-policy.ts`, the judge port in `jev-judge.ts`, config
  * resolution in `config.ts`, and host access in `host-integration.ts`.
  */
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { type ExtensionAPI, type ExtensionCommandContext } from "@oh-my-pi/pi-coding-agent";
+import { type ExtensionAPI, type ExtensionCommandContext, type ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { loadSpecToCodeConfig } from "./spec-to-code/config";
 import { activateSkill, hasSkill, hasTddAgent } from "./spec-to-code/host-integration";
 import { createJudgeDecider } from "./spec-to-code/jev-judge";
@@ -40,6 +41,8 @@ import {
 	type TurnPorts,
 } from "./spec-to-code/turn-policy";
 import { createWorkflowSession, MAX_AUTO_ACTIONS } from "./spec-to-code/workflow-session";
+import { createRetroWorkflow, tddTicket, tddResult } from "./spec-to-code/retro-host";
+import type { RetroWorkflow } from "./spec-to-code/retro-workflow";
 
 // ============================================================================
 // Constants
@@ -148,9 +151,9 @@ function buildAskAnswer(questions: readonly AskAnswerQuestion[]): {
 // Phase 2: orchestrate TDD subagents
 // ============================================================================
 
-async function startPhase2(pi: ExtensionAPI, slug: string): Promise<void> {
+function startPhase2(pi: ExtensionAPI, slug: string): void {
 	pi.sendUserMessage(
-		`请读取 .scratch/${slug}/implementation/ 目录下的所有 ticket 文件。\n分析每个 ticket 的内容和依赖关系，按依赖顺序排列。\n\n对每个 ticket，使用 task 工具执行：\n  agent: "tdd"\n  task: 包含 ticket 的完整内容和名称\n\n⚠️ 约束：\n- 每个 ticket 必须由一次独立的 task(agent="tdd") 调用执行\n- 绝不能将多个 ticket 合并到同一次 task 调用中\n- 必须等待每个 task 完成后，再开始下一个\n- 全部完成后，输出每个 ticket 的完成状态摘要`,
+		`请读取 .scratch/${slug}/implementation/ 目录下的所有 ticket 文件。\n分析每个 ticket 的内容和依赖关系，按依赖顺序排列。\n\n对每个 ticket，使用 task 工具执行：\n  agent: "tdd"\n  name: ticket 的完整文件名（含 .md；retry 使用相同名称）\n  task: 包含 ticket 的完整内容和名称\n\n⚠️ 约束：\n- 每个 ticket 必须由一次独立的 task(agent="tdd") 调用执行\n- 绝不能将多个 ticket 合并到同一次 task 调用中\n- 必须等待每个 task 完成后，再开始下一个\n- 实现失败时按现有策略重新派发独立的 TDD task，保留相同票据 name；不要向失败的原 agent 发送实现续跑消息\n- 每次 TDD 结束（包含失败与 retry）后，宿主会在原会话启动后台 retro；无需等待 retro，也不要自行调用 retro 或等待其 agent\n- retro 失败不会影响 TDD；按依赖顺序继续执行下一票\n- 全部 TDD 及其 retry 结束后，必须调用 spec_to_code_finish 工具等待后台 retro 的成功或失败终态；只在队列结束时调用，不能在票与票之间调用\n- 收尾工具返回后，结合各次实现报告输出最终汇总：区分实现验收与复盘交付，列出失败、retry、未执行票据及文档路径；不因 retro 失败重跑实现`,
 		{ deliverAs: "followUp" },
 	);
 }
@@ -164,6 +167,68 @@ export default function specToCode(pi: ExtensionAPI): void {
 
 	const z = pi.zod;
 	const session = createWorkflowSession();
+	let retroWorkflow: RetroWorkflow | undefined;
+	let phase2Starting = false;
+
+	pi.on("tool_call", async (event, ctx) => {
+		const workflow = retroWorkflow;
+		if (!workflow?.owns(ctx.sessionManager.getSessionId(), ctx.agent.id) || event.toolName !== "task") return;
+		try {
+			const ticket = tddTicket(event.input);
+			if (ticket !== undefined) await workflow.begin(event.toolCallId, ticket);
+		} catch (error) {
+			return { block: true, reason: error instanceof Error ? error.message : String(error) };
+		}
+	});
+
+	pi.on("tool_result", async (event, ctx) => {
+		const workflow = retroWorkflow;
+		if (!workflow?.owns(ctx.sessionManager.getSessionId(), ctx.agent.id) || event.toolName !== "task") return;
+		await workflow.settle(event.toolCallId, tddResult(event.details), event.isError
+			? event.content.filter(item => item.type === "text").map(item => item.text).join("\n")
+			: undefined);
+	});
+
+	pi.registerTool({
+		name: "spec_to_code_finish",
+		label: "Finish Spec-to-Code",
+		description: "After all Spec-to-Code TDD attempts and retries have ended, wait for their background retrospectives and return independent implementation/retro outcomes. Retro failures are terminal, not reasons to retry or block completion. Call before the final workflow summary; never between tickets.",
+		parameters: z.object({}),
+		approval: "read",
+		async execute(_toolCallId, _params, signal, _onUpdate, ctx) {
+			const workflow = retroWorkflow;
+			if (!workflow?.owns(ctx.sessionManager.getSessionId(), ctx.agent.id)) {
+				return { content: [{ type: "text" as const, text: "当前 session 没有待收尾的 Spec-to-Code Phase 2。" }], isError: true };
+			}
+			const cancel = () => { void workflow.cancel(); };
+			signal?.addEventListener("abort", cancel, { once: true });
+			try {
+				if (signal?.aborted) await workflow.cancel();
+				const summary = await workflow.finish();
+				if (retroWorkflow === workflow) retroWorkflow = undefined;
+				return { content: [{ type: "text" as const, text: summary }], details: { executions: workflow.records } };
+			} catch (error) {
+				return { content: [{ type: "text" as const, text: error instanceof Error ? error.message : String(error) }], isError: true };
+			} finally {
+				signal?.removeEventListener("abort", cancel);
+			}
+		},
+	});
+
+	// Event handlers have a short host timeout; long draining belongs in a tool execution.
+	pi.on("session_stop", (_event, ctx) => {
+		if (!retroWorkflow?.owns(ctx.sessionManager.getSessionId(), ctx.agent.id)) return;
+		return { decision: "block" as const, reason: "Spec-to-Code 尚未收尾。若仍有可执行票据或 TDD retry，请继续串行派发，勿等待后台 retro。所有 TDD 结束后，调用 spec_to_code_finish 等待复盘终态，再输出最终汇总。retro 失败也可正常收尾，不要重试 retro。" };
+	});
+
+	const cancelWorkflow = async (_event: unknown, ctx: ExtensionContext) => {
+		const workflow = retroWorkflow;
+		if (!workflow?.owns(ctx.sessionManager.getSessionId(), ctx.agent.id)) return;
+		await workflow.cancel();
+		if (retroWorkflow === workflow) retroWorkflow = undefined;
+	};
+	pi.on("session_before_switch", cancelWorkflow);
+	pi.on("session_shutdown", cancelWorkflow);
 
 	// Config lives in `config.json` beside the config module (extensions/spec-to-code/).
 	// Read once at extension load: editing it requires an extension reload / omp restart.
@@ -274,7 +339,15 @@ export default function specToCode(pi: ExtensionAPI): void {
 			// The budget raced away between planning and applying; fall through to the budget stop.
 		} else if (plan.type === "phase2") {
 			session.reset();
-			await startPhase2(pi, plan.slug);
+			phase2Starting = true;
+			try {
+				retroWorkflow = await createRetroWorkflow(pi, ctx, plan.slug);
+				startPhase2(pi, plan.slug);
+			} catch (error) {
+				ctx.ui.notify(`Spec-to-Code 无法启动 Phase 2：${error instanceof Error ? error.message : String(error)}`, "error");
+			} finally {
+				phase2Starting = false;
+			}
 			return;
 		}
 
@@ -292,7 +365,7 @@ export default function specToCode(pi: ExtensionAPI): void {
 	pi.registerCommand("spec-to-code", {
 		description: "Autonomous Spec → Tickets → Code workflow",
 		handler: async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
-			if (session.isActive) {
+			if (session.isActive || retroWorkflow || phase2Starting) {
 				ctx.ui.notify("已有 Spec-to-Code 工作流在运行，等待其结束或停止后再启动。", "error");
 				return;
 			}

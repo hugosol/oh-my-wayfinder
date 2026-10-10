@@ -9,7 +9,7 @@ disable-model-invocation: true
 Scaffold the per-repo configuration that the engineering skills assume:
 
 - **Issue tracker**: where issues live (GitHub by default; local markdown is also supported out of the box)
-- **Triage labels**: the strings used for issue statuses, with separate vocabularies for decision tickets and implementation tickets
+- **Triage labels**: the implementation-ticket triage vocabulary
 - **Domain docs**: where `GLOSSARY.md` and ADRs live, and the consumer rules for reading them
 
 This is a prompt-driven skill, not a deterministic script. Explore, present what you found, confirm with the user, then write.
@@ -33,7 +33,7 @@ Look at the current repo to understand its starting state. Read whatever exists;
 
 Summarise what's present and what's missing. Then take the sections in order. One section, one answer, then the next.
 
-Lead each section with the recommended answer so the user can accept it in a word. Give a one-line explainer only when the choice genuinely branches; skip the section entirely when exploration already settled it (Section B when `triage` isn't installed, Section C when there's no monorepo).
+Lead each section with the recommended answer so the user can accept it in a word. Give a one-line explainer only when the options have meaningfully different consequences; skip the section entirely when exploration already settled it (Section B when `triage` isn't installed, Section C when there's no monorepo).
 
 **Section A: Issue tracker.**
 
@@ -54,7 +54,7 @@ If it is installed, ask exactly one question:
 
 > Do you want to keep the default triage labels? (recommended: **yes**)
 
-The defaults define two ticket systems with separate status vocabularies: Decision tickets (`open` / `claimed` / `resolved`) and Implementation tickets (`ready-for-agent` / `ready-for-human` / `in-progress` / `closed`), plus shared labels (`needs-triage` / `needs-info` / `wontfix`). On **yes**, write them as-is. Only if the user says no (usually because their tracker already uses other names) collect the overrides so `triage` applies existing labels instead of creating duplicates.
+For implementation tickets, the default triage labels are `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`. On **yes**, write them as-is. Otherwise map those roles to the tracker’s existing labels.
 
 **Section C: Domain docs.** Default to **single-context** (one `GLOSSARY.md` + `docs/adr/` at the repo root). This fits almost every repo; write it without asking.
 
@@ -100,6 +100,8 @@ The block:
 ```
 
 Include the `### Triage labels` sub-block, and write `docs/agents/triage-labels.md`, only when `triage` is installed and Section B ran. When it isn't, both are omitted.
+
+When Section B ran on GitHub or GitLab, create each configured label the tracker lacks (`gh label create` / `glab label create`).
 
 Then write the docs files using the seed templates in this skill folder as a starting point:
 
