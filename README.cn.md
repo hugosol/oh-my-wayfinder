@@ -22,7 +22,7 @@
 
 **第一部分：通用 skills**（与 agent 无关，任何支持 markdown skill 的 agent 均可使用）
 
-它们驱动的规划循环：`wayfinder` 把一次超出单个会话的工作量绘制成 issue tracker 上的决策票地图；每张票解决后由 **lighthouse** 固化为文档；**backtracer** 在地图上追踪信号、暴露缺口；**traverse** 在地图完成后做端到端终审，然后交给 `to-spec`；`to-spec` 产出 spec 后，`to-contract` 把它变成已批准的契约（承诺清单，以及观察这些承诺的 seam），`to-tickets` 再据此切片。
+它们驱动的规划循环：`wayfinder` 把一次超出单个会话的工作量绘制成 issue tracker 上的决策票地图；暂停或结案时由 **lighthouse** 增量保存已确认结果；**backtracer** 在地图上追踪信号、暴露缺口；**traverse** 在地图完成后做端到端终审，然后交给 `to-spec`；`to-spec` 产出 spec 后，`to-contract` 把它变成已批准的契约（承诺清单，以及观察这些承诺的 seam），`to-tickets` 再据此切片。
 
 **第二部分：[Oh My Pi](https://github.com/can1357/oh-my-pi) 自动化扩展**（仅 `@oh-my-pi/pi-coding-agent`）
 
@@ -32,11 +32,11 @@
 
 | 技能 | 类型 | 作用 | 何时调用 | 触发方式 |
 |---|---|---|---|---|
-| `lighthouse` | **新增** | 把已解决的 wayfinder 票固化为灯塔文档：决策、用户故事、前置条件、后置条件、不变量，是 backtracer 追踪的信号源 | 每张 wayfinder 票解决后立即执行 | **自动**（由 wayfinder 调用） |
-| `backtracer` | **新增** | 把票与灯塔文档中的 "so that" 子句、不变量、依赖信号回溯到整张地图，在缺口变成 bug 之前暴露缺失票、层次缺口与不对称 | lighthouse 之后，每张已解决票执行一次 | **自动**（由 wayfinder 调用） |
+| `lighthouse` | **新增** | 把 wayfinder 已确认结果（含未结案票的部分结果）增量保存为灯塔文档：决策、用户故事、前置条件、后置条件、不变量，是 backtracer 追踪的信号源 | 暂停或决策票完成时执行 | **自动**（由 wayfinder 调用） |
+| `backtracer` | **新增** | 把票与灯塔文档中的 "so that" 子句、不变量、依赖信号回溯到整张地图，在缺口变成 bug 之前暴露缺失票、层次缺口与不对称，并核对当前结论之间的具体冲突 | 暂停／完成的 lighthouse 之后，或需要核对具体冲突时 | **自动**（由 wayfinder 调用） |
 | `traverse` | **新增** | 已完成地图的终审：构建设计树并走查整棵树的每个分支，检查依赖覆盖、同级对称、层次完整、边界完备 | 所有 wayfinder 票解决后、进入 to-spec 之前 | **手动** |
 | `to-contract` | **新增** | 把 spec 变成已批准的契约：承诺清单与轻量测试 seam 草图，优先沿用既有 seam；重大 interface 重设计先获用户授权。写入 `.scratch/<feature>/contract.md` | 介于 to-spec 与 to-tickets 之间 | **手动** |
-| `wayfinder` | **改造** | 上游 skill 的重构版：每张票解决后强制 lighthouse + backtracer，区分决策票（`.scratch/<feature>/decision/`）与实现票（`.scratch/<feature>/implementation/`），缺口决策交由用户拍板 | 当工作量超出单个 agent 会话时 | **手动** |
+| `wayfinder` | **改造** | 上游 skill 的重构版：支持暂停／恢复，暂停与结案均执行 lighthouse + backtracer，区分决策票（`.scratch/<feature>/decision/`）与实现票（`.scratch/<feature>/implementation/`），缺口决策交由用户拍板 | 当工作量超出单个 agent 会话时 | **手动** |
 | `setup-matt-pocock-skills` | **改造** | 上游设置 skill，轻量适配（issue tracker 选项、triage 标签、domain 文档布局） | 每个仓库一次，首次使用前 | **手动** |
 | `to-spec` | **改造** | 上游 skill 的重构版：seam 草图与 Testing Decisions 中的 seam 部分移交给 `to-contract`；发布 spec 后指向 `/to-contract` 作为下一步 | 把当前对话变成 spec 时 | **手动** |
 | `to-tickets` | **改造** | 上游 skill 的重构版：本地 tracker 的输出去向改为 `.scratch/<feature>/implementation/`，且必须输入已批准契约；票要声明 `Delivers`（或 enabling），quiz 增加覆盖度提问 | 把契约拆成票时 | **手动** |
@@ -50,7 +50,7 @@ skill 行的「自动」指调用方 skill 在流程中强制触发该步骤，�
 
 ## 暂不支持 GitHub / GitLab tracker
 
-管线中「自动」的那部分（每张票解决后强制 lighthouse + backtracer）目前只针对**本地 markdown tracker**（`.scratch/<feature>/decision/` 用于规划、`.scratch/<feature>/implementation/` 用于实现票）设计。GitHub 与 GitLab 的 tracker 配置原样来自上游，描述的仍是上游原本的 resolve 步骤，因此这两种场景暂不支持。
+管线中「自动」的那部分（暂停与决策票完成时执行 lighthouse + backtracer）目前只针对**本地 markdown tracker**（`.scratch/<feature>/decision/` 用于规划、`.scratch/<feature>/implementation/` 用于实现票）设计。GitHub 与 GitLab 的 tracker 配置原样来自上游，描述的仍是上游原本的 resolve 步骤，因此这两种场景暂不支持。
 
 这是有意留到后续的步骤，不是遗漏。
 
@@ -69,7 +69,7 @@ flowchart TD
     G -->|"无雾"| N["不需要地图：直接开工"]
     G -->|"有雾"| M["创建 map issue"]
     M --> T["创建 tickets + 布线 blocking"]
-    T --> L["票循环：claim → 解析 →<br/>写 decision ticket"]
+    T --> L["票循环：claim → 讨论 →<br/>暂停／完成时保存进度"]
     L --> LH["lighthouse<br/><b>自动</b>"]
     LH --> BT["backtracer<br/><b>自动</b>"]
     BT --> OWN["将已确认发现追加到<br/>合适的未解决责任票"]
@@ -100,7 +100,7 @@ flowchart TD
 ```
 
 - wayfinder 循环内只有两个手动触发点：`wayfinder` 本身和 `traverse`（终审）；其后的交接 `to-spec` → `to-contract` 同样是手动。
-- `lighthouse` 与 `backtracer` 由 wayfinder 在每张票解决后自动调用。
+- 用户请求暂停及决策票完成时，wayfinder 调用 `lighthouse` 与 `backtracer`。暂停先保存压缩交接、执行追踪，最后释放未完成票的认领；恢复读取该交接及相关当前 Lighthouse。用户可点名另一票中输入已具备的局部问题，不代表该票整体解锁。
 - `backtracer` 先将已确认发现追加到决策范围匹配的既有未解决票，保留证据，并区分已决定约束与待决问题。归属是交接，不是解决。只有剩余无归属问题进入[共享后续处理协议](skills/backtracer/GAP-FOLLOWUP.md)；`traverse` 在所有票解决后运行，直接传入终审的未决问题批次。用户对传入批次只选一次方式：**当前会话 grilling** 直接加载并执行 `/grilling`；**生成一张 ticket** 把全部问题及证据收进一张 open 的 grilling 决策票，关联地图并布线，不立即开始讨论。当前会话的结论确认后更新已有 decision/lighthouse 文档及地图；明确延期的问题记入 **Not yet specified**。traverse 终审收尾时，新增票未解决或仍有未决雾区就返回规划，而不进入 `/to-spec`。
 - 管线依次交给 `to-spec` 与 `to-contract`，两者都由本仓库发布。`implement` 属于 mattpocock/skills；本仓库 vendoring `to-tickets` 与 `ask-matt`（本地票目录改名 + 契约门）。
 
@@ -165,9 +165,9 @@ JSON 留存本次 TDD 结果、独立 retro 状态和错误；成功的 Markdown
 - [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md)、[deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md)、[deltas/mappings/to-spec.md](deltas/mappings/to-spec.md)、[deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md)、[deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md)、[deltas/mappings/prototype.md](deltas/mappings/prototype.md)、[deltas/mappings/code-review.md](deltas/mappings/code-review.md)、[deltas/mappings/tdd.md](deltas/mappings/tdd.md) 同时是映射源文件和人类审核入口。每个 op 把目标、ID、理由和编辑放在一起；白名单中没有映射的文件原样继承。
 - `skills/`：安装产物。`lighthouse`、`backtracer`、`traverse`、`to-contract` 为手写；manifest 里列出的十七个文件为生成物，**不要手工编辑**。
 
-票规则按职责维护：wayfinder 定义决策生命周期与完成流程；本地 tracker 模板定义存储和字段，完成步骤指回 wayfinder；triage 模板只维护实现票词汇。范围外处置必须完成依赖检查后再回到主流程，每张已解决票只调用一次 backtracer。
+票规则按职责维护：wayfinder 定义决策生命周期与完成流程；本地 tracker 模板定义存储和字段，完成步骤指回 wayfinder；triage 模板只维护实现票词汇。范围外处置必须完成依赖检查后再回到主流程，每次暂停与决策票完成均调用 backtracer。
 
-[wayfinder mappings](deltas/mappings/wayfinder.md) 中的完成 hooks：[lighthouse-on-resolution](deltas/mappings/wayfinder.md#lighthouse-on-resolution) 负责普通答案；[out-of-scope-disposition](deltas/mappings/wayfinder.md#out-of-scope-disposition) 负责范围外处置流程；[backtracer-on-resolution](deltas/mappings/wayfinder.md#backtracer-on-resolution) 负责两条流程共享的 tracing；[follow-up-ticket-handoffs](deltas/mappings/wayfinder.md#follow-up-ticket-handoffs) 整理后续票交接。
+[wayfinder mappings](deltas/mappings/wayfinder.md) 中的暂停／完成 hooks：[grilling-pause](deltas/mappings/wayfinder.md#grilling-pause) 负责压缩交接和最后释放认领；[lighthouse-on-resolution](deltas/mappings/wayfinder.md#lighthouse-on-resolution) 负责普通答案；[out-of-scope-disposition](deltas/mappings/wayfinder.md#out-of-scope-disposition) 负责范围外处置流程；[backtracer-on-resolution](deltas/mappings/wayfinder.md#backtracer-on-resolution) 负责两条流程共享的 tracing；[follow-up-ticket-handoffs](deltas/mappings/wayfinder.md#follow-up-ticket-handoffs) 整理后续票交接。
 
 直接在 `deltas/mappings/` 下的八份文档中编辑映射：
 

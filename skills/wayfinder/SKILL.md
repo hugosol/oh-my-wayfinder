@@ -26,7 +26,7 @@ The map is an **index**, not a store. It lists the decisions made and points at 
 
 ### The map body
 
-The whole map at low resolution, loaded once per session. Open tickets are **not** listed: they are open child issues, found by query.
+The whole map at low resolution, loaded once per session. Open work is found by tracker query; confirmed results may be indexed even while their source tickets remain unfinished.
 
 ```markdown
 ## Destination
@@ -39,9 +39,9 @@ The whole map at low resolution, loaded once per session. Open tickets are **not
 
 ## Decisions so far
 
-<!-- the index: one line per closed ticket, enough to judge relevance, then zoom the link for the detail the ticket holds -->
+<!-- the index: confirmed results, with their confirmed scope and Lighthouse link; source tickets may remain unfinished, enough to judge relevance, then zoom the link for the detail the ticket holds -->
 
-- [<closed ticket title>](link): <one-line gist of the answer>
+- [<confirmed result or topic>](link): <one-line gist of the answer>
 
 ## Not yet specified
 
@@ -68,7 +68,7 @@ A session **claims** a ticket by assigning it to the dev driving the map, **firs
 
 Use the tracker’s native dependency relationship where available, otherwise its body convention. A ticket is **unblocked** when every blocker is resolved and its recorded outcome satisfies the prerequisite. For an out-of-scope blocker, complete the dependency review in [Out of scope](#out-of-scope) before advancing. The **frontier** is the open, unblocked, unclaimed children.
 
-The answer isn't part of the body; it's recorded in the lighthouse document (see [Work through the map](#work-through-the-map)). Assets created while resolving a ticket are linked from the issue, not pasted in.
+The answer isn't part of the body; it's recorded in the lighthouse document (see [Work through the map](#work-through-the-map)). The ticket retains compact discussion and a handoff; evidence assets are linked, not pasted in.
 
 ## Ticket Types
 
@@ -112,7 +112,7 @@ Out-of-scope work never graduates (the frontier stops at the destination), so it
 
 When the user confirms an existing ticket is outside the destination or no longer needed:
 
-1. Record the disposition and reason in the ticket; call the Skill tool with "lighthouse". Confirm its draft with the user and write the lighthouse document before continuing. If the skill is unavailable, stop.
+1. Record the disposition and reason in the ticket; call the Skill tool with "lighthouse". Clarify ambiguous summaries only and write the confirmed lighthouse before continuing. If the skill is unavailable, stop.
 2. Set `Status: resolved` and link the ticket with its reason under the map's **Out of scope**, not **Decisions so far**. This records the disposition, not an answer to the original question.
 3. Execute only Step 6 of [Work through the map](#work-through-the-map) against the updated map, including backtracer's gap follow-up. Return here for the dependency review below before continuing the main flow.
 4. Review every dependent. Record a replacement provider, a user-confirmed removal of the prerequisite, or the remaining blocker. Obtain confirmation before applying this disposition procedure to a dependent too.
@@ -141,19 +141,30 @@ User invokes with a map (URL or number). A ticket is **optional**: without one, 
 0. **Load the tracker conventions.** Read `docs/agents/issue-tracker.md` for storage and field conventions; use the [decision lifecycle](#decision-tickets) for this map.
 
 1. Load the **map**: the low-res view, not every ticket body.
-2. Choose the ticket. If the user named one, use it. Otherwise take the first frontier ticket in order. **Claim it**: assign it to yourself before any work.
-3. **Read the processing type:** the local ticket’s `Type:` field, or its `wayfinder:<type>` label on a remote tracker (see [Ticket Types](#ticket-types)). For grilling tickets, present an **opening brief** before the first question: read the ticket’s Question and scan the map’s Decisions-so-far for relevant decisions. Follow relevant links to the source tickets and lighthouse documents.
+2. Choose the ticket. If the user named one, check its claim and the specific question's inputs. On the local Markdown tracker you may discuss a ready part while preserving its other blockers; this does not unblock the whole ticket. Respect another session's claim. Otherwise take the first frontier ticket in order. **Claim it**: assign it to yourself before any work.
+3. **Read the processing type:** the local ticket’s `Type:` field, or its `wayfinder:<type>` label on a remote tracker (see [Ticket Types](#ticket-types)). Before starting or resuming grilling, read the ticket’s latest handoff/discussion and relevant current Lighthouse conclusions, including confirmed parts of unfinished tickets. Reuse applicable decisions, rejected branches and their reasons, investigation findings and limits, and the user’s decision-relevant background. Follow evidence links for concrete ambiguities or changes, not to repeat settled exploration. Compare the saved stopping point with intervening results and recompute this ticket’s frontier. If the missing choice belongs to another ticket, identify that prerequisite and offer the Pause detour rather than deciding its scope under this claim. A design input need not be implemented, but one available input does not settle every prerequisite.
 
    For that brief, show:
-   - **Topic:** What this ticket must decide and how it serves the Destination.
+   - **Topic:** The stopping point, what has changed, and what is ready to decide next toward the Destination.
    - **Settled decisions:** Only confirmed decisions that constrain or inform this ticket, each with its source link and implication for this discussion. If none are relevant, say so.
 
    Then ask the first grilling question. Other ticket types skip the brief.
-4. Resolve it using its recorded type. **Zoom as needed**: fetch the full body of any related or closed ticket on demand; call the Skill tool for whichever skills the `## Notes` block names. If in doubt, call the Skill tool twice, for "grilling" and "domain-modeling".
+4. Work using its recorded type. When the user requests a pause, saved progress, or a switch, return through [Pause](#pause) instead of finishing the whole grilling tree. That request authorizes recording confirmed results and progress, not executing the Destination or approving unanswered branches. **Zoom as needed**: fetch the full body of any related or closed ticket on demand; call the Skill tool for whichever skills the `## Notes` block names. If in doubt, call the Skill tool twice, for "grilling" and "domain-modeling".
 5. **Record the outcome.** Before updating the ticket or map, choose the matching procedure:
    - **Confirmed out-of-scope disposition:** complete [Out of scope](#out-of-scope), then continue at Step 7; it includes Step 6.
-   - **Ordinary answer:** write the discussion results to the ticket body, then call the Skill tool with "lighthouse". Confirm its draft with the user and write it to `lighthouse/<NN>-<slug>.md` before setting `Status: resolved`. Append the lighthouse's `## Decision` gist and link to the map's Decisions-so-far. If lighthouse is unavailable, stop before changing status.
+   - **Ordinary answer:** save compact discussion and sources in the ticket, then call the Skill tool with "lighthouse" and write its confirmed update to the existing `lighthouse/<NN>-<slug>.md`. Reconcile the gist and link in Decisions-so-far. Set `Status: resolved` only when the ticket’s whole scope is decided or has confirmed dispositions, with no disputed prerequisite; otherwise use [Pause](#pause). If lighthouse is unavailable, stop before changing status.
 6. **Trace the updated map.** Call the Skill tool with "backtracer"; if unavailable, stop. Complete its gap follow-up before proceeding. Carry its recorded outcomes and ticket handoffs into Step 7 rather than creating duplicate tickets.
 7. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. This includes any tickets backtracer surfaced and the user confirmed. If this reveals another out-of-scope ticket, obtain the user's confirmation, complete [Out of scope](#out-of-scope) for that ticket, and resume this step. If the decision invalidates other parts of the map, update or delete those tickets.
+
+### Pause
+
+On the local Markdown tracker, when the user pauses or switches, perform these steps in order before asking another grilling round or starting another ticket. Other tracker setups do not provide this extended pause/publication loop:
+
+1. Save a compact handoff in the decision ticket's existing discussion/Comments: confirmed-result links; rejected branches, reasons and reconsideration conditions; relevant investigation conclusions, sources and limits; the user's decision-relevant reasons/background; and unanswered questions, answer scope, pause reason and resume point. Preserve question meaning, not just a round number. Tentative preferences stay tentative; complete chat replay is unnecessary.
+2. Call "lighthouse" and write confirmed updates, reconciling map gist/links with their partial scope. With no new confirmed choice, keep the existing Lighthouse unchanged; proposals and conflicting evidence remain available in the ticket for tracing.
+3. Execute only Step 6 of [Work through the map](#work-through-the-map), passing this pause's results, evidence and unresolved conflicts to Backtracer. Follow-up may hand findings to appropriate tickets; the pause does not require another interview to settle them all.
+4. Refresh and save the final handoff with trace outcomes or pending work. Await those writes before setting your own unfinished ticket `open` and clearing your claim; use sequential edits or one combined write, not concurrent edits to the same ticket. Reread its saved handoff, status and assignee to confirm the pause is durable. Only then stop, or return to Step 2 to claim the user’s next ticket and discuss its ready question. Do not alter another session’s claim.
+
+Complete when the results and final resume point are saved, Backtracer has run with findings resolved or handed off, and your unfinished-ticket claim is released. If saving/tracing cannot finish, record the remaining steps and release your claim on a normal stop without declaring the pause complete. Resuming alone keeps the claim: release it only on a later pause or completion. A pause never supplies unanswered choices or counts as a resolution.
 
 The user may run unblocked tickets in parallel, so expect other sessions to be editing the tracker concurrently.

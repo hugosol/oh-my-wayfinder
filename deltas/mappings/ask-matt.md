@@ -70,7 +70,7 @@ anchor: |
     When the map clears, **it hands off, it doesn't build**: merge onto the main flow at **`/to-spec`**, which collapses the map's linked decisions into a buildable plan, then `/to-tickets` and `/implement` as usual. Looping the map straight into `/implement` skips that collapse and throws the linked detail away, so go straight to `/implement` only when the effort turned out genuinely small.
 find: When the map clears, **it hands off, it doesn't build**: merge onto the main flow at **`/to-spec`**, which collapses the map's linked decisions into a buildable plan, then
 content: |-
-  On the local markdown tracker, every resolved decision ticket runs **`/lighthouse`** and then **`/backtracer`** automatically; you decide what to do with any gaps they surface. Once every ticket is resolved, run **`/traverse`** for the final audit. This extended planning loop currently supports the local tracker only; the GitHub and GitLab tracker setups do not include it yet.
+  On the local markdown tracker, you may pause Wayfinder grilling to save compact ticket progress and partial confirmed results through **`/lighthouse`** and **`/backtracer`**, then resume from the ticket handoff and related Lighthouse conclusions. Every resolved decision ticket also runs this publication/trace pair; you decide what to do with findings. Once every ticket is resolved, run **`/traverse`** for the final audit. This extended planning loop currently supports the local tracker only; the GitHub and GitLab tracker setups do not include it yet.
 
     When the map clears and `/traverse` is accepted, **wayfinder hands off, it doesn't build**: merge onto the main flow at **`/to-spec`**, which collapses the map's linked decisions into a buildable plan, then `/to-contract`,
 ```

@@ -22,7 +22,7 @@ Then run `/setup-matt-pocock-skills` once per repo, as with the upstream set.
 
 **Part 1: Generic skills** (agent-agnostic; work with any agent that loads markdown skills)
 
-The planning loop they drive: `wayfinder` charts an effort too big for one session as a map of decision tickets on your issue tracker; every resolved ticket is captured in a **lighthouse** document; **backtracer** traces signals across the map to surface gaps; **traverse** audits the completed map end to end before it hands off to `to-spec`, which publishes the spec; `to-contract` then turns that spec into an approved contract (the promises the build is held to, and the seams at which they are observed), and `to-tickets` slices the contract.
+The planning loop they drive: `wayfinder` charts an effort too big for one session as a map of decision tickets on your issue tracker; confirmed results are captured incrementally in a **lighthouse** document at a pause or completion; **backtracer** traces signals across the map to surface gaps; **traverse** audits the completed map end to end before it hands off to `to-spec`, which publishes the spec; `to-contract` then turns that spec into an approved contract (the promises the build is held to, and the seams at which they are observed), and `to-tickets` slices the contract.
 
 **Part 2: [Oh My Pi](https://github.com/can1357/oh-my-pi) automation extension** (`@oh-my-pi/pi-coding-agent` only)
 
@@ -32,11 +32,11 @@ The planning loop they drive: `wayfinder` charts an effort too big for one sessi
 
 | Skill | Type | What it does | When it runs | Trigger |
 |---|---|---|---|---|
-| `lighthouse` | **New** | Produces a lighthouse document from a resolved wayfinder ticket: the decision, user stories, preconditions, postconditions, and invariants. It is the single source of truth backtracer traces. | Immediately after a wayfinder ticket is resolved | **Auto** (invoked by wayfinder) |
-| `backtracer` | **New** | Traces "so that" clauses, invariants, and dependencies from tickets and lighthouse documents across the whole map, surfacing missing tickets, layer gaps, and asymmetry before they become bugs. | Immediately after lighthouse, once per resolved ticket | **Auto** (invoked by wayfinder) |
+| `lighthouse` | **New** | Produces or updates a lighthouse document from confirmed Wayfinder results, including partial results: the decision, user stories, preconditions, postconditions, and invariants. It is the single source of truth backtracer traces. | On a pause or ticket completion | **Auto** (invoked by wayfinder) |
+| `backtracer` | **New** | Traces "so that" clauses, invariants, and dependencies from tickets and lighthouse documents across the whole map, surfacing missing tickets, layer gaps, and asymmetry before they become bugs, and checking concrete conflicts between current conclusions. | After pause/completion publication, or for a concrete conflict | **Auto** (invoked by wayfinder) |
 | `traverse` | **New** | Final audit of a completed map: builds the design tree and walks every branch of the entire tree, checking dependency coverage, peer symmetry, layer integrity, and boundary completeness. | After all wayfinder tickets are resolved, before to-spec | **Manual** |
 | `to-contract` | **New** | Turns a spec into an approved contract: promises and a lightweight test-seam sketch, preferring existing seams; substantial interface redesign requires user approval. Writes `.scratch/<feature>/contract.md`. | Between to-spec and to-tickets | **Manual** |
-| `wayfinder` | **Modified** | Upstream skill, reworked: mandates lighthouse + backtracer after every resolved ticket, separates decision tickets (`.scratch/<feature>/decision/`) from implementation tickets (`.scratch/<feature>/implementation/`), routes gap decisions through the user | When an effort is too big for one agent session | **Manual** |
+| `wayfinder` | **Modified** | Upstream skill, reworked: supports pause/resume with lighthouse + backtracer and still traces ticket completion, separates decision tickets (`.scratch/<feature>/decision/`) from implementation tickets (`.scratch/<feature>/implementation/`), routes gap decisions through the user | When an effort is too big for one agent session | **Manual** |
 | `setup-matt-pocock-skills` | **Modified** | Upstream setup skill, lightly adapted (tracker options, triage labels, domain-doc layout) | Once per repo, before first use | **Manual** |
 | `to-spec` | **Modified** | Upstream skill, reworked: the seam sketch and the seam half of Testing Decisions move to `to-contract`; publishing a spec points at `/to-contract` as the next step. | Turning a conversation into a spec | **Manual** |
 | `to-tickets` | **Modified** | Upstream skill, reworked: local-tracker output moved to `.scratch/<feature>/implementation/`, an approved contract is required input, tickets declare `Delivers` (or enabling), and the quiz asks the coverage questions. | Splitting a spec or plan into tickets | **Manual** |
@@ -50,7 +50,7 @@ In the skill rows, "Auto" means the calling skill mandates the step as part of i
 
 ## Supported trackers (for now)
 
-The automatic part of this pipeline, the mandatory `lighthouse` and `backtracer` steps after every resolved ticket, is wired for the **local markdown tracker** only (`.scratch/<feature>/decision/` for planning, `.scratch/<feature>/implementation/` for implementation tickets). The GitHub and GitLab tracker setups ship from upstream unchanged and still describe upstream's plain resolve step, so this repo does not support them yet.
+The automatic part of this pipeline, the mandatory `lighthouse` and `backtracer` steps at a pause or ticket completion, is wired for the **local markdown tracker** only (`.scratch/<feature>/decision/` for planning, `.scratch/<feature>/implementation/` for implementation tickets). The GitHub and GitLab tracker setups ship from upstream unchanged and still describe upstream's plain resolve step, so this repo does not support them yet.
 
 That is a deliberate later step, not an oversight.
 
@@ -69,7 +69,7 @@ flowchart TD
     G -->|"no fog"| N["No map needed:<br/>build directly"]
     G -->|"fog found"| M["Create the map issue"]
     M --> T["Create tickets +<br/>wire blocking edges"]
-    T --> L["Ticket loop:<br/>claim → resolve →<br/>write decision ticket"]
+    T --> L["Ticket loop:<br/>claim → discuss →<br/>save on pause/completion"]
     L --> LH["lighthouse<br/><b>auto</b>"]
     LH --> BT["backtracer<br/><b>auto</b>"]
     BT --> OWN["Append confirmed findings to<br/>suitable unresolved tickets"]
@@ -100,7 +100,7 @@ flowchart TD
 ```
 
 - Inside wayfinder's loop the only manual triggers are `wayfinder` itself and `traverse` (the final audit); the handoff that follows, `to-spec` then `to-contract`, is manual too.
-- `lighthouse` and `backtracer` are invoked automatically by wayfinder after every resolved ticket.
+- `lighthouse` and `backtracer` are invoked by wayfinder on a user-requested pause and at ticket completion. A pause saves a compact ticket handoff, then releases the unfinished-ticket claim after tracing; resume loads that handoff and relevant current Lighthouse results. A user-named ready question can be discussed in another ticket without declaring its whole scope unblocked.
 - `backtracer` first appends confirmed findings to existing unresolved tickets that own the decision scope, preserving evidence and distinguishing established constraints from unanswered questions. Assignment is a handoff, not a resolution. Only its unassigned remainder enters [the shared follow-up protocol](skills/backtracer/GAP-FOLLOWUP.md); `traverse`, which starts after all tickets are resolved, supplies its unresolved audit batch directly. For the supplied batch, choose once: **grill now** loads and executes `/grilling` in the current conversation; **create one ticket** puts all questions and their evidence in one open grilling decision ticket, wired into the map, without starting the discussion. Confirmed in-session resolutions update the existing decision/lighthouse documents and map; explicitly deferred findings go to **Not yet specified**. At traverse's final handoff, an open follow-up ticket or unresolved fog returns the map to planning instead of `/to-spec`.
 - The pipeline hands off to `to-spec`, then `to-contract`; both ship in this repo. `implement` ships in mattpocock/skills; this repo vendors `to-tickets` and `ask-matt` as well (the local ticket directory rename, plus the contract gate).
 
@@ -165,9 +165,9 @@ The eight reworked skills ship complete, and the divergence from upstream is kep
 - [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md), [deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md), [deltas/mappings/to-spec.md](deltas/mappings/to-spec.md), [deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md), [deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md), [deltas/mappings/prototype.md](deltas/mappings/prototype.md), [deltas/mappings/code-review.md](deltas/mappings/code-review.md) and [deltas/mappings/tdd.md](deltas/mappings/tdd.md) are the mapping sources and the human review entry points. Each op keeps its target, ID, reason and edits together. Listed files without mappings are inherited verbatim.
 - `skills/` is the install artifact. `lighthouse`, `backtracer`, `traverse` and `to-contract` are hand-written; the seventeen files listed in the manifest are generated, so do not edit them by hand.
 
-The ticket rules have distinct owners: wayfinder defines the decision lifecycle and completion procedures; the local tracker template defines storage and fields and points back to wayfinder for resolution; the triage template contains only implementation vocabulary. Keep scope-disposition dependency review before rejoining the main flow, with one backtracer call per resolved ticket.
+The ticket rules have distinct owners: wayfinder defines the decision lifecycle and completion procedures; the local tracker template defines storage and fields and points back to wayfinder for resolution; the triage template contains only implementation vocabulary. Keep scope-disposition dependency review before rejoining the main flow, with a backtracer call at each pause and ticket completion.
 
-Completion hooks in the [wayfinder mappings](deltas/mappings/wayfinder.md): [lighthouse-on-resolution](deltas/mappings/wayfinder.md#lighthouse-on-resolution) handles ordinary answers; [out-of-scope-disposition](deltas/mappings/wayfinder.md#out-of-scope-disposition) handles the disposition procedure; [backtracer-on-resolution](deltas/mappings/wayfinder.md#backtracer-on-resolution) owns their shared trace; [follow-up-ticket-handoffs](deltas/mappings/wayfinder.md#follow-up-ticket-handoffs) reconciles the resulting tickets.
+Pause/completion hooks in the [wayfinder mappings](deltas/mappings/wayfinder.md): [grilling-pause](deltas/mappings/wayfinder.md#grilling-pause) owns the compact handoff and release sequence; [lighthouse-on-resolution](deltas/mappings/wayfinder.md#lighthouse-on-resolution) handles ordinary answers; [out-of-scope-disposition](deltas/mappings/wayfinder.md#out-of-scope-disposition) handles the disposition procedure; [backtracer-on-resolution](deltas/mappings/wayfinder.md#backtracer-on-resolution) owns their shared trace; [follow-up-ticket-handoffs](deltas/mappings/wayfinder.md#follow-up-ticket-handoffs) reconciles the resulting tickets.
 
 Edit mappings directly in the eight documents under `deltas/mappings/`:
 
