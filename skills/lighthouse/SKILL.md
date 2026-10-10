@@ -15,11 +15,13 @@ Read the question, saved discussion/handoff, existing Lighthouse, and the caller
 
 ### 2. Read the conversation
 
-Extract confirmed conclusions, their scope and conditions, the user's decision-relevant reasons, and rejected alternatives with their reasons and reconsideration conditions. Keep related evidence and its limits distinct from choices. Write or update one `## Discussion` subsection per topic; unexplored questions are not conclusions.
+Extract confirmed conclusions, their scope and conditions, the user's decision-relevant reasons, and rejected alternatives with their reasons and reconsideration conditions. Keep related evidence and its limits distinct from choices. Update the existing Discussion topic for the same decision; add a topic only for a distinct confirmed question. Keep unexplored questions in the ticket's Handoff, with their scope intact.
 
 ### 3. Produce the lighthouse document
 
-Create or update `lighthouse/<NN>-<slug>.md` by topic using this template. For partial results, state the confirmed scope and that the ticket remains unfinished. Preserve still-applicable results and reconcile Decision, stories, and conditions with each update. For an approved change to an existing conclusion, update its original authoritative document with a brief old-to-new reason and confirmation source; a different ticket records the change and links that authority instead of publishing an opposing answer.
+Create or update `lighthouse/<NN>-<slug>.md` by topic using this template. For partial results, state the confirmed scope and that the ticket remains unfinished. For each changed conclusion, reconcile every affected statement in the current document: Question/scope summaries, Discussion, Decision, stories, preconditions, postconditions and invariants. Replace obsolete pending/approved claims with the precise settled scope and remaining questions; retain applicable conclusions and implementation limits.
+
+For an approved revision, update its original authority with a brief old-to-new reason and a recoverable confirmation source, such as the session plus message time/link, or the user's explicit words when no locator is available. Keep the former policy in linked history or a compact explicitly superseded note, not as a competing current answer. A different source ticket links that authority and records its own consequences.
 
 <lighthouse-template>
 
@@ -47,7 +49,7 @@ Create or update `lighthouse/<NN>-<slug>.md` by topic using this template. For p
 
 ## Decision
 
-<One or two sentences: what was decided. The one-line gist for the map's Decisions-so-far.>
+<One or two concise sentences covering the main decision and its confirmed scope. Detailed rules stay in their Discussion topics; the map links this gist.>
 
 ## User stories
 
@@ -80,4 +82,4 @@ Capture confirmed needs and approved design intents, including developer constra
 
 Show only summaries whose meaning needs clarification or confirmation; an explicit user choice does not need whole-document reapproval. The caller writes the confirmed update and reconciles the map index. Publishing leaves claim and ticket completion to Wayfinder.
 
-Complete when the confirmed results, reasons, conditions, and sources are consistent, partial scope is clear, and no unanswered proposal has become a decision.
+Complete when every affected current statement expresses the confirmed revision consistently, remaining questions and implementation limits are explicit, confirmation sources are recoverable, and candidates remain outside the decision. Decision is a gist rather than a second rule list.

@@ -104,13 +104,13 @@ Completion criterion: every gap listed under its gap types and every concrete co
 
 ### 5. Reuse existing tickets
 
-For findings the user confirms need follow-up, prefer an existing unresolved ticket whose decision scope owns the finding. Show the proposed owner and reason in the report. Append established constraints and unanswered questions with their source evidence; preserve the ticket's unresolved status. Related subject matter alone is not ownership. Assigning a finding is a handoff, not a resolution.
+For findings the user confirms need follow-up, prefer an existing unresolved ticket whose decision scope owns the finding. Show the owner and reason in the report. Reconcile its [current Handoff](../wayfinder/SKILL.md#local-ticket-handoff): use a source link and brief owner-specific consequences, leaving source-policy details in Lighthouse; merge this ticket's affected inputs and unanswered consequences by topic, replacing stale or duplicate handoff statements. Preserve other unresolved questions and the actual status/claim. Related subject matter alone is not ownership; a handoff records work, not a resolution.
 
-For confirmed changes, call Lighthouse to update the original authority, retain the old-to-new reason/source, and reconcile affected ticket questions, references, handoffs, and map gist. The new source ticket links that authority. Only reopen a resolved ticket when it now has an unanswered question; unrelated conclusions stay unchanged. A tentative proposal stays in discussion and leaves current approved text intact. Ask only about undecided consequences, not an already explicit choice.
+For confirmed changes, call Lighthouse to update the original authority, retain the old-to-new reason/source, and reconcile affected ticket questions, references and current Handoffs, including obsolete "still undecided" summaries, and the map gist. The new source ticket links that authority. Only reopen a resolved ticket when it now has an unanswered question; unrelated conclusions stay unchanged. A tentative proposal stays in discussion and leaves current approved text intact. Ask only about undecided consequences, not an already explicit choice.
 
 If an exported spec/contract or active implementation relies on a disputed or changed result, stop the affected handoff and identify what must be reconsidered through the existing approval flow; document edits do not update a running delivery.
 
-Completion criterion: confirmed changes are reconciled; every finding has an owner or remains in the batch, and unresolved conflicts cannot support a new final decision.
+Completion criterion: every affected consumer links the current authority and has consistent current inputs and remaining questions; findings have an owner or remain in the batch, and unresolved conflicts cannot support a new final decision.
 
 ### 6. Follow up on the remaining batch
 

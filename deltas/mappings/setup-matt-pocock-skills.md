@@ -103,6 +103,19 @@ content: |-
     → Produced by `/to-tickets`. Use Implementation ticket statuses from `triage-labels.md`.
 ```
 
+### local-decision-handoff
+
+Keep current decision handoffs separate from append-only discussion history; Wayfinder owns their contents and lifecycle.
+
+```op
+anchor: |-
+  - Comments and conversation history append to the bottom of the file under a `## Comments` heading
+find: |-
+  Comments and conversation history append to the bottom of the file under a `## Comments` heading
+content: |-
+  Discussion history belongs under `## Comments`. Decision tickets keep one current `## Handoff` before `## Question`; Wayfinder's Local ticket handoff section defines its contents and updates.
+```
+
 ### local-status-field
 
 Keep lifecycle independent of implementation triage.
