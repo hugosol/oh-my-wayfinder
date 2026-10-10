@@ -169,6 +169,8 @@ JSON 留存本次 TDD 结果、独立 retro 状态和错误；成功的 Markdown
 
 [wayfinder mappings](deltas/mappings/wayfinder.md) 中的暂停／完成 hooks：[grilling-pause](deltas/mappings/wayfinder.md#grilling-pause) 负责压缩交接和最后释放认领；[lighthouse-on-resolution](deltas/mappings/wayfinder.md#lighthouse-on-resolution) 负责普通答案；[out-of-scope-disposition](deltas/mappings/wayfinder.md#out-of-scope-disposition) 负责范围外处置流程；[backtracer-on-resolution](deltas/mappings/wayfinder.md#backtracer-on-resolution) 负责两条流程共享的 tracing；[follow-up-ticket-handoffs](deltas/mappings/wayfinder.md#follow-up-ticket-handoffs) 整理后续票交接。
 
+工作循环入口按行为分别维护：`processing-type-read` 读取类型，`grilling-context-reuse` 恢复已保存上下文，`grilling-frontier-refresh` 重算可讨论问题及跨票转向，`grilling-opening-brief` 展示目标句。这些 op 按上述顺序在同一个上游 resolution anchor 前追加，再由 `recorded-type-work` 替换该 anchor。`grilling-pause-trigger` 负责暂停请求与授权边界，`grilling-pause` 负责暂停流程。本次仅拆分 mapping，生成技能逐字节不变。
+
 直接在 `deltas/mappings/` 下的八份文档中编辑映射：
 
 - 文档以 `# <skill>` 开头，用 `## <skill>/<file>` 指定有改动且位于白名单内的目标，用 `### <op-id>` 标识每个 op。ID 使用小写 kebab-case，在同一 skill 内唯一。每个 op 包含简短理由和恰好一个反引号围栏的 `op` 块。

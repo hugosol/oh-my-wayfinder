@@ -127,31 +127,74 @@ find: use it
 content: check its claim and the specific question's inputs. On the local Markdown tracker you may discuss a ready part while preserving its other blockers; this does not unblock the whole ticket. Respect another session's claim
 ```
 
-### grilling-opening-brief
+### processing-type-read
 
-Owns the grilling-only opening brief after claiming the ticket and before resolution. Reuse current context internally, then state the decision goal in one sentence using the project glossary. Anchor on the claim, independently of the following `recorded-type-work` edit.
+Read the recorded processing type before working. This starts Step 3; the following context, frontier and brief ops append at the same upstream resolution anchor in document order, before `recorded-type-work` replaces it.
 
 ```op
 anchor: |-
-  **Claim it**: assign it to yourself before any work.
-  <oh-my-wayfinder:insert>
-insert: |
-  3. **Read the processing type:** the local ticket’s `Type:` field, or its `wayfinder:<type>` label on a remote tracker (see [Ticket Types](#ticket-types)). Before starting or resuming grilling, read the ticket’s latest handoff/discussion and relevant current Lighthouse conclusions, including confirmed parts of unfinished tickets. Reuse applicable decisions, rejected branches and their reasons, investigation findings and limits, and the user’s decision-relevant background. Follow evidence links for concrete ambiguities or changes, not to repeat settled exploration. Compare the saved stopping point with intervening results and recompute this ticket’s frontier. If the missing choice belongs to another ticket, identify that prerequisite and offer the Pause detour rather than deciding its scope under this claim. A design input need not be implemented, but one available input does not settle every prerequisite.
+  <oh-my-wayfinder:insert>3. Resolve it as the type its `wayfinder:<type>` label names (see [Ticket Types](#ticket-types)). Read the label, not just the body: the body never states the type.
+insert: |-
+  3. **Read the processing type:** the local ticket’s `Type:` field, or its `wayfinder:<type>` label on a remote tracker (see [Ticket Types](#ticket-types)).
+```
 
+### grilling-context-reuse
+
+Load saved discussion and current confirmed Lighthouse results for starting or resuming grilling. Append after `processing-type-read` at the unchanged upstream resolution anchor; keep frontier recomputation and the displayed brief in their own ops.
+
+```op
+anchor: |-
+  <oh-my-wayfinder:insert>3. Resolve it as the type its `wayfinder:<type>` label names (see [Ticket Types](#ticket-types)). Read the label, not just the body: the body never states the type.
+insert: |-
+   Before starting or resuming grilling, read the ticket’s latest handoff/discussion and relevant current Lighthouse conclusions, including confirmed parts of unfinished tickets. Reuse applicable decisions, rejected branches and their reasons, investigation findings and limits, and the user’s decision-relevant background. Follow evidence links for concrete ambiguities or changes, not to repeat settled exploration.
+```
+
+### grilling-frontier-refresh
+
+Recompute the saved frontier against intervening results and route missing cross-ticket choices through Pause. Append after `grilling-context-reuse` at the same upstream resolution anchor, before the opening brief.
+
+```op
+anchor: |-
+  <oh-my-wayfinder:insert>3. Resolve it as the type its `wayfinder:<type>` label names (see [Ticket Types](#ticket-types)). Read the label, not just the body: the body never states the type.
+insert: |-
+   Compare the saved stopping point with intervening results and recompute this ticket’s frontier. If the missing choice belongs to another ticket, identify that prerequisite and offer the Pause detour rather than deciding its scope under this claim. A design input need not be implemented, but one available input does not settle every prerequisite.
+```
+
+### grilling-opening-brief
+
+Display only a one-sentence decision goal using the project glossary, then enter grilling. Append after `grilling-frontier-refresh` at the unchanged upstream resolution anchor; the leading paragraph break and trailing newline preserve the existing Step 3 layout.
+
+```op
+anchor: |-
+  <oh-my-wayfinder:insert>3. Resolve it as the type its `wayfinder:<type>` label names (see [Ticket Types](#ticket-types)). Read the label, not just the body: the body never states the type.
+insert: |
+  
+  
      Read the relevant project `GLOSSARY.md` if available (follow `GLOSSARY-MAP.md` when present). Using its canonical terms, give only a one-sentence brief on what this ticket needs to decide and what that answer enables toward the Destination, followed immediately by the first grilling round. Other ticket types skip the brief.
 ```
 
 ### recorded-type-work
 
-Work with the recorded processing type; a user pause returns to the caller before the tree is complete. Keep upstream Zoom and skill selection outside this edit.
+Work using the recorded processing type. Adjust the step number after `processing-type-read` adds Step 3; preserve upstream Zoom and skill selection. The preceding insertions must run before this op replaces their shared upstream anchor.
 
 ```op
 anchor: |-
   3. Resolve it as the type its `wayfinder:<type>` label names (see [Ticket Types](#ticket-types)). Read the label, not just the body: the body never states the type.
 find: |-
-  3. Resolve it as the type its `wayfinder:<type>` label names (see [Ticket Types](#ticket-types)). Read the label, not just the body: the body never states the type.
+  3. Resolve it as the type its `wayfinder:<type>` label names (see [Ticket Types](#ticket-types)). Read the label, not just the body: the body never states the
 content: |-
-  4. Work using its recorded type. When the user requests a pause, saved progress, or a switch, return through [Pause](#pause) instead of finishing the whole grilling tree. That request authorizes recording confirmed results and progress, not executing the Destination or approving unanswered branches.
+  4. Work using its recorded
+```
+
+### grilling-pause-trigger
+
+Route user pause, save-progress and switch requests through Pause, preserving their authorization boundary. Insert before upstream Zoom, independently of the processing-type replacement; `grilling-pause` owns the pause procedure.
+
+```op
+anchor: |-
+  <oh-my-wayfinder:insert> **Zoom as needed**:
+insert: |-
+   When the user requests a pause, saved progress, or a switch, return through [Pause](#pause) instead of finishing the whole grilling tree. That request authorizes recording confirmed results and progress, not executing the Destination or approving unanswered branches.
 ```
 
 ### lighthouse-on-resolution
@@ -182,7 +225,7 @@ insert: |
 
 ### follow-up-ticket-handoffs
 
-Owns reconciliation of backtracer handoffs with newly surfaced tickets and the return from further scope dispositions. Preserve upstream’s fog graduation and invalidation guidance. This becomes step 7 after the opening brief and shared tracing insertions.
+Owns reconciliation of backtracer handoffs with newly surfaced tickets and the return from further scope dispositions. Preserve upstream’s fog graduation and invalidation guidance. This becomes step 7 after the processing-type read and shared tracing insertions.
 
 ```op
 anchor: |-

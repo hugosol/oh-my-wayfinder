@@ -169,6 +169,8 @@ The ticket rules have distinct owners: wayfinder defines the decision lifecycle 
 
 Pause/completion hooks in the [wayfinder mappings](deltas/mappings/wayfinder.md): [grilling-pause](deltas/mappings/wayfinder.md#grilling-pause) owns the compact handoff and release sequence; [lighthouse-on-resolution](deltas/mappings/wayfinder.md#lighthouse-on-resolution) handles ordinary answers; [out-of-scope-disposition](deltas/mappings/wayfinder.md#out-of-scope-disposition) handles the disposition procedure; [backtracer-on-resolution](deltas/mappings/wayfinder.md#backtracer-on-resolution) owns their shared trace; [follow-up-ticket-handoffs](deltas/mappings/wayfinder.md#follow-up-ticket-handoffs) reconciles the resulting tickets.
 
+The work-loop entry mappings have separate owners: `processing-type-read` reads the type, `grilling-context-reuse` reloads saved context, `grilling-frontier-refresh` recomputes the ready questions and cross-ticket detour, and `grilling-opening-brief` displays the goal sentence. These ops append in that order before the same upstream resolution anchor; `recorded-type-work` then replaces it. `grilling-pause-trigger` owns the pause request and authorization boundary, while `grilling-pause` owns the procedure. This mapping-only split preserves the generated skill byte for byte.
+
 Edit mappings directly in the eight documents under `deltas/mappings/`:
 
 - Start with `# <skill>`. Use `## <skill>/<file>` for each changed, whitelisted target, then `### <op-id>` for each op. IDs use lowercase kebab-case and are unique within a skill. Each op has a short reason and exactly one backtick-fenced `op` block.
