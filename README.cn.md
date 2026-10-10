@@ -33,7 +33,7 @@
 | 技能 | 类型 | 作用 | 何时调用 | 触发方式 |
 |---|---|---|---|---|
 | `lighthouse` | **新增** | 把 wayfinder 已确认结果（含未结案票的部分结果）增量保存为灯塔文档：决策、用户故事、前置条件、后置条件、不变量，是 backtracer 追踪的信号源 | 暂停或决策票完成时执行 | **自动**（由 wayfinder 调用） |
-| `backtracer` | **新增** | 把票与灯塔文档中的 "so that" 子句、不变量、依赖信号回溯到整张地图，在缺口变成 bug 之前暴露缺失票、层次缺口与不对称，并核对当前结论之间的具体冲突 | 暂停／完成的 lighthouse 之后，或需要核对具体冲突时 | **自动**（由 wayfinder 调用） |
+| `backtracer` | **新增** | 从已发布结果回溯已经决定的上下游问题，暴露缺失问题、层次缺口、不对称与具体冲突；只有用户确认的 gap 才写入下游票 | 发布边界，或需要核对具体冲突时 | **自动**（由 wayfinder 调用）／手动调查 |
 | `traverse` | **新增** | 已完成地图的终审：构建设计树并走查整棵树的每个分支，检查依赖覆盖、同级对称、层次完整、边界完备 | 所有 wayfinder 票解决后、进入 to-spec 之前 | **手动** |
 | `to-contract` | **新增** | 把 spec 变成已批准的契约：承诺清单与轻量测试 seam 草图，优先沿用既有 seam；重大 interface 重设计先获用户授权。写入 `.scratch/<feature>/contract.md` | 介于 to-spec 与 to-tickets 之间 | **手动** |
 | `wayfinder` | **改造** | 上游 skill 的重构版：支持暂停／恢复，暂停与结案均执行 lighthouse + backtracer，区分决策票（`.scratch/<feature>/decision/`）与实现票（`.scratch/<feature>/implementation/`），缺口决策交由用户拍板 | 当工作量超出单个 agent 会话时 | **手动** |
@@ -72,7 +72,7 @@ flowchart TD
     T --> L["票循环：claim → 讨论 →<br/>暂停／完成时保存进度"]
     L --> LH["lighthouse<br/><b>自动</b>"]
     LH --> BT["backtracer<br/><b>自动</b>"]
-    BT --> OWN["更新受影响责任票的<br/>当前交接"]
+    BT --> OWN["把已确认 gap 问题<br/>加入责任票"]
     OWN -->|"剩余问题"| CG{"剩余批次<br/>只选一次方式"}
     OWN -->|"全部归属或无缺口"| L
     CG -->|"一张票：剩余批次"| T
@@ -100,8 +100,8 @@ flowchart TD
 ```
 
 - wayfinder 循环内只有两个手动触发点：`wayfinder` 本身和 `traverse`（终审）；其后的交接 `to-spec` → `to-contract` 同样是手动。
-- 用户请求暂停及决策票完成时，wayfinder 调用 `lighthouse` 与 `backtracer`。暂停更新同一份当前 Handoff、执行追踪，最后释放未完成票的认领；恢复读取该交接及相关当前 Lighthouse。普通 grilling 回答继续采访；已确认的旧结论修订走 Backtracer 的修订流程。用户可点名另一票中输入已具备的局部问题，不代表该票整体解锁。
-- `backtracer` 先协调原权威及受影响责任票的当前输入和未决后果，链接来源结论，而非复制整套规则。归属是交接，不是解决。只有剩余无归属问题进入[共享后续处理协议](skills/backtracer/GAP-FOLLOWUP.md)；`traverse` 在所有票解决后运行，直接传入终审的未决问题批次。用户对传入批次只选一次方式：**当前会话 grilling** 直接加载并执行 `/grilling`；**生成一张 ticket** 把全部问题及证据收进一张 open 的 grilling 决策票，关联地图并布线，不立即开始讨论。当前会话的结论确认后更新已有 decision/lighthouse 文档及地图；明确延期的问题记入 **Not yet specified**。traverse 终审收尾时，新增票未解决或仍有未决雾区就返回规划，而不进入 `/to-spec`。
+- 暂停、保存进度／切换或决策票完成时，wayfinder 才进入发布边界，调用 `lighthouse` 与 `backtracer`。普通确认与已批准修订先留在当前对话；边界之前持久化文档可以滞后。边界上批量发布累积结果、一次性保存当前票的 Handoff 并追踪已发布变化。暂停在发布后释放未完成票的认领，保存进度则保留认领。恢复只读取该票的当前恢复入口及本题所需的 Lighthouse 主题，不加载全部票体或 Lighthouse。用户可点名另一票中输入已具备的局部问题，不代表该票整体解锁。
+- `backtracer` 从已发布结果回溯地图中已经决定的上下游问题，复用本次调用已有的来源，报告缺口与矛盾。它只在用户确认某个 gap 需要跟进时，把该未答问题加入拥有它的下游票；不同步消费者输入、不复制政策、不整理旧 Handoff。只有无人认领的已确认 gap 问题进入[共享后续处理协议](skills/backtracer/GAP-FOLLOWUP.md)；`traverse` 在所有票解决后运行，直接传入终审的未决问题批次。用户对传入批次只选一次方式：**当前会话 grilling** 直接加载并执行 `/grilling`；**生成一张 ticket** 把全部问题及证据收进一张 open 的 grilling 决策票，关联地图并布线，不立即开始讨论。当前会话的结论确认后更新原 Lighthouse 权威及地图；明确延期的问题记入 **Not yet specified**。traverse 终审收尾时，新增票未解决或仍有未决雾区就返回规划，而不进入 `/to-spec`。
 - 管线依次交给 `to-spec` 与 `to-contract`，两者都由本仓库发布。`implement` 属于 mattpocock/skills；本仓库 vendoring `to-tickets` 与 `ask-matt`（本地票目录改名 + 契约门）。
 
 颜色图例：蓝色粗边框 = 本仓库新增的 skill · 绿色 = 自动调用 · 橙色 = 手动触发 · 紫色 = 一次性 setup · 灰色虚线 = 上游 / 本仓库之外。
@@ -165,9 +165,9 @@ JSON 留存本次 TDD 结果、独立 retro 状态和错误；成功的 Markdown
 - [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md)、[deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md)、[deltas/mappings/to-spec.md](deltas/mappings/to-spec.md)、[deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md)、[deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md)、[deltas/mappings/prototype.md](deltas/mappings/prototype.md)、[deltas/mappings/code-review.md](deltas/mappings/code-review.md)、[deltas/mappings/tdd.md](deltas/mappings/tdd.md) 同时是映射源文件和人类审核入口。每个 op 把目标、ID、理由和编辑放在一起；白名单中没有映射的文件原样继承。
 - `skills/`：安装产物。`lighthouse`、`backtracer`、`traverse`、`to-contract` 为手写；manifest 里列出的十七个文件为生成物，**不要手工编辑**。
 
-票规则按职责维护：wayfinder 定义决策生命周期与完成流程；本地 tracker 模板定义存储和字段，完成步骤指回 wayfinder；triage 模板只维护实现票词汇。范围外处置必须完成依赖检查后再回到主流程，每次暂停与决策票完成均调用 backtracer。
+票规则按职责维护：wayfinder 定义决策生命周期、发布边界与完成流程；本地 tracker 模板定义存储和字段，完成步骤指回 wayfinder；triage 模板只维护实现票词汇。范围外处置必须完成依赖检查后再回到主流程，发布边界（暂停／完成）才调用 backtracer，普通回答不调用。
 
-[Local ticket handoff](skills/wayfinder/SKILL.md#local-ticket-handoff) 统一定义当前交接和旧交接合并规则。[wayfinder mappings](deltas/mappings/wayfinder.md) 中的暂停／完成 hooks：[grilling-pause](deltas/mappings/wayfinder.md#grilling-pause) 负责压缩交接和最后释放认领；[lighthouse-on-resolution](deltas/mappings/wayfinder.md#lighthouse-on-resolution) 负责普通答案；[out-of-scope-disposition](deltas/mappings/wayfinder.md#out-of-scope-disposition) 负责范围外处置流程；[backtracer-on-resolution](deltas/mappings/wayfinder.md#backtracer-on-resolution) 负责两条流程共享的 tracing；[follow-up-ticket-handoffs](deltas/mappings/wayfinder.md#follow-up-ticket-handoffs) 整理后续票交接。
+[Local ticket handoff](skills/wayfinder/SKILL.md#local-ticket-handoff) 统一定义当前恢复入口、旧交接合并规则与发布边界。[wayfinder mappings](deltas/mappings/wayfinder.md) 中的发布／完成 hooks：[grilling-pause](deltas/mappings/wayfinder.md#grilling-pause) 负责边界流程和最后释放认领；[lighthouse-on-resolution](deltas/mappings/wayfinder.md#lighthouse-on-resolution) 负责完成时批量发布；[out-of-scope-disposition](deltas/mappings/wayfinder.md#out-of-scope-disposition) 负责范围外处置流程；[backtracer-on-resolution](deltas/mappings/wayfinder.md#backtracer-on-resolution) 负责两条流程共享的 tracing；[map-invalidation-boundary](deltas/mappings/wayfinder.md#map-invalidation-boundary) 防止上游结果授权批量修改消费者。
 
 工作循环入口按行为分别维护：`processing-type-read` 读取类型，`grilling-context-reuse` 恢复已保存上下文，`grilling-frontier-refresh` 重算可讨论问题及跨票转向，`grilling-opening-brief` 展示目标句。这些 op 按上述顺序在同一个上游 resolution anchor 前追加，再由 `recorded-type-work` 替换该 anchor。`grilling-pause-trigger` 负责暂停请求与授权边界，`grilling-pause` 负责暂停流程。本次仅拆分 mapping，生成技能逐字节不变。
 

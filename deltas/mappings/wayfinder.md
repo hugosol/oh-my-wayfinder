@@ -17,7 +17,7 @@ content: The ticket retains compact discussion and a handoff; evidence assets ar
 
 ### local-ticket-handoff
 
-Keep the local ticket's current handoff separate from historical discussion; saving updates this one section without adding a per-round publication trigger.
+Own local recovery and publication boundaries; a ticket keeps its working context while Lighthouse owns approved policy.
 
 ```op
 anchor: |-
@@ -25,9 +25,15 @@ anchor: |-
 insert: |
   ### Local ticket handoff
   
-  On the local Markdown tracker, keep one `## Handoff` in each decision ticket, before its Question. Update it in place when saving progress, pausing, recording an outcome, or receiving trace findings. It holds confirmed-result links, the ticket's remaining questions and next ready question, relevant reasons/rejected branches and evidence limits, and trace owners or pending work. Include only fields that matter; preserve the meaning and scope of unanswered questions. Link Lighthouse for approved behavior and record only this ticket's consequences locally.
+  On the local Markdown tracker, each decision ticket owns its question, exploration and recovery context. Keep one `## Handoff` before its Question: confirmed-result links, remaining questions and the next ready question, relevant reasons/rejected branches, evidence limits and pending findings. Approved policy belongs in its Lighthouse; other tickets consume that authority when they start or resume.
   
-  When touching a legacy ticket, consolidate its current resume/handoff sections here. Carry forward still-relevant reasons, findings, rejected alternatives and unanswered questions; replace obsolete next steps and answered-question markers. Keep unique historical evidence in compact discussion or linked history, with superseded choices clearly historical. Full prior text can remain in version history; an unrecorded reason must be retained before its old passage is removed.
+  At a publication boundary for the ticket you are working, consolidate its legacy resume/handoff sections into this current entry; a claim alone leaves the legacy layout in place. Preserve unanswered scope, unique reasons and evidence; retire obsolete resume points and use linked history for prior full text. A gap added to another ticket preserves its existing recovery context.
+  
+  ### Publication
+  
+  During ordinary grilling, keep new confirmations and approved revisions in the current conversation. Persistent documents may lag until the user requests pause, saved progress or a switch, or the whole ticket is ready for completion or confirmed disposition. Claim/status operations remain immediate; publication waits for that boundary. At that boundary, publish the accumulated confirmed changes through Lighthouse, update the working ticket's Handoff and compact evidence once, reconcile the map's gist/links, then trace the published changes. Each policy has one Lighthouse authority; revise its original topic rather than copying it into consumer tickets. Other sessions see the last publication, so publish before handing them work that requires a new choice.
+  
+  Complete publication when confirmed choices and revisions are recoverable at their authorities, candidates remain unanswered, and the working ticket's recovery point and map navigation agree with them.
   
 ```
 
@@ -128,7 +134,7 @@ Load the tracker vocabulary before choosing a ticket so decision and implementat
 anchor: |
   <oh-my-wayfinder:insert>1. Load the **map**: the low-res view, not every ticket body.
 insert: |
-  0. **Load the tracker conventions.** Read `docs/agents/issue-tracker.md` for storage and field conventions; use the [decision lifecycle](#decision-tickets) for this map. For a local tracker, reconcile its handoff-storage sentence with the [local tracker template](../setup-matt-pocock-skills/issue-tracker-local.md), preserving project-specific fields and paths.
+  0. **Load the tracker conventions.** Read `docs/agents/issue-tracker.md` for storage and fields; use the [decision lifecycle](#decision-tickets) and [local handoff](#local-ticket-handoff) for this map. Consult the [local tracker template](../setup-matt-pocock-skills/issue-tracker-local.md) only for a conflicting storage convention; preserve project-specific fields and paths.
 
 ```
 
@@ -156,13 +162,13 @@ insert: |-
 
 ### grilling-context-reuse
 
-Load saved discussion and current confirmed Lighthouse results for starting or resuming grilling. Append after `processing-type-read` at the unchanged upstream resolution anchor; keep frontier recomputation and the displayed brief in their own ops.
+Load the current recovery entry and question-relevant authorities for starting or resuming grilling. Append after `processing-type-read` at the unchanged upstream resolution anchor; keep frontier recomputation and the displayed brief in their own ops.
 
 ```op
 anchor: |-
   <oh-my-wayfinder:insert>3. Resolve it as the type its `wayfinder:<type>` label names (see [Ticket Types](#ticket-types)). Read the label, not just the body: the body never states the type.
 insert: |-
-   Before starting or resuming grilling, read the ticket's current Handoff and relevant current Lighthouse conclusions, including confirmed parts of unfinished tickets. If the ticket still has legacy handoffs, consolidate them using [Local ticket handoff](#local-ticket-handoff). Reuse the saved reasons, rejected branches, findings and evidence limits; follow history or evidence links for a concrete ambiguity or change.
+   Before starting or resuming grilling, read the ticket's fields, Question and current Handoff, then the Lighthouse topics needed by that question and its prerequisites, including published parts of unfinished tickets. Use the map index and dependency links to select those authorities. Reuse available context without rereading it; follow history/evidence links only for a concrete ambiguity or changed premise. For a legacy ticket, locate its latest applicable recovery point and read from it; leave its layout unchanged until that ticket's next publication boundary.
 ```
 
 ### grilling-frontier-refresh
@@ -210,7 +216,7 @@ Route user pause, save-progress and switch requests through Pause, preserving th
 anchor: |-
   <oh-my-wayfinder:insert> **Zoom as needed**:
 insert: |-
-   Keep ordinary grilling rounds in this interview step; enter Step 5 only when the ticket’s whole scope is ready for completion or confirmed disposition. Approved revisions of existing conclusions follow Backtracer’s revision procedure. When the user requests a pause, saved progress, or a switch, return through [Pause](#pause) instead of finishing the whole grilling tree. That request authorizes recording confirmed results and progress, not executing the Destination or approving unanswered branches.
+   Keep ordinary grilling rounds in this interview step, using the current conversation until a [publication boundary](#publication). A confirmed answer or approved revision alone stays in the interview; enter Step 5 when the whole ticket is ready for completion or confirmed disposition. A user request to pause, save progress or switch goes through [Pause](#pause). It authorizes publication, not execution of the Destination or approval of unanswered branches. Keep a disputed premise as a question until the user settles it.
 ```
 
 ### lighthouse-on-resolution
@@ -225,7 +231,7 @@ find: |-
 content: |-
   5. **Record the outcome.** Before updating the ticket or map, choose the matching procedure:
      - **Confirmed out-of-scope disposition:** complete [Out of scope](#out-of-scope), then continue at Step 7; it includes Step 6.
-     - **Ordinary answer:** update the ticket's [Handoff](#local-ticket-handoff) and compact evidence record, then call the Skill tool with "lighthouse" and write its confirmed update to the existing `lighthouse/<NN>-<slug>.md`. Reconcile the gist and link in Decisions-so-far. Set `Status: resolved` only when the ticket’s whole scope is decided or has confirmed dispositions, with no disputed prerequisite; otherwise use [Pause](#pause). If lighthouse is unavailable, stop before changing status.
+     - **Ordinary answer:** call the Skill tool with "lighthouse" to publish the accumulated confirmed changes under [Publication](#publication), then save this ticket's [Handoff](#local-ticket-handoff) and compact evidence and reconcile the map gist/link. Set `Status: resolved` only when the ticket’s whole scope is decided or has confirmed dispositions, with no disputed prerequisite; otherwise use [Pause](#pause). If lighthouse is unavailable, stop before changing status.
 ```
 
 ### backtracer-on-resolution
@@ -241,7 +247,7 @@ insert: |
 
 ### follow-up-ticket-handoffs
 
-Owns reconciliation of backtracer handoffs with newly surfaced tickets and the return from further scope dispositions. Preserve upstream’s fog graduation and invalidation guidance. This becomes step 7 after the processing-type read and shared tracing insertions.
+Reuse Backtracer's gap-question assignments when adding newly surfaced tickets and returning from scope dispositions. Preserve upstream’s fog graduation. This becomes step 7 after the processing-type read and shared tracing insertions.
 
 ```op
 anchor: |-
@@ -256,6 +262,19 @@ content: |-
   This includes any tickets backtracer surfaced and the user confirmed. If this reveals another out-of-scope ticket, obtain the user's confirmation, complete [Out of scope](#out-of-scope) for that ticket, and resume this step.
 ```
 
+### map-invalidation-boundary
+
+Backtracer owns gap/conflict diagnosis and authorized gap-question assignments; an upstream result does not authorize bulk consumer mutation. Scope changes use the explicit disposition procedure.
+
+```op
+anchor: |-
+  If the decision invalidates other parts of the map, update or delete those tickets.
+find: |-
+  If the decision invalidates other parts of the map, update or delete those tickets.
+content: |-
+  When the user confirms another ticket's question is invalidated, record that specific disposition in the affected ticket and reconcile only that question, its recovery entry and the map navigation; preserve unrelated context and claims.
+```
+
 ### grilling-pause
 
 Own the pause sequence once, after the work loop; completion and a user-named detour reuse its existing publication and tracing skills.
@@ -266,14 +285,14 @@ anchor: |
 insert: |
   ### Pause
 
-  On the local Markdown tracker, when the user pauses or switches, perform these steps in order before asking another grilling round or starting another ticket. Other tracker setups do not provide this extended pause/publication loop:
+  On the local Markdown tracker, when the user pauses, requests saved progress or switches, publish through [Publication](#publication) in this order before another grilling round or ticket. Other tracker setups do not provide this extended pause/publication loop:
 
-  1. Update the ticket's [Handoff](#local-ticket-handoff) with the pause reason, confirmed-result links and exact unanswered resume question. Merge incoming findings and retire obsolete resume points; tentative preferences remain tentative.
-  2. Call "lighthouse" and write confirmed updates, reconciling the map gist/links with their partial scope. With no new confirmed choice, retain the existing Lighthouse and map result index; proposals and conflicting evidence remain in the ticket for tracing.
-  3. Execute only Step 6 of [Work through the map](#work-through-the-map), passing this pause's results, evidence and unresolved conflicts to Backtracer. Follow-up may hand findings to appropriate tickets; the pause does not require another interview to settle them all.
-  4. Refresh the same Handoff with trace outcomes or pending work. Finish these writes before setting your unfinished ticket `open` and clearing your claim; use sequential edits or one combined write. Reread the Handoff and actual status/assignee fields: one current resume point, every pending finding retained or linked to its owner, and your claim released. Only then stop, or return to Step 2 to claim the user's next ticket. Preserve other sessions' claims.
+  1. Call "lighthouse" to publish the conversation's accumulated confirmed choices and approved revisions at their authorities; reconcile the map gist/links with their partial scope. With no confirmed change, retain those documents.
+  2. Execute only Step 6 of [Work through the map](#work-through-the-map), passing the published changes, evidence and unresolved conflicts to Backtracer. A pause hands off its confirmed gap questions rather than requiring another interview.
+  3. Save the working ticket's [Handoff](#local-ticket-handoff) and compact evidence with the pause reason, result links, exact unanswered resume question and trace findings or pending work. Retire obsolete resume points while preserving candidates and unanswered scope. With no findings, retain the existing trace record instead of adding another empty report.
+  4. Finish publication before setting your unfinished ticket `open` and clearing your claim; use sequential edits or one combined write. For saved progress without a pause or switch, keep the claim. Verify the saved recovery point and actual status/assignee fields, preserving other sessions' claims; then stop or return to Step 2 for the requested switch.
   
-  Complete when the single current Handoff and confirmed results agree, Backtracer's findings are resolved or handed off, and the saved fields show your unfinished-ticket claim released. If saving/tracing cannot finish, retain the remaining work in Handoff and release your claim on a normal stop without declaring the pause complete. Resuming alone keeps the claim until a later pause or completion. A pause records progress without supplying unanswered choices or resolving the ticket.
+  Complete when [Publication](#publication) is complete, trace findings are recorded or handed off, and your claim is released for pause/switch or retained for saved progress. If saving/tracing cannot finish, retain the remaining work in Handoff and release your claim on a normal stop without declaring the pause complete. A pause leaves the unfinished ticket open; resuming or saving progress alone keeps its claim.
 
 ```
 

@@ -3,7 +3,7 @@ name: lighthouse
 description: "Distill confirmed Wayfinder decisions and approved changes into Lighthouse documents, including partial results from tickets that remain open."
 ---
 
-Capture confirmed results at a Wayfinder pause or completion. A lighthouse document is the single source of truth for what was decided, why, and what it constrains; its source ticket may still be unfinished. Backtracer traces these results across the map for gaps and conflicts.
+Publish accumulated confirmed results at a Wayfinder [publication boundary](../wayfinder/SKILL.md#publication). A Lighthouse is the single authority for what was decided, why and what it constrains; its source ticket may remain unfinished. Other tickets read that authority when starting or resuming. Backtracer checks its relevant upstream decisions for gaps and conflicts.
 
 Synthesize choices and constraints explicitly confirmed by the user. Decision-relevant background and preferences explain the rationale; they do not create additional approved behavior or guarantees. Candidates and unanswered proposals remain in the ticket; clarify ambiguous summaries only.
 
@@ -21,7 +21,7 @@ Extract confirmed conclusions, their scope and conditions, the user's decision-r
 
 Create or update `lighthouse/<NN>-<slug>.md` by topic using this template. For partial results, state the confirmed scope and that the ticket remains unfinished. For each changed conclusion, reconcile every affected statement in the current document: Question/scope summaries, Discussion, Decision, stories, preconditions, postconditions and invariants. Replace obsolete pending/approved claims with the precise settled scope and remaining questions; retain applicable conclusions and implementation limits.
 
-For an approved revision, update its original authority with a brief old-to-new reason and a recoverable confirmation source, such as the session plus message time/link, or the user's explicit words when no locator is available. Keep the former policy in linked history or a compact explicitly superseded note, not as a competing current answer. A different source ticket links that authority and records its own consequences.
+For an approved revision, update its original authority with a brief old-to-new reason and a recoverable confirmation source, such as the session plus message time/link, or the user's explicit words when no locator is available. Keep the former policy in linked history or a compact explicitly superseded note, not as a competing current answer. A different source ticket links that authority. Keep policy at its original topic; publication updates the working ticket and map navigation, not downstream ticket inputs or Handoffs.
 
 <lighthouse-template>
 
