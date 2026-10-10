@@ -129,7 +129,7 @@ content: check its claim and the specific question's inputs. On the local Markdo
 
 ### grilling-opening-brief
 
-Owns the grilling-only opening brief after claiming the ticket and before resolution. Read the recorded type to determine whether this brief is required; show the ticket question and settled constraints. Anchor on the claim, independently of the following `recorded-type-work` edit.
+Owns the grilling-only opening brief after claiming the ticket and before resolution. Reuse current context internally, then state the decision goal in one sentence using the project glossary. Anchor on the claim, independently of the following `recorded-type-work` edit.
 
 ```op
 anchor: |-
@@ -138,11 +138,7 @@ anchor: |-
 insert: |
   3. **Read the processing type:** the local ticket’s `Type:` field, or its `wayfinder:<type>` label on a remote tracker (see [Ticket Types](#ticket-types)). Before starting or resuming grilling, read the ticket’s latest handoff/discussion and relevant current Lighthouse conclusions, including confirmed parts of unfinished tickets. Reuse applicable decisions, rejected branches and their reasons, investigation findings and limits, and the user’s decision-relevant background. Follow evidence links for concrete ambiguities or changes, not to repeat settled exploration. Compare the saved stopping point with intervening results and recompute this ticket’s frontier. If the missing choice belongs to another ticket, identify that prerequisite and offer the Pause detour rather than deciding its scope under this claim. A design input need not be implemented, but one available input does not settle every prerequisite.
 
-     For that brief, show:
-     - **Topic:** The stopping point, what has changed, and what is ready to decide next toward the Destination.
-     - **Settled decisions:** Only confirmed decisions that constrain or inform this ticket, each with its source link and implication for this discussion. If none are relevant, say so.
-
-     Then ask the first grilling question. Other ticket types skip the brief.
+     Read the relevant project `GLOSSARY.md` if available (follow `GLOSSARY-MAP.md` when present). Using its canonical terms, give only a one-sentence brief on what this ticket needs to decide and what that answer enables toward the Destination, followed immediately by the first grilling round. Other ticket types skip the brief.
 ```
 
 ### recorded-type-work
