@@ -75,6 +75,8 @@ flowchart TB
 
 Skill-level automatic calls are instructions executed by the agent, not an independent scheduler. `/spec-to-code` additionally provides host-driven orchestration. It starts with a prepared spec and approved contract, automates ticket creation and serial TDD, and adds automatic Retro calls.
 
+The Grilling overlay adds one experiment: the agent gathers common reasons into a proposed constraint, recommends its scope and tradeoffs, and waits for your authorization before using it to answer other decisions. Frontier-sized rounds and decision-tree coverage are unchanged. See the [Grilling experiment](docs/upstream-differences.md#8-grilling-experiment-reasons--proposed-constraints).
+
 For the design changes and their mapping operations, see the [upstream comparison blueprint](docs/upstream-differences.md).
 
 ## Quick start

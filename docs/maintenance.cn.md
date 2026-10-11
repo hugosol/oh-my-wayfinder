@@ -2,34 +2,34 @@
 
 [English](./maintenance.md)
 
-本仓库把改造过的八个 skill 作为**增量叠加层（delta overlay）**发布：`upstream/` 保存上游文件的快照，`deltas/mappings/*.md` 用带类型的 op 描述本仓库的每一处改动，`skills/` 由二者生成。本指南介绍维护者需要的机制：manifest、映射格式、命令，以及如何更新上游快照。仓库定位与安装见 [README](../README.cn.md)；fork 改了什么、为什么改见 [与上游的差异](./upstream-differences.cn.md)。
+本仓库把改造过的九个 skill 作为**增量叠加层（delta overlay）**发布：`upstream/` 保存上游文件的快照，`deltas/mappings/*.md` 用带类型的 op 描述本仓库的每一处改动，`skills/` 由二者生成。本指南介绍维护者需要的机制：manifest、映射格式、命令，以及如何更新上游快照。仓库定位与安装见 [README](../README.cn.md)；fork 改了什么、为什么改见 [与上游的差异](./upstream-differences.cn.md)。
 
 ## 目录结构
 
 | 路径 | 作用 |
 | --- | --- |
-| `upstream/` | 手工复制的八个上游 skill 目录快照（`wayfinder`、`setup-matt-pocock-skills`、`to-spec`、`to-tickets`、`ask-matt`、`prototype`、`code-review`、`tdd`）。可能带 CRLF，构建读取时会归一化。未列入 manifest 的文件一律忽略，也不会随仓库发布。 |
-| [deltas/manifest.json](../deltas/manifest.json) | `files` 白名单：本仓库为这八个 skill 发布的全部 17 个文件。 |
-| `deltas/mappings/<skill>.md` | 每个生成 skill 一份映射文档，用带类型的 op 表达 fork 的全部改动，是人工评审的入口。八份文档：[wayfinder](../deltas/mappings/wayfinder.md)、[setup-matt-pocock-skills](../deltas/mappings/setup-matt-pocock-skills.md)、[to-spec](../deltas/mappings/to-spec.md)、[to-tickets](../deltas/mappings/to-tickets.md)、[ask-matt](../deltas/mappings/ask-matt.md)、[prototype](../deltas/mappings/prototype.md)、[code-review](../deltas/mappings/code-review.md)、[tdd](../deltas/mappings/tdd.md)。 |
+| `upstream/` | 手工复制的九个上游 skill 目录快照（`wayfinder`、`setup-matt-pocock-skills`、`to-spec`、`to-tickets`、`ask-matt`、`prototype`、`code-review`、`tdd`、`grilling`）。可能带 CRLF，构建读取时会归一化。未列入 manifest 的文件一律忽略，也不会随仓库发布。 |
+| [deltas/manifest.json](../deltas/manifest.json) | `files` 白名单：本仓库为这九个 skill 发布的全部 18 个文件。 |
+| `deltas/mappings/<skill>.md` | 每个生成 skill 一份映射文档，用带类型的 op 表达 fork 的全部改动，是人工评审的入口。九份文档：[wayfinder](../deltas/mappings/wayfinder.md)、[setup-matt-pocock-skills](../deltas/mappings/setup-matt-pocock-skills.md)、[to-spec](../deltas/mappings/to-spec.md)、[to-tickets](../deltas/mappings/to-tickets.md)、[ask-matt](../deltas/mappings/ask-matt.md)、[prototype](../deltas/mappings/prototype.md)、[code-review](../deltas/mappings/code-review.md)、[tdd](../deltas/mappings/tdd.md)、[grilling](../deltas/mappings/grilling.md)。 |
 | [deltas/build.mjs](../deltas/build.mjs) | 由 `upstream/` + 映射重新生成 `skills/`；`--check` 只校验、不写文件。 |
 | [deltas/ops.mjs](../deltas/ops.mjs) | op 的解析与应用逻辑，构建与预览共用同一份实现，两者不可能各说各话。 |
 | [deltas/check-upstream.mjs](../deltas/check-upstream.mjs) | 将快照与 `mattpocock/skills` 对比，可走 GitHub API 或本地检出。 |
 | [deltas/preview.mjs](../deltas/preview.mjs) | 把映射渲染成差异页面（`deltas/preview.html`，已 gitignore）。 |
-| `skills/` | 安装产物：八个 skill 的生成文件，加上手写的 `lighthouse`、`backtracer`、`traverse`、`to-contract`。 |
+| `skills/` | 安装产物：九个 skill 的生成文件，加上手写的 `lighthouse`、`backtracer`、`traverse`、`to-contract`。 |
 
 ## 生成文件与手写 skill
 
 `deltas/manifest.json` 只包含一个 `files` 数组，每项是 `<skill>/<file>` 形式的路径。只有这些路径会从 `upstream/` 读取并写入 `skills/`；生成的 skill 目录由路径的第一段推导得出。
 
-- **生成 skill**：上面的八个改造 skill。它们的 `skills/<skill>/` 目录严格等于 manifest 白名单，不多一个文件。
+- **生成 skill**：上面的九个改造 skill。它们的 `skills/<skill>/` 目录严格等于 manifest 白名单，不多一个文件。
 - **手写 skill**：[lighthouse](../skills/lighthouse/SKILL.md)、[backtracer](../skills/backtracer/SKILL.md)、[traverse](../skills/traverse/SKILL.md)、[to-contract](../skills/to-contract/SKILL.md) 是本仓库原生的：不在 manifest 中，没有 `upstream/` 对应物，构建不会碰它们，直接编辑即可。
 - **原样复制的文件**：白名单中没有映射 op 的文件会按快照逐字节复制（仅做换行归一化）。它仍然是生成文件，同样受下面的清理规则约束。
 
-**破坏性清理警告。** 写入式构建（`node deltas/build.mjs`）会删除生成 skill 目录中所有不在 `manifest.files` 里的文件，并删除因此变空的目录。不要在这八个 skill 的 `skills/<skill>/` 里放笔记、临时实验或生成的素材——它们会被无提示地删除，即使已经提交，只要上游没有对应文件也一样。要发布额外的上游文件，必须把它复制进 `upstream/` 并加入 manifest。
+**破坏性清理警告。** 写入式构建（`node deltas/build.mjs`）会删除生成 skill 目录中所有不在 `manifest.files` 里的文件，并删除因此变空的目录。不要在这九个 skill 的 `skills/<skill>/` 里放笔记、临时实验或生成的素材——它们会被无提示地删除，即使已经提交，只要上游没有对应文件也一样。要发布额外的上游文件，必须把它复制进 `upstream/` 并加入 manifest。
 
 ## 改映射，不要改生成文件
 
-绝不要编辑 `skills/` 下的 17 个生成文件：下一次构建会覆盖它们，或在其退出 manifest 时将其清理。对生成 skill 的每一处改动都写在 `deltas/mappings/<skill>.md` 里，流程是：
+绝不要编辑 `skills/` 下的 18 个生成文件：下一次构建会覆盖它们，或在其退出 manifest 时将其清理。对生成 skill 的每一处改动都写在 `deltas/mappings/<skill>.md` 里，流程是：
 
 1. 编辑映射文档（每个 skill 一份；即使文件都无需改动，该 skill 仍需一份文档）。
 2. 运行 `node deltas/build.mjs` 重新生成，或运行 `node deltas/build.mjs --check` 只校验不写入。
@@ -101,7 +101,7 @@ node deltas/check-upstream.mjs --local <dir>  # 与本地上游检出对比
 
 当前快照对应 `mattpocock/skills` 的提交 `f3fc5632f401156837ee3872f14fe33ccf1024ea`。来源信息只记录在这里；快照更新时请一并更新这一行（检查输出会标注它所比较的版本）。
 
-1. 从选定的上游检出中把八个完整 skill 目录复制进 `upstream/`，替换旧快照。多复制文件没有问题：构建会忽略未列入 manifest 的一切。
+1. 从选定的上游检出中把九个完整 skill 目录复制进 `upstream/`，替换旧快照。多复制文件没有问题：构建会忽略未列入 manifest 的一切。
 2. 针对新基线逐条适配映射的锚点与编辑，同时保留上游的修复和 fork 已确认的语义。预期会有 op 因锚点被点名而构建失败——这正是评审点，不是意外。
 3. 运行 `node deltas/build.mjs`，然后检查重新生成的差异（预览页面，或 `git diff skills/`）。
 4. 运行 `node deltas/build.mjs --check`。
