@@ -2,211 +2,119 @@
 
 [English](./README.md)
 
-**[mattpocock/skills](https://github.com/mattpocock/skills) 的 fork**：为 AI 编程 agent 设计的工程技能集。本仓库在其基础上新增了规划质检类 skill，并为 **[Oh My Pi](https://github.com/can1357/oh-my-pi)** agent 编写了自动化扩展。
+**让决策跨会话保持完整，让需求在实现前变得可验证，让每次执行留下经验。**
 
-本仓库改造上游的八个 skill（`wayfinder`、`setup-matt-pocock-skills`、`to-spec`、`to-tickets`、`ask-matt`、`prototype`、`code-review`、`tdd`），并以**完整目录**形式发布（无需改动的文件逐字取自上游），另加新增的 `lighthouse` / `backtracer` / `traverse` / `to-contract` 与 Oh My Pi 扩展。请先安装 Matt 的技能集，再把本仓库的文件覆盖上去（见 [快速开始](#快速开始)）。
+Oh My Wayfinder 是 [mattpocock/skills](https://github.com/mattpocock/skills) 的非侵入式 fork，面向需要多个会话才能推进的大型 AI 辅助开发工作，并为 [Oh My Pi](https://github.com/can1357/oh-my-pi)（OMP）提供可选的自动化扩展。
+
+## 为什么需要这个 fork？
+
+### 会话结束了，决策不一定已经完成
+
+大型工作需要研究、原型，以及彼此依赖的设计讨论。一个问题尚未讨论完，不应阻止其中已确认的结果发挥作用；新会话也不应从头重建整段讨论。
+
+本仓库为 Wayfinder 增加暂停与恢复，把已确认决策发布为可共同引用的权威来源，并回溯其前提，检查缺口与冲突；在形成规格前，再对整体设计做一次终审。目标是让工作可以连续推进，而不是把其他票的政策复制进每一张票。
+
+### 如果需求已经丢失，测试通过也不够
+
+需求可能在切票时遗漏，测试也可能变成对当前实现的确认，而不是对原本承诺的验证。
+
+本仓库把规格与已批准的契约分开，明确承诺及测试 seam，将交付与覆盖责任分配给实现票，并围绕这些责任强化 TDD。目标是从已批准的要求追溯到能够发现违约行为的证据，而不只是得到一套绿色测试。
+
+### 实现结束，不应丢掉这次工作带来的经验
+
+上游已经提供 Retro。本仓库的 OMP 扩展将它接入自动化执行：每次 TDD 执行都有独立复盘，实现与复盘结果分别报告。改进建议会被记录，而不会自动执行；执行结束本身也不代表验收已经通过。
+
+## 流程概览
+
+本仓库分为两部分：适用于支持 Markdown skill 的 agent 的**通用技能**，以及用于连续、无人托管执行的 **OMP 专用扩展**。其他 agent 用户仍可手动调用 skills 完成通用规划与实现流程，不需要安装 OMP 扩展。
+
+下面展示大型工作的主路径，不包含上游全部分支或具体执行规则。
+
+### 上游流程
+
+```mermaid
+flowchart LR
+    W["Wayfinder<br/>决策讨论"] --> S["To-spec"]
+    S --> T["To-tickets"]
+    T --> I["Implement / TDD"]
+    I --> R["Retro"]
+    classDef upstream fill:#f3f4f6,stroke:#6b7280,color:#111827;
+    class W,S,T,I,R upstream;
+```
+
+### 本仓库流程
+
+```mermaid
+flowchart TB
+    subgraph PLAN["决策规划"]
+        direction LR
+        W["Wayfinder<br/>暂停与恢复"] --> L["Lighthouse<br/>发布决策"]
+        L --> B["Backtracer<br/>回溯前提"]
+        B --> V["Traverse<br/>全局终审"]
+    end
+    subgraph PREP["实现准备"]
+        direction LR
+        S["To-spec"] --> C["To-contract"]
+    end
+    subgraph OMP["OMP：/spec-to-code 自动化（可选）"]
+        direction LR
+        T["To-tickets"] --> I["TDD 执行"]
+        I --> R["每次执行后 Retro"]
+    end
+    PLAN --> PREP --> OMP
+    classDef added fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;
+    classDef changed fill:#fff7ed,stroke:#c2410c,color:#7c2d12;
+    class V,L,B,C added;
+    class W,S,T,I,R changed;
+    style PLAN fill:none,stroke:#d1d5db
+    style PREP fill:none,stroke:#d1d5db
+    style OMP fill:none,stroke:#6b7280,stroke-dasharray:5 5
+```
+
+**蓝色**表示新增 skill，**橙色**表示职责或集成方式发生变化。Lighthouse 与 Backtracer 在决策发布边界参与工作，Traverse 在地图完成后做终审；图中省略反复讨论、暂停恢复和缺口跟进分支。虚线框表示 OMP 自动化覆盖的部分，不代表这些环节必须使用 OMP。
+
+Skill 内的自动调用由 agent 执行指令，不是独立调度器；`/spec-to-code` 另外提供宿主驱动的编排。它以已有 spec 和已批准 contract 为输入，自动切票、串行执行 TDD，并自动调用 Retro。
+
+设计变化及其对应的 mapping op，见[上游对比蓝图](docs/upstream-differences.cn.md)。
 
 ## 快速开始
 
-> 开始之前，请确保你已经理解 wayfinder 的流程：本仓库的一切都建立在它之上（见 [流程图 A](#流程图-awayfinder-规划管线)）。
-
-本仓库是 Matt 技能集之上的增量，所以：先装上游，再覆盖。
+通用 skills 不需要修改 agent 本体或使用专用安装器：先安装上游，再复制覆盖。
 
 1. 安装 Matt 的技能集：`npx skills@latest add mattpocock/skills`。
-2. 把本仓库的 `skills/` 目录复制并覆盖到已安装的 skill 目录：同名文件自动替换上游版本，其余文件为纯新增。
-3. Oh My Pi 用户：把 `extensions/spec-to-code.ts`、整个 `extensions/spec-to-code/` 配套目录和 `extensions/agents/tdd.md` 一起放入扩展位置，保留相对布局（扩展会自动发现同目录下的 `tdd` agent）。后台复盘使用已安装的上游 `retro` 与 `writing-for-agents`，无需覆盖或修改它们。
+2. 将本仓库 `skills/` 中的内容复制到 agent 已安装的 skill 目录，保留各 skill 的目录结构；覆盖同名文件，并加入新增目录。
+3. 在实际使用的项目中运行 `/setup-matt-pocock-skills`。如果项目此前已使用 Matt 的 skills，请重新运行 setup，检查并确认更新项目中的持久化配置。替换已安装的 skills 不会自动更新项目配置，也不会自动迁移既有票据。
+4. 不知道下一步做什么？调用 `/ask-matt`，根据当前场景选择 skill。
 
-然后与上游一致，每个仓库运行一次 `/setup-matt-pocock-skills`。
+**适用范围：** Wayfinder 的扩展暂停／发布／回溯循环目前针对本地 Markdown tracker，尚未接入 GitHub／GitLab tracker 配置。
 
-## 仓库内容
+**OMP 用户：** 按 [spec-to-code 使用指南](docs/spec-to-code.cn.md)安装并运行可选扩展。仅复制 skills 不会安装 `/spec-to-code`。
 
-**第一部分：通用 skills**（与 agent 无关，任何支持 markdown skill 的 agent 均可使用）
+## 进一步阅读
 
-它们驱动的规划循环：`wayfinder` 把一次超出单个会话的工作量绘制成 issue tracker 上的决策票地图；暂停或结案时由 **lighthouse** 增量保存已确认结果；**backtracer** 在地图上追踪信号、暴露缺口；**traverse** 在地图完成后做端到端终审，然后交给 `to-spec`；`to-spec` 产出 spec 后，`to-contract` 把它变成已批准的契约（承诺清单，以及观察这些承诺的 seam），`to-tickets` 再据此切片。
+| 我想…… | 阅读入口 |
+|---|---|
+| 选择下一步调用的 skill | [Ask Matt](skills/ask-matt/SKILL.md) |
+| 理解本仓库改了什么、改动在哪里 | [上游对比蓝图](docs/upstream-differences.cn.md) |
+| 安装、配置和使用 OMP 自动化 | [Spec-to-code 使用指南](docs/spec-to-code.cn.md) |
+| 修改 mapping、构建技能或同步上游 | [维护指南](docs/maintenance.cn.md) |
 
-**第二部分：[Oh My Pi](https://github.com/can1357/oh-my-pi) 自动化扩展**（仅 `@oh-my-pi/pi-coding-agent`）
-
-`/spec-to-code` 把一份 spec 自动切分为实现票，并用串行 TDD 子代理逐个实现。一条命令，全流程自动。使用其他 agent 的读者可以完全忽略这部分。
-
-## 相比上游新增了什么
-
-| 技能 | 类型 | 作用 | 何时调用 | 触发方式 |
-|---|---|---|---|---|
-| `lighthouse` | **新增** | 把 wayfinder 已确认结果（含未结案票的部分结果）增量保存为灯塔文档：决策、用户故事、前置条件、后置条件、不变量，是 backtracer 追踪的信号源 | 暂停或决策票完成时执行 | **自动**（由 wayfinder 调用） |
-| `backtracer` | **新增** | 从已发布结果回溯已经决定的上下游问题，暴露缺失问题、层次缺口、不对称与具体冲突；只有用户确认的 gap 才写入下游票 | 发布边界，或需要核对具体冲突时 | **自动**（由 wayfinder 调用）／手动调查 |
-| `traverse` | **新增** | 已完成地图的终审：构建设计树并走查整棵树的每个分支，检查依赖覆盖、同级对称、层次完整、边界完备 | 所有 wayfinder 票解决后、进入 to-spec 之前 | **手动** |
-| `to-contract` | **新增** | 把 spec 变成已批准的契约：承诺清单与轻量测试 seam 草图，优先沿用既有 seam；重大 interface 重设计先获用户授权。写入 `.scratch/<feature>/contract.md` | 介于 to-spec 与 to-tickets 之间 | **手动** |
-| `wayfinder` | **改造** | 上游 skill 的重构版：支持暂停／恢复，暂停与结案均执行 lighthouse + backtracer，区分决策票（`.scratch/<feature>/decision/`）与实现票（`.scratch/<feature>/implementation/`），缺口决策交由用户拍板 | 当工作量超出单个 agent 会话时 | **手动** |
-| `setup-matt-pocock-skills` | **改造** | 上游设置 skill，轻量适配（issue tracker 选项、triage 标签、domain 文档布局） | 每个仓库一次，首次使用前 | **手动** |
-| `to-spec` | **改造** | 上游 skill 的重构版：seam 草图与 Testing Decisions 中的 seam 部分移交给 `to-contract`；发布 spec 后指向 `/to-contract` 作为下一步 | 把当前对话变成 spec 时 | **手动** |
-| `to-tickets` | **改造** | 上游 skill 的重构版：本地 tracker 的输出去向改为 `.scratch/<feature>/implementation/`，且必须输入已批准契约；票要声明 `Delivers`（或 enabling），quiz 增加覆盖度提问 | 把契约拆成票时 | **手动** |
-| `ask-matt` | **改造** | 路由文本：本地 tracker 路径改为 `.scratch/<feature>/implementation/`，并补充新增 skill 的说明与原有流程的改动 | 询问该用哪个 skill 时 | **手动** |
-| `prototype` | **改造** | 上游 skill 的重构版：问题回答完后交回一个 `prototype/<name>` worktree（内含所选结果与 `VERDICT.md`），并还原工作区；不再写 spec、issue 或 ticket | 用一次性代码回答一个设计问题时 | **手动** |
-| `code-review` | **改造** | 上游 skill 的重构版：默认 review 目标改为相对 `HEAD` 的未提交改动（含未跟踪文件、遵守 `.gitignore`）；传入固定点仍 review 已提交区间 | review 进行中的工作、分支或 PR 时 | **手动** |
-| `tdd` | **改造** | 上游 skill 的重构版：执行改为票驱动 —— 验收标准、覆盖归属与已批准 seam 来自被指派的工作 —— 循环新增 design-before-red、preserve-the-criterion、check-the-evidence 规则，并加上完成条件 | 以测试先行方式实现功能或修 bug 时 | **手动** |
-| `spec-to-code` + `tdd` agent | **扩展**（仅 OMP） | Spec → 实现票 → 串行 TDD，每次执行后台 retro、分别记录结果；可选 Jev 驱动回合回复 | 有规格文档并希望实现它时 | **手动启动**，之后全自动 |
-
-skill 行的「自动」指调用方 skill 在流程中强制触发该步骤，是指令层面的保证，而非独立调度器。OMP 扩展另外通过宿主代码调度后台 retro，并约束最终收尾。
-
-## 暂不支持 GitHub / GitLab tracker
-
-管线中「自动」的那部分（暂停与决策票完成时执行 lighthouse + backtracer）目前只针对**本地 markdown tracker**（`.scratch/<feature>/decision/` 用于规划、`.scratch/<feature>/implementation/` 用于实现票）设计。GitHub 与 GitLab 的 tracker 配置原样来自上游，描述的仍是上游原本的 resolve 步骤，因此这两种场景暂不支持。
-
-这是有意留到后续的步骤，不是遗漏。
-
-**本地目录改名（对本地 tracker 是破坏性变更）**：实现票从 `.scratch/<feature>/issues/` 移到 `.scratch/<feature>/implementation/`，术语也从「任务票」改为「实现票」；已配置过的仓库不会被自动迁移。
-
-**决策票生命周期**：本地决策票仅使用 `open → claimed → resolved`，`Type:` 仍表示处理方式。`resolved` 表示决策或经确认的范围外处置已记录，与生产实现是否交付无关；研究与原型代码可以作为证据。Triage 仅用于实现票。范围外处置记入地图的 **Out of scope**，不进入 **Decisions so far**；推进 frontier 前必须检查依赖，因为处置完成不等于原问题已获解答。
-
-已有项目的 tracker 文档不会自动更新。请按新版 setup 模板调整决策票状态与阻塞判定；旧的 triage 状态决策票需要逐张确认含义，不应机械转换为 `resolved`。
-
-## 流程图 A：wayfinder 规划管线
-
-```mermaid
-flowchart TD
-    S["setup-matt-pocock-skills<br/><i>手动 · 每个仓库一次</i>"] --> W["wayfinder：建图<br/><b>手动</b>"]
-    W --> G["Grilling：命名目的地 +<br/>侦察雾区<br/>grilling + domain-modeling"]
-    G -->|"无雾"| N["不需要地图：直接开工"]
-    G -->|"有雾"| M["创建 map issue"]
-    M --> T["创建 tickets + 布线 blocking"]
-    T --> L["票循环：claim → 讨论 →<br/>暂停／完成时保存进度"]
-    L --> LH["lighthouse<br/><b>自动</b>"]
-    LH --> BT["backtracer<br/><b>自动</b>"]
-    BT --> OWN["把已确认 gap 问题<br/>加入责任票"]
-    OWN -->|"剩余问题"| CG{"剩余批次<br/>只选一次方式"}
-    OWN -->|"全部归属或无缺口"| L
-    CG -->|"一张票：剩余批次"| T
-    CG -->|"当前会话 grilling"| BG["调用 /grilling<br/>确认并记录结论"]
-    BG --> L
-    L -->|"所有票已解决"| TR["traverse：终审<br/><b>手动</b>"]
-    TR --> CG2{"本轮整批问题<br/>只选一次方式"}
-    CG2 -->|"一张票：全部问题"| T
-    CG2 -->|"当前会话 grilling"| TG["调用 /grilling<br/>确认并记录结论"]
-    TG --> R{"无 open 票<br/>且无未决问题？"}
-    R -->|"是"| TS["to-spec<br/><b>手动</b>"]
-    R -->|"否：继续收口"| L
-    CG2 -->|"无缺口"| R
-    TS --> TC["to-contract<br/><b>手动</b>"]
-    TC -.->|"to-tickets / implement"| X["…"]
-
-    style LH fill:#e6ffe6,stroke:#2b6cb0,stroke-width:2px
-    style BT fill:#e6ffe6,stroke:#2b6cb0,stroke-width:2px
-    style TR fill:#fff3e0,stroke:#2b6cb0,stroke-width:2px
-    style W fill:#fff3e0,stroke:#dd6b20
-    style S fill:#f3e8ff,stroke:#805ad5,stroke-width:2px
-    style TS fill:#fff3e0,stroke:#2b6cb0,stroke-width:2px
-    style TC fill:#fff3e0,stroke:#2b6cb0,stroke-width:2px
-    style X fill:#f4f4f4,stroke:#999,stroke-dasharray:5 5
-```
-
-- wayfinder 循环内只有两个手动触发点：`wayfinder` 本身和 `traverse`（终审）；其后的交接 `to-spec` → `to-contract` 同样是手动。
-- 暂停、保存进度／切换或决策票完成时，wayfinder 才进入发布边界，调用 `lighthouse` 与 `backtracer`。普通确认与已批准修订先留在当前对话；边界之前持久化文档可以滞后。边界上批量发布累积结果、一次性保存当前票的 Handoff 并追踪已发布变化。暂停在发布后释放未完成票的认领，保存进度则保留认领。恢复只读取该票的当前恢复入口及本题所需的 Lighthouse 主题，不加载全部票体或 Lighthouse。用户可点名另一票中输入已具备的局部问题，不代表该票整体解锁。
-- `backtracer` 从已发布结果回溯地图中已经决定的上下游问题，复用本次调用已有的来源，报告缺口与矛盾。它只在用户确认某个 gap 需要跟进时，把该未答问题加入拥有它的下游票；不同步消费者输入、不复制政策、不整理旧 Handoff。只有无人认领的已确认 gap 问题进入[共享后续处理协议](skills/backtracer/GAP-FOLLOWUP.md)；`traverse` 在所有票解决后运行，直接传入终审的未决问题批次。用户对传入批次只选一次方式：**当前会话 grilling** 直接加载并执行 `/grilling`；**生成一张 ticket** 把全部问题及证据收进一张 open 的 grilling 决策票，关联地图并布线，不立即开始讨论。当前会话的结论确认后更新原 Lighthouse 权威及地图；明确延期的问题记入 **Not yet specified**。traverse 终审收尾时，新增票未解决或仍有未决雾区就返回规划，而不进入 `/to-spec`。
-- 管线依次交给 `to-spec` 与 `to-contract`，两者都由本仓库发布。`implement` 属于 mattpocock/skills；本仓库 vendoring `to-tickets` 与 `ask-matt`（本地票目录改名 + 契约门）。
-
-颜色图例：蓝色粗边框 = 本仓库新增的 skill · 绿色 = 自动调用 · 橙色 = 手动触发 · 紫色 = 一次性 setup · 灰色虚线 = 上游 / 本仓库之外。
-
-## 流程图 B：`/spec-to-code`：spec 到代码（仅 Oh My Pi）
-
-spec 位于 `.scratch/<slug>/spec.md`（由 `/to-spec` 发布）、已批准契约位于 `.scratch/<slug>/contract.md`（由 `/to-contract` 写入；Phase 1 的 `to-tickets` 强制要求它），运行 `/spec-to-code <slug>`。这一条命令是唯一的手动步骤。之后全部自动运行。在 `to-tickets` 阶段，agent 的 `ask` 会被自动代答为「请你仔细思考后回答这个问题」，不再等待人工输入；每次回合结束发送一条自动回复。默认走旧的原生序列（先「请你仔细思考后回答这些问题」，之后「请生成文件」）；在 `extensions/spec-to-code/config.json` 里开启 `jev.enabled: true` 后，扩展改问 `judge` 角色链（优先 TypeSafe Jev）决定回复 —— 第一轮只提供「请你仔细思考后回答这些问题」/「请生成文件」，第二轮起加入「请继续」。Jev 模式下第二轮起，ticket 一旦落盘就直接结束 Phase 1、不再请求 Jev，已发布的票不会被反复催促。每次自动代答或自动续跑都会消耗一个有界预算（15 次），用尽后停止该阶段并给出通知，而不是无限循环；但若 ticket 文件已生成，则直接进入 Phase 2。
-
-```jsonc
-// extensions/spec-to-code/config.json —— 扩展加载时读取一次
-{
-  "jev": {
-    "enabled": false          // 可选开启；需要有凭证的原生 judge（如 typesafe/jev-latest）
-  }
-}
-```
-
-```mermaid
-flowchart TD
-    P["spec 文件<br/>.scratch/&lt;slug&gt;/spec.md"] --> CT["契约文件<br/>.scratch/&lt;slug&gt;/contract.md"]
-    CT --> C["/spec-to-code &lt;slug&gt;<br/><b>手动启动</b>"]
-    C --> A["激活 to-tickets<br/><b>自动</b>"]
-    A --> Q{"tickets 已落盘？<br/>（Jev 模式：第 2 轮起）"}
-    Q -->|"否"| QA["自动回复本轮<br/>（ask：自行思考；<br/>其余由 Jev 或旧序列决定）"] --> A
-    Q -->|"是"| P2["Phase 2<br/><b>自动</b>"]
-    P2 --> ORD["按依赖关系排序"]
-    ORD --> TD["逐个 task(agent=tdd)：串行<br/>每个等待前一个完成"]
-    TD --> RT["每次 TDD 结束后：原会话后台 retro<br/>失败和 retry 分别记录，不阻塞下一次 TDD"]
-    TD --> FIN["全部 TDD 与 retry 结束<br/>spec_to_code_finish"]
-    RT --> FIN
-    FIN --> DONE["等待所有 retro 终态<br/>输出实现与复盘的独立摘要"]
-
-    style C fill:#fff3e0,stroke:#dd6b20
-```
-
-扩展中的 `tdd` agent（`extensions/agents/tdd.md`）执行实现；宿主在每次 task 返回后启动原会话的后台 retro，不要求 TDD agent 自行加载 retro。`to-tickets` 与 `tdd` 两个 skill 来自上游、在本仓库被改造：`to-tickets` 强制要求契约，`tdd` 则从被指派的工作中取得验收标准、覆盖 ID 与 seam。前置条件（`to-tickets` skill、`tdd` skill 或 `tdd` agent）由扩展自动检查、立即报错，无需手动确认。
-
-### 后台复盘与状态留存
-
-每次 TDD 执行（包括失败及独立 retry）对应一份复盘。父 session 按依赖排序、串行派发单票 task；`task.name` 必须是 implementation 中的完整票据文件名，retry 复用名称但获得新的执行标识。retro 与后续 TDD 并行，暂不限制并发。父 session 在全部 TDD 与 retry 结束后调用 `spec_to_code_finish`，等待所有复盘达到成功或失败终态后汇总；复盘失败不阻塞 TDD，不自动重试，也不改变实现结果。
-
-宿主加载未修改的上游 retro 和写作指导，原 TDD 会话返回复盘正文，宿主写入：
-
-```text
-.scratch/<feature>/retro/<ticket-file>/<run-id>.json
-.scratch/<feature>/retro/<ticket-file>/<run-id>.md
-```
-
-JSON 留存本次 TDD 结果、独立 retro 状态和错误；成功的 Markdown 包含 `agent`、`agent_id`、本地 `session_id`、`session_file`、父会话、`workspace`、`execution_cwd`、ticket、执行标识及时间。运行中状态保存在内存，文件只供追溯，不是重启恢复队列。进程异常退出后遗留的 running/pending 只是最后记录状态，不会自动续跑。
-
-缺少 retro/写作指导、原会话无法恢复、隔离执行、正文为空或截断、文档写入失败时，报告复盘未交付；记录写入失败也会明确报告。每轮 retro 的执行上限为 5 分钟。切换或关闭所属 session 会取消后台复盘。当前只依据对话历史，不增加工作区快照或 worktree 改造。原 TDD 输出在启动复盘前单独保存，复盘不覆盖其执行器产物。详见 [宿主编排说明](docs/tdd-subagent-retro-host-orchestration.md)。
-
-验证：`bun test extensions/spec-to-code/retro-workflow.test.ts`。
-
-## 源文件与构建
-
-八个被改造的 skill 以完整目录发布，与上游的差异以数据形式保存：
-
-- `upstream/`：整目录拷贝进来的八个上游 skill 目录；里面多出来的文件（例如 `agents/openai.yaml`）无所谓，构建会忽略它们。
-- `deltas/manifest.json` 只保留 `files` 白名单，列出本仓库为这八个 skill 发布的全部十七个文件。只有列表中的文件会从 `upstream/` 读取并写入 `skills/`；这两个 `skills/<skill>/` 目录下的其他文件会被构建删除。
-- [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md)、[deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md)、[deltas/mappings/to-spec.md](deltas/mappings/to-spec.md)、[deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md)、[deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md)、[deltas/mappings/prototype.md](deltas/mappings/prototype.md)、[deltas/mappings/code-review.md](deltas/mappings/code-review.md)、[deltas/mappings/tdd.md](deltas/mappings/tdd.md) 同时是映射源文件和人类审核入口。每个 op 把目标、ID、理由和编辑放在一起；白名单中没有映射的文件原样继承。
-- `skills/`：安装产物。`lighthouse`、`backtracer`、`traverse`、`to-contract` 为手写；manifest 里列出的十七个文件为生成物，**不要手工编辑**。
-
-票规则按职责维护：wayfinder 定义决策生命周期、发布边界与完成流程；本地 tracker 模板定义存储和字段，完成步骤指回 wayfinder；triage 模板只维护实现票词汇。范围外处置必须完成依赖检查后再回到主流程，发布边界（暂停／完成）才调用 backtracer，普通回答不调用。
-
-[Local ticket handoff](skills/wayfinder/SKILL.md#local-ticket-handoff) 统一定义当前恢复入口、旧交接合并规则与发布边界。[wayfinder mappings](deltas/mappings/wayfinder.md) 中的发布／完成 hooks：[grilling-pause](deltas/mappings/wayfinder.md#grilling-pause) 负责边界流程和最后释放认领；[lighthouse-on-resolution](deltas/mappings/wayfinder.md#lighthouse-on-resolution) 负责完成时批量发布；[out-of-scope-disposition](deltas/mappings/wayfinder.md#out-of-scope-disposition) 负责范围外处置流程；[backtracer-on-resolution](deltas/mappings/wayfinder.md#backtracer-on-resolution) 负责两条流程共享的 tracing；[map-invalidation-boundary](deltas/mappings/wayfinder.md#map-invalidation-boundary) 防止上游结果授权批量修改消费者。
-
-工作循环入口按行为分别维护：`processing-type-read` 读取类型，`grilling-context-reuse` 恢复已保存上下文，`grilling-frontier-refresh` 重算可讨论问题及跨票转向，`grilling-opening-brief` 展示目标句。这些 op 按上述顺序在同一个上游 resolution anchor 前追加，再由 `recorded-type-work` 替换该 anchor。`grilling-pause-trigger` 负责暂停请求与授权边界，`grilling-pause` 负责暂停流程。本次仅拆分 mapping，生成技能逐字节不变。
-
-[跨票确认](skills/wayfinder/SKILL.md#cross-ticket-confirmation) 负责提前回答其他票问题时的局部发布；对应行为、文件名提示与认领例外分别维护在 `cross-ticket-confirmation`、`cross-ticket-filename` 和 `cross-ticket-claim-exception` mapping op 中。
-
-直接在 `deltas/mappings/` 下的八份文档中编辑映射：
-
-- 文档以 `# <skill>` 开头，用 `## <skill>/<file>` 指定有改动且位于白名单内的目标，用 `### <op-id>` 标识每个 op。ID 使用小写 kebab-case，在同一 skill 内唯一。每个 op 包含简短理由和恰好一个反引号围栏的 `op` 块。
-- 每个 op 只拥有一个可独立修改的 fork 行为，按行为而不是当前步骤编号命名。与该行为无关的上游措辞留在编辑之外；能唯一定位时，也留在 anchor 之外。优先锚定上游快照，而不是前面 op 生成的文本；必要的执行顺序依赖写入理由。重新指定上游 anchor 与修改 fork 行为分开进行。只重构 mappings 时，`skills/` 产物必须逐字节保持不变。
-- 一个 op = 一个 `anchor:` 加上作用在它内部的若干编辑。anchor 是上游文件中的一段文本，必须恰好命中一次；这一次命中为整个 op 把关：只要它还匹配，所有编辑自动生效；一旦上游改动了它，构建失败，由人重新指定 anchor。
-- `find:` / `content:` 成对出现，把 `find` 替换为 `content`。同一个 op 内，连续的改动用一组替换表达，必要的步骤编号调整一并包含；分散的改动才使用多组，中间不变的文本留在替换之外。每一对都针对 anchor 的原文求解，所以它们在块中的顺序无关紧要，且两个编辑不得重叠。`find` 必须在 anchor 内恰好命中一次；`content` 为空表示删除。让 `find` 尽量等于改动本身，而不是它周围的上下文：宽 `find` 不影响构建行为（门禁是 anchor），但会把上下文重复进 `content`、掩盖补丁真正拥有的内容。当 `find` 可证明地与其 `content` 共享词边界上下文时，构建会给出 warning。
-- `insert:` 把内容放到 anchor 中 `<oh-my-wayfinder:insert>` 标记处，每个 anchor 最多一个标记。匹配前会先剥掉标记，因此 anchor 读起来仍是插入点周围的字面上游文本。
-- 字段值使用块标量：`field: |` 保留一个末尾换行，`field: |-` 去掉它；很短的单行值可以内联（`find: on resolution`）。块标量的每一行缩进两个空格，使用 LF 换行并保留文件末尾换行。
-- 当 `branch` 容易被误读为 Git 操作时，按用途命名流程选择，例如原型 `mode` 或结果处理 `procedure`。mapping 的 anchor 和 find 中引用的上游原文保持不变。
-- Markdown 表格在原始文本中也要保持列对齐。对齐 `content:` / `insert:` 中编写的表格和手写 skill 中的表格；`anchor:` / `find:` 中的上游原文保持不变。
-- 同一目标内按文档顺序执行 op，后项处理前项修改后的文本。anchor 或编辑缺失、有歧义、相互重叠，以及无实际改动和格式损坏，都会导致构建失败。
+## 维护命令
 
 ```bash
-node deltas/build.mjs                         # 重新生成 skills/，并刷新 deltas/preview.html
-node deltas/build.mjs --check                 # 只校验 skills/，不写文件或刷新 preview
-node deltas/preview.mjs                       # 仅刷新 deltas/preview.html
-node deltas/check-upstream.mjs                # 列出与上游 HEAD 有差异的 skill
+node deltas/build.mjs                         # 生成 skills 并刷新 preview
+node deltas/build.mjs --check                 # 只检查生成一致性，不写文件
+node deltas/preview.mjs                       # 仅刷新 preview
+node deltas/check-upstream.mjs                # 比较快照与上游 HEAD
 node deltas/check-upstream.mjs --verbose      # 同时列出具体差异文件
-node deltas/check-upstream.mjs --local <dir>  # 对比已有的上游 checkout
+node deltas/check-upstream.mjs --local <dir>  # 与本地上游 checkout 比较
 ```
 
-`check-upstream.mjs`：默认通过 GitHub API 把白名单文件与上游 HEAD 逐一比较，任何一个 skill 有差异就以非零码退出。
-
-`check-upstream.mjs --local <dir>` 与本地仓库比较，例如 `--local ../mattpocock-skills`。
-
-`build.mjs` 成功完成技能构建后会自动刷新 `deltas/preview.html`，即使 skill 文件没有变化也会刷新。Preview 生成失败时，build 同样以失败退出。`build.mjs --check` 保持只读，不生成或刷新 preview；仍可单独运行 `preview.mjs`。
-
-`preview.mjs` 生成 `deltas/preview.html`（已加入 `.gitignore`），不必手工阅读 op 块即可审阅 mapping：单个自包含页面，无需起服务、无依赖，把每个 op 呈现为 `upstream/` 与重新生成的 `skills/` 之间的 GitHub 风格 diff。每个变更块都标注了产生它的 op，点击标注即可看到该 op 的理由、anchor 与编辑。它通过与构建共用的 `deltas/ops.mjs` 重放这些 op，并与已提交的 `skills/` 文件比对，因此不会与构建对某个 op 的理解产生分歧。
-
-当前快照来自 mattpocock/skills 提交 `f3fc5632f401156837ee3872f14fe33ccf1024ea`。更新时，先将选定上游 checkout 的八个完整 skill 目录（`wayfinder`、`setup-matt-pocock-skills`、`to-spec`、`to-tickets`、`ask-matt`、`prototype`、`code-review`、`tdd`）同步到 `upstream/`；再基于新基线调整 mapping 的 anchor 与编辑，同时保留上游修复和已确认的 fork 语义。随后运行 `node deltas/build.mjs`，检查生成差异，执行 `node deltas/build.mjs --check`、`check-upstream.mjs --local <checkout>`，并演练受影响的流程分支。仅通过构建一致性检查，不代表上游快照已更新。当上游改写了某个 op 的 anchor 依赖的文本时，构建会大声失败并指出该 op；列表中的文件若被上游删除，构建同样会失败。仍有一个盲区：anchor 触及文件末尾的 op 无法察觉上游在该 anchor 之后追加的内容，因此请检查重新生成的 `skills/` diff，确认替换之后没有残留的上游文本。
+修改生成技能时应编辑 mapping，而不是生成文件。源码归属、mapping 语法和上游同步步骤见[维护指南](docs/maintenance.cn.md)。
 
 ## 致谢
 
-本仓库的核心是 **[mattpocock/skills](https://github.com/mattpocock/skills)**。感谢 Matt Pocock 构建并以 MIT 协议开源这套技能，也感谢 [skills.sh](https://skills.sh/mattpocock/skills) 安装器与[新闻通讯](https://www.aihero.dev/s/skills-newsletter)让整个生态持续运转。同时感谢 [Oh My Pi](https://github.com/can1357/oh-my-pi) 项目，本扩展所服务的 agent 平台。
+本项目建立在 [mattpocock/skills](https://github.com/mattpocock/skills) 之上。感谢 Matt Pocock 提供工程工作流并以 MIT 协议开源技能，感谢 [skills.sh](https://skills.sh/mattpocock/skills) 与 [AI Hero 新闻通讯](https://www.aihero.dev/s/skills-newsletter)，以及为可选自动化扩展提供平台的 [Oh My Pi](https://github.com/can1357/oh-my-pi)。
 
 ## License
 

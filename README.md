@@ -2,212 +2,120 @@
 
 [中文文档](./README.cn.md)
 
-A fork of **[mattpocock/skills](https://github.com/mattpocock/skills)**, the engineering skills for AI agents. It is extended with new planning-quality skills and an automation extension for the **[Oh My Pi](https://github.com/can1357/oh-my-pi)** agent.
+**Keep decisions intact across sessions. Make requirements testable before implementation. Learn from each execution.**
 
-This repository reworks eight upstream skills (`wayfinder`, `setup-matt-pocock-skills`, `to-spec`, `to-tickets`, `ask-matt`, `prototype`, `code-review`, `tdd`) and ships them as **complete skill directories** (files that need no change are copied from upstream verbatim), plus the new `lighthouse` / `backtracer` / `traverse` / `to-contract` skills, and the Oh My Pi extension. Install Matt's skills first, then overlay this repo's files on top (see [Quick Start](#quick-start)).
+Oh My Wayfinder is a non-invasive fork of [mattpocock/skills](https://github.com/mattpocock/skills) for AI-assisted engineering. It extends the upstream workflow for large efforts that need more than one conversation, and offers optional automation for [Oh My Pi](https://github.com/can1357/oh-my-pi) (OMP).
 
-## Quick Start
+## Why this fork?
 
-> Make sure you understand the wayfinder flow before you start. It is the core this repo builds on (see [Flow A](#flow-a-the-wayfinder-planning-pipeline)).
+### A conversation can stop before a decision is finished
 
-This repo is a delta on top of Matt's set, so: install upstream first, then overlay.
+Large efforts involve research, prototypes, and decisions that depend on one another. An unfinished question should not prevent a confirmed result from being useful, and a new session should not have to reconstruct the entire discussion.
+
+This fork adds pause and recovery to Wayfinder, publishes confirmed decisions as shared authorities, and checks their prerequisites for gaps and conflicts. A final audit checks the whole design before it becomes a specification. The goal is continuity without turning every ticket into a copy of every other ticket's policy.
+
+### Passing tests are not enough if they lost the requirement
+
+Requirements can disappear while work is split into tickets. Tests can also end up confirming the implementation rather than testing the behavior that was promised.
+
+This fork separates the specification from an approved contract of promises and test seams, assigns delivery and coverage responsibilities to implementation tickets, and strengthens TDD around those responsibilities. The aim is a traceable path from an approved requirement to evidence that can detect its violation—not just a green test suite.
+
+### Finishing implementation should not discard what it taught you
+
+Upstream already provides Retro. The OMP extension makes it part of automated execution: each TDD execution gets a separate retrospective, with implementation and retrospective outcomes reported independently. Suggestions are recorded, not automatically applied; a completed run is not itself proof of acceptance.
+
+## At a glance
+
+The repository has two parts: **portable Markdown skills** for agents that support them, and an **OMP-only extension** for continuous, unattended execution. Other agents can complete the portable planning and implementation workflow by invoking skills manually; they do not need the OMP extension.
+
+These diagrams show the large-effort route, not every upstream branch or execution rule.
+
+### Upstream
+
+```mermaid
+flowchart LR
+    W["Wayfinder<br/>decision discussions"] --> S["To-spec"]
+    S --> T["To-tickets"]
+    T --> I["Implement / TDD"]
+    I --> R["Retro"]
+    classDef upstream fill:#f3f4f6,stroke:#6b7280,color:#111827;
+    class W,S,T,I,R upstream;
+```
+
+### This fork
+
+```mermaid
+flowchart TB
+    subgraph PLAN["Decision planning"]
+        direction LR
+        W["Wayfinder<br/>pause and resume"] --> L["Lighthouse<br/>publish decisions"]
+        L --> B["Backtracer<br/>trace prerequisites"]
+        B --> V["Traverse<br/>final audit"]
+    end
+    subgraph PREP["Implementation preparation"]
+        direction LR
+        S["To-spec"] --> C["To-contract"]
+    end
+    subgraph OMP["OMP: /spec-to-code automation (optional)"]
+        direction LR
+        T["To-tickets"] --> I["TDD execution"]
+        I --> R["Retro per execution"]
+    end
+    PLAN --> PREP --> OMP
+    classDef added fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;
+    classDef changed fill:#fff7ed,stroke:#c2410c,color:#7c2d12;
+    class V,L,B,C added;
+    class W,S,T,I,R changed;
+    style PLAN fill:none,stroke:#d1d5db
+    style PREP fill:none,stroke:#d1d5db
+    style OMP fill:none,stroke:#6b7280,stroke-dasharray:5 5
+```
+
+**Blue** marks new skills; **orange** marks changed responsibilities or integration. Lighthouse and Backtracer participate at decision-publication boundaries; Traverse audits the completed map. The diagrams omit repeated discussions, pause/resume branches, and gap follow-up. The dashed box marks what OMP automates, not a requirement to use OMP.
+
+Skill-level automatic calls are instructions executed by the agent, not an independent scheduler. `/spec-to-code` additionally provides host-driven orchestration. It starts with a prepared spec and approved contract, automates ticket creation and serial TDD, and adds automatic Retro calls.
+
+For the design changes and their mapping operations, see the [upstream comparison blueprint](docs/upstream-differences.md).
+
+## Quick start
+
+No agent modifications or custom installer are required for the skills: install upstream, then copy the overlay.
 
 1. Install Matt's skills: `npx skills@latest add mattpocock/skills`.
-2. Copy this repo's `skills/` directory over the installed skill directory. Files with the same name replace upstream's; the rest are plain additions.
-3. Oh My Pi users: copy `extensions/spec-to-code.ts`, the entire companion `extensions/spec-to-code/` directory, and `extensions/agents/tdd.md` into your extension setup, preserving their relative layout. Background retrospectives use the installed upstream `retro` and `writing-for-agents` skills without modifying them.
+2. Copy the contents of this repository's `skills/` into your agent's installed skill directory, preserving each skill directory. Replace files with the same name and include the new directories.
+3. Run `/setup-matt-pocock-skills` in the project where you will use them. If that project already uses Matt's skills, rerun setup to review and confirm updates to its persistent configuration. Replacing installed skills does not update project configuration or migrate existing tickets automatically.
+4. Not sure where to start? Invoke `/ask-matt` to choose a skill for your situation.
 
-Then run `/setup-matt-pocock-skills` once per repo, as with the upstream set.
+**Scope:** Wayfinder's extended pause/publication/backtrace loop currently targets the local Markdown tracker, not the GitHub/GitLab tracker setups.
 
-## What's inside
+**OMP users:** install and run the optional extension using the [spec-to-code guide](docs/spec-to-code.md). Copying skills alone does not install `/spec-to-code`.
 
-**Part 1: Generic skills** (agent-agnostic; work with any agent that loads markdown skills)
+## Further reading
 
-The planning loop they drive: `wayfinder` charts an effort too big for one session as a map of decision tickets on your issue tracker; confirmed results are captured incrementally in a **lighthouse** document at a pause or completion; **backtracer** traces signals across the map to surface gaps; **traverse** audits the completed map end to end before it hands off to `to-spec`, which publishes the spec; `to-contract` then turns that spec into an approved contract (the promises the build is held to, and the seams at which they are observed), and `to-tickets` slices the contract.
+| I want to… | Read |
+|---|---|
+| Choose the next skill | [Ask Matt](skills/ask-matt/SKILL.md) |
+| Understand what this fork changes and where | [Upstream comparison blueprint](docs/upstream-differences.md) |
+| Install, configure, and run OMP automation | [Spec-to-code guide](docs/spec-to-code.md) |
+| Edit mappings, build skills, or update upstream | [Maintenance guide](docs/maintenance.md) |
 
-**Part 2: [Oh My Pi](https://github.com/can1357/oh-my-pi) automation extension** (`@oh-my-pi/pi-coding-agent` only)
-
-`/spec-to-code` turns a spec into implementation tickets and executes them with serial TDD subagents: one command, fully automatic. Irrelevant if you use another agent; ignore it.
-
-## What's new compared to upstream
-
-| Skill | Type | What it does | When it runs | Trigger |
-|---|---|---|---|---|
-| `lighthouse` | **New** | Produces or updates a lighthouse document from confirmed Wayfinder results, including partial results: the decision, user stories, preconditions, postconditions, and invariants. It is the single source of truth backtracer traces. | On a pause or ticket completion | **Auto** (invoked by wayfinder) |
-| `backtracer` | **New** | Backtraces published results through already-decided prerequisites to surface missing questions, layer gaps, asymmetry, and concrete conflicts; it adds a downstream question only for a user-confirmed gap. | At a publication boundary, or for a concrete conflict | **Auto** (invoked by wayfinder) / manual investigation |
-| `traverse` | **New** | Final audit of a completed map: builds the design tree and walks every branch of the entire tree, checking dependency coverage, peer symmetry, layer integrity, and boundary completeness. | After all wayfinder tickets are resolved, before to-spec | **Manual** |
-| `to-contract` | **New** | Turns a spec into an approved contract: promises and a lightweight test-seam sketch, preferring existing seams; substantial interface redesign requires user approval. Writes `.scratch/<feature>/contract.md`. | Between to-spec and to-tickets | **Manual** |
-| `wayfinder` | **Modified** | Upstream skill, reworked: supports pause/resume with lighthouse + backtracer and still traces ticket completion, separates decision tickets (`.scratch/<feature>/decision/`) from implementation tickets (`.scratch/<feature>/implementation/`), routes gap decisions through the user | When an effort is too big for one agent session | **Manual** |
-| `setup-matt-pocock-skills` | **Modified** | Upstream setup skill, lightly adapted (tracker options, triage labels, domain-doc layout) | Once per repo, before first use | **Manual** |
-| `to-spec` | **Modified** | Upstream skill, reworked: the seam sketch and the seam half of Testing Decisions move to `to-contract`; publishing a spec points at `/to-contract` as the next step. | Turning a conversation into a spec | **Manual** |
-| `to-tickets` | **Modified** | Upstream skill, reworked: local-tracker output moved to `.scratch/<feature>/implementation/`, an approved contract is required input, tickets declare `Delivers` (or enabling), and the quiz asks the coverage questions. | Splitting a spec or plan into tickets | **Manual** |
-| `ask-matt` | **Modified** | Router text: the local tracker path is now `.scratch/<feature>/implementation/`, with guidance for the new skills and changes to the existing flow | Asking which skill fits | **Manual** |
-| `prototype` | **Modified** | Upstream skill, reworked: when the question is answered it hands back a `prototype/<name>` worktree holding the chosen result and a `VERDICT.md`, restores the working tree, and writes no spec, issue, or ticket | Answering one design question with throwaway code | **Manual** |
-| `code-review` | **Modified** | Upstream skill, reworked: the default review target is the uncommitted changes against `HEAD` (untracked files included, `.gitignore` respected); supplying a fixed point still reviews the committed range | Reviewing work in progress, a branch, or a PR | **Manual** |
-| `tdd` | **Modified** | Upstream skill, reworked: execution is ticket-driven — the acceptance criteria, coverage ownership and approved seams come from the assigned work — and the loop adds design-before-red, preserve-the-criterion and check-the-evidence rules, plus completion requirements | Building a feature or fixing a bug test-first | **Manual** |
-| `spec-to-code` + `tdd` agent | **Extension** (OMP only) | Spec → implementation tickets → serial TDD with per-attempt background retro and independent outcome records; optional Jev-driven turn replies | When you have a spec you want implemented | **Manual kickoff**, then automatic |
-
-In the skill rows, "Auto" means the calling skill mandates the step as part of its flow: an instruction-level guarantee, not a separate scheduler. The OMP extension additionally schedules background retro and gates final draining in host code.
-
-## Supported trackers (for now)
-
-The automatic part of this pipeline, the mandatory `lighthouse` and `backtracer` steps at a pause or ticket completion, is wired for the **local markdown tracker** only (`.scratch/<feature>/decision/` for planning, `.scratch/<feature>/implementation/` for implementation tickets). The GitHub and GitLab tracker setups ship from upstream unchanged and still describe upstream's plain resolve step, so this repo does not support them yet.
-
-That is a deliberate later step, not an oversight.
-
-**Local directory rename (breaking for local trackers).** Implementation tickets moved from `.scratch/<feature>/issues/` to `.scratch/<feature>/implementation/`, and the vocabulary changed from "task ticket" to "implementation ticket". Existing setups are not migrated.
-
-**Decision lifecycle:** local decision tickets use only `open → claimed → resolved`; `Type:` remains the processing method. `resolved` records a decision or confirmed out-of-scope disposition, independently of production delivery. Research and prototype code may be evidence. Triage applies only to implementation tickets. Out-of-scope dispositions go in the map’s **Out of scope**, not **Decisions so far**; review their dependents before advancing the frontier, since a disposition does not supply the abandoned answer.
-
-Existing project tracker docs are not automatically refreshed. Reconcile their decision statuses and blocking rule with the updated setup templates; review old triage-marked decision tickets individually rather than translating them mechanically to `resolved`.
-
-## Flow A: the wayfinder planning pipeline
-
-```mermaid
-flowchart TD
-    S["setup-matt-pocock-skills<br/><i>manual · once per repo</i>"] --> W["wayfinder: chart the map<br/><b>manual</b>"]
-    W --> G["Grilling: name the destination,<br/>scout the fog<br/>grilling + domain-modeling"]
-    G -->|"no fog"| N["No map needed:<br/>build directly"]
-    G -->|"fog found"| M["Create the map issue"]
-    M --> T["Create tickets +<br/>wire blocking edges"]
-    T --> L["Ticket loop:<br/>claim → discuss →<br/>save on pause/completion"]
-    L --> LH["lighthouse<br/><b>auto</b>"]
-    LH --> BT["backtracer<br/><b>auto</b>"]
-    BT --> OWN["Add confirmed gap questions<br/>to their owning tickets"]
-    OWN -->|"remaining questions"| CG{"Remaining batch<br/>choose mode once"}
-    OWN -->|"all assigned or no findings"| L
-    CG -->|"one ticket: remaining batch"| T
-    CG -->|"grill now"| BG["Invoke /grilling<br/>confirm + record outcomes"]
-    BG --> L
-    L -->|"all tickets resolved"| TR["traverse: final audit<br/><b>manual</b>"]
-    TR --> CG2{"Whole audit<br/>choose mode once"}
-    CG2 -->|"one ticket: all questions"| T
-    CG2 -->|"grill now"| TG["Invoke /grilling<br/>confirm + record outcomes"]
-    TG --> R{"No open tickets<br/>or unresolved findings?"}
-    R -->|"yes"| TS["to-spec<br/><b>manual</b>"]
-    R -->|"no: resolve remaining work"| L
-    CG2 -->|"no findings"| R
-    TS --> TC["to-contract<br/><b>manual</b>"]
-    TC -.->|"to-tickets / implement"| X["…"]
-
-    style LH fill:#e6ffe6,stroke:#2b6cb0,stroke-width:2px
-    style BT fill:#e6ffe6,stroke:#2b6cb0,stroke-width:2px
-    style TR fill:#fff3e0,stroke:#2b6cb0,stroke-width:2px
-    style W fill:#fff3e0,stroke:#dd6b20
-    style S fill:#f3e8ff,stroke:#805ad5,stroke-width:2px
-    style TS fill:#fff3e0,stroke:#2b6cb0,stroke-width:2px
-    style TC fill:#fff3e0,stroke:#2b6cb0,stroke-width:2px
-    style X fill:#f4f4f4,stroke:#999,stroke-dasharray:5 5
-```
-
-- Inside wayfinder's loop the only manual triggers are `wayfinder` itself and `traverse` (the final audit); the handoff that follows, `to-spec` then `to-contract`, is manual too.
-- `lighthouse` and `backtracer` run at Wayfinder's publication boundary: a user-requested pause, saved progress/switch, or ticket completion. Ordinary confirmations and approved revisions stay in the conversation until then; a ticket's persistent documents may lag that boundary. At the boundary, Wayfinder publishes accumulated results through Lighthouse, saves the working ticket's Handoff once, and traces the published changes. A pause releases the unfinished-ticket claim after publication; saved progress keeps it. Resume loads the ticket's current recovery entry and the Lighthouse topics its question needs, not every ticket body or Lighthouse. A user-named ready question can be discussed in another ticket without declaring its whole scope unblocked.
-- `backtracer` backtraces the published results through the map's already-decided questions, reusing sources already in the call, to report gaps and contradictions. It writes to a downstream ticket only to add a confirmed gap question that ticket owns; it does not synchronize consumer inputs, copy policy, or consolidate legacy layouts. Only unassigned confirmed gap questions enter [the shared follow-up protocol](skills/backtracer/GAP-FOLLOWUP.md); `traverse`, which starts after all tickets are resolved, supplies its unresolved audit batch directly. For the supplied batch, choose once: **grill now** loads and executes `/grilling` in the current conversation; **create one ticket** puts all questions and their evidence in one open grilling decision ticket, wired into the map, without starting the discussion. Confirmed in-session resolutions update the existing Lighthouse authority and map; explicitly deferred findings go to **Not yet specified**. At traverse's final handoff, an open follow-up ticket or unresolved fog returns the map to planning instead of `/to-spec`.
-- The pipeline hands off to `to-spec`, then `to-contract`; both ship in this repo. `implement` ships in mattpocock/skills; this repo vendors `to-tickets` and `ask-matt` as well (the local ticket directory rename, plus the contract gate).
-
-Legend: blue outline = new skills in this repo · green = auto-invoked · orange = manual trigger · purple = one-time setup · gray dashed = upstream / beyond this repo.
-
-## Flow B: `/spec-to-code`: spec to code (Oh My Pi only)
-
-Run `/spec-to-code <slug>` with the spec at `.scratch/<slug>/spec.md` (published by `/to-spec`) and its approved contract at `.scratch/<slug>/contract.md` (written by `/to-contract`; phase 1's `to-tickets` requires it). That single command is the only manual step. Everything after it runs automatically. While `to-tickets` runs, any `ask` is auto-answered with "请你仔细思考后回答这个问题" instead of waiting for a person, and each turn ending sends one follow-up. By default that follow-up is the pre-Jev canned sequence ("请你仔细思考后回答这些问题", then "请生成文件"); with `jev.enabled: true` in `extensions/spec-to-code/config.json` the extension asks the `judge` role chain (TypeSafe Jev first) to choose the reply — round 1 offers only "请你仔细思考后回答这些问题" / "请生成文件", and "请继续" joins from round 2 on. From round 2 on, tickets already on disk end phase 1 without another judge call, so a published set is never re-nagged. Every automatic answer or follow-up spends a bounded budget (15); exhausting it stops the phase with a notification instead of looping — unless ticket files already exist, in which case phase 2 starts.
-
-```jsonc
-// extensions/spec-to-code/config.json — read once at extension load
-{
-  "jev": {
-    "enabled": false          // opt-in; needs a credentialed native judge (e.g. typesafe/jev-latest)
-  }
-}
-```
-
-```mermaid
-flowchart TD
-    P["Spec at<br/>.scratch/&lt;slug&gt;/spec.md"] --> CT["Contract at<br/>.scratch/&lt;slug&gt;/contract.md"]
-    CT --> C["/spec-to-code &lt;slug&gt;<br/><b>manual kickoff</b>"]
-    C --> A["to-tickets activated<br/><b>auto</b>"]
-    A --> Q{"Tickets landed on disk?<br/>(Jev mode: round 2 on)"}
-    Q -->|"no"| QA["Auto-answer the turn<br/>(ask: think it through;<br/>Jev or canned reply)"] --> A
-    Q -->|"yes"| P2["Phase 2<br/><b>auto</b>"]
-    P2 --> ORD["Sort tickets by<br/>dependencies"]
-    ORD --> TD["task(agent=tdd) per ticket<br/>serial: each waits<br/>for the previous"]
-    TD --> RT["After each TDD attempt: background retro<br/>original session; failures and retries kept separately"]
-    TD --> FIN["All TDD attempts and retries ended<br/>spec_to_code_finish"]
-    RT --> FIN
-    FIN --> DONE["Wait for every retro terminal outcome<br/>summarize implementation and retro separately"]
-
-    style C fill:#fff3e0,stroke:#dd6b20
-```
-
-The `tdd` agent (`extensions/agents/tdd.md`) implements each ticket; the host starts a background retro in its original session after every task returns. The implementation agent does not have to load retro itself. The `to-tickets` and `tdd` skills are upstream, reworked here: `to-tickets` requires the contract, and `tdd` takes its acceptance criteria, coverage IDs and seams from the assigned work. The extension fails fast if the `to-tickets` skill, the `tdd` skill, or the `tdd` agent is missing; it checks automatically, with nothing to confirm manually.
-
-### Background retrospectives and retained state
-
-Every TDD execution attempt, including failures and independent retries, gets its own retro. The parent session orders tickets by dependency and dispatches one TDD task at a time. `task.name` must be the complete implementation ticket filename; retries reuse the name but receive a new execution identity. Retro runs alongside subsequent TDD, with no concurrency cap for now. Once all TDD attempts and retries end, the parent calls `spec_to_code_finish` to drain every retro to a successful or failed terminal outcome before the final summary. Retro failures do not stop TDD, are not automatically retried, and do not change implementation outcomes.
-
-The host loads unchanged upstream retro and writing guidance. The original TDD session returns Markdown analysis; the host writes:
-
-```text
-.scratch/<feature>/retro/<ticket-file>/<run-id>.json
-.scratch/<feature>/retro/<ticket-file>/<run-id>.md
-```
-
-JSON retains the original TDD result, independent retro state, and errors. Successfully delivered Markdown includes `agent`, `agent_id`, the local `session_id`, `session_file`, parent session, `workspace`, `execution_cwd`, ticket, execution identity, and timestamps. Scheduling state lives in memory; files are audit records, not a restart queue. A pending/running record left by a crashed process is only its last observed state and is never automatically resumed.
-
-Missing retro/writing skills, an unavailable original session, isolated execution, empty/truncated output, and document write errors produce an undelivered retro. Record-write failures are reported too. Each monitored retro turn has a five-minute runtime cap. Switching or closing the owning session cancels its background retros. This change uses conversation history; it does not add workspace snapshots or worktree orchestration. The implementation result is saved before retro starts, and retro never overwrites its executor artifact. See the [host orchestration notes](docs/tdd-subagent-retro-host-orchestration.md).
-
-Verification: `bun test extensions/spec-to-code/retro-workflow.test.ts`.
-
-## Sources & build
-
-The eight reworked skills ship complete, and the divergence from upstream is kept as data:
-
-- `upstream/` holds those eight upstream skill directories, copied in whole; extra files there (such as `agents/openai.yaml`) are fine and ignored by the build.
-- `deltas/manifest.json` holds only the `files` whitelist: the exact seventeen files this repo ships for the eight skills. Only listed files are read from `upstream/` and written to `skills/`; anything else under those `skills/<skill>/` directories is removed by the build.
-- [deltas/mappings/wayfinder.md](deltas/mappings/wayfinder.md), [deltas/mappings/setup-matt-pocock-skills.md](deltas/mappings/setup-matt-pocock-skills.md), [deltas/mappings/to-spec.md](deltas/mappings/to-spec.md), [deltas/mappings/to-tickets.md](deltas/mappings/to-tickets.md), [deltas/mappings/ask-matt.md](deltas/mappings/ask-matt.md), [deltas/mappings/prototype.md](deltas/mappings/prototype.md), [deltas/mappings/code-review.md](deltas/mappings/code-review.md) and [deltas/mappings/tdd.md](deltas/mappings/tdd.md) are the mapping sources and the human review entry points. Each op keeps its target, ID, reason and edits together. Listed files without mappings are inherited verbatim.
-- `skills/` is the install artifact. `lighthouse`, `backtracer`, `traverse` and `to-contract` are hand-written; the seventeen files listed in the manifest are generated, so do not edit them by hand.
-
-The ticket rules have distinct owners: wayfinder defines the decision lifecycle, publication boundary and completion procedures; the local tracker template defines storage and fields and points back to wayfinder for resolution; the triage template contains only implementation vocabulary. Keep scope-disposition dependency review before rejoining the main flow, and run backtracer at each publication boundary rather than on ordinary answers.
-
-[Local ticket handoff](skills/wayfinder/SKILL.md#local-ticket-handoff) owns the current recovery entry, its legacy consolidation and the publication boundary. Pause/completion hooks in the [wayfinder mappings](deltas/mappings/wayfinder.md): [grilling-pause](deltas/mappings/wayfinder.md#grilling-pause) owns the boundary sequence and claim release; [lighthouse-on-resolution](deltas/mappings/wayfinder.md#lighthouse-on-resolution) handles a completion's accumulated publication; [out-of-scope-disposition](deltas/mappings/wayfinder.md#out-of-scope-disposition) handles the disposition procedure; [backtracer-on-resolution](deltas/mappings/wayfinder.md#backtracer-on-resolution) owns their shared trace; [map-invalidation-boundary](deltas/mappings/wayfinder.md#map-invalidation-boundary) prevents an upstream result from authorizing bulk consumer mutation.
-
-The work-loop entry mappings have separate owners: `processing-type-read` reads the type, `grilling-context-reuse` reloads saved context, `grilling-frontier-refresh` recomputes the ready questions and cross-ticket detour, and `grilling-opening-brief` displays the goal sentence. These ops append in that order before the same upstream resolution anchor; `recorded-type-work` then replaces it. `grilling-pause-trigger` owns the pause request and authorization boundary, while `grilling-pause` owns the procedure. This mapping-only split preserves the generated skill byte for byte.
-
-[Cross-ticket confirmation](skills/wayfinder/SKILL.md#cross-ticket-confirmation) owns early partial decisions for another ticket. Maintain its behavior and filename/claim exceptions in the `cross-ticket-confirmation`, `cross-ticket-filename` and `cross-ticket-claim-exception` mapping ops.
-
-Edit mappings directly in the eight documents under `deltas/mappings/`:
-
-- Start with `# <skill>`. Use `## <skill>/<file>` for each changed, whitelisted target, then `### <op-id>` for each op. IDs use lowercase kebab-case and are unique within a skill. Each op has a short reason and exactly one backtick-fenced `op` block.
-- Each op owns one independently changeable fork behavior; name it for that behavior, rather than its current step numbers. Keep unrelated upstream wording outside the edits and, where a unique locator permits, outside the anchor. Prefer anchors in the upstream snapshot over text generated by earlier ops; explain necessary ordering dependencies in the reason. Re-specifying upstream anchors and changing fork behavior are separate changes. Mapping-only refactors must preserve the `skills/` artifacts byte for byte.
-- An op is one `anchor:` plus the edits that apply inside it. The anchor is a span of the upstream file that must occur exactly once, and that single occurrence gates the whole op: while it still matches, every edit applies automatically; when upstream changes it, the build fails and a human re-specifies the anchor.
-- A `find:`/`content:` pair replaces `find` with `content`. Within one op, use one pair for a continuous change, including its step-number adjustment when needed; use multiple pairs for separated changes, leaving intervening unchanged text outside the replacements. Every pair resolves against the anchor's original text, so their order in the block does not matter and two edits may not overlap. `find` must occur exactly once inside the anchor; an empty `content` deletes the match. Keep `find` to the change itself rather than the context around it: a wide `find` does not change what the build does (the anchor is the gate), but it repeats that context into `content` and hides what the patch owns. The build warns when a `find` provably shares word-boundary context with its `content`.
-- An `insert:` places its content where the anchor carries the `<oh-my-wayfinder:insert>` marker, at most one marker per anchor. The marker is stripped before the anchor is matched, so the anchor still reads as the literal upstream text around the insert point.
-- Field values use block scalars: `field: |` keeps one trailing newline, `field: |-` drops it, and a short single-line value may stay inline (`find: on resolution`). Indent every block-scalar line two spaces and keep LF line endings and a final newline.
-- Name workflow choices by their purpose (for example, prototype `mode` or outcome `procedure`) when `branch` could be mistaken for a Git operation. Preserve quoted upstream text in mapping anchors and finds.
-- Keep Markdown tables column-aligned in their raw source. Format authored tables in `content:` / `insert:` and hand-written skills; preserve upstream text in `anchor:` / `find:` verbatim.
-- Ops run in document order within each target, against the result of earlier ops. Missing, ambiguous or overlapping anchors and edits, no-ops and malformed ops all fail the build.
+## Maintenance commands
 
 ```bash
-node deltas/build.mjs                         # regenerate skills/ and refresh deltas/preview.html
-node deltas/build.mjs --check                 # verify skills/ without writing files or refreshing preview
-node deltas/preview.mjs                       # refresh only deltas/preview.html
-node deltas/check-upstream.mjs                # list skills that differ from upstream HEAD
-node deltas/check-upstream.mjs --verbose      # also list the differing files
-node deltas/check-upstream.mjs --local <dir>  # compare against an existing upstream checkout
+node deltas/build.mjs                         # Generate skills and refresh preview
+node deltas/build.mjs --check                 # Check generated consistency without writing
+node deltas/preview.mjs                       # Refresh preview only
+node deltas/check-upstream.mjs                # Compare the snapshot with upstream HEAD
+node deltas/check-upstream.mjs --verbose      # Include individual changed files
+node deltas/check-upstream.mjs --local <dir>  # Compare with a local upstream checkout
 ```
 
-`check-upstream.mjs`: by default compares the whitelisted files against upstream HEAD over the GitHub API and exits non-zero when any skill differs.
+Edit mappings rather than generated skill files. Source ownership, mapping syntax, and upstream-update procedures belong in the [maintenance guide](docs/maintenance.md).
 
-`check-upstream.mjs --local <dir>` compares against a local repository, for example `--local ../mattpocock-skills`.
+## Acknowledgements
 
-A successful `build.mjs` run automatically refreshes `deltas/preview.html`, even when the skill files are unchanged. Preview-generation failure makes the build fail. `build.mjs --check` remains read-only and does not generate or refresh the preview; `preview.mjs` can still run independently.
-
-`preview.mjs` writes `deltas/preview.html` (gitignored) so the mappings can be reviewed without reading the op blocks by hand: one self-contained page, no server and no dependencies, showing every op as a GitHub-style diff of `upstream/` against the regenerated `skills/`. Each changed block is tagged with the op(s) that produced it, and clicking a tag shows that op's reason, anchor and edits. It replays the ops through `deltas/ops.mjs`, the same code the build uses, and compares the result against the committed `skills/` files, so it cannot disagree with the build about what an op does.
-
-The current snapshot is from mattpocock/skills commit `f3fc5632f401156837ee3872f14fe33ccf1024ea`. To update it, first copy all eight complete skill directories (`wayfinder`, `setup-matt-pocock-skills`, `to-spec`, `to-tickets`, `ask-matt`, `prototype`, `code-review`, `tdd`) from the selected upstream checkout into `upstream/`. Next adapt mapping anchors and edits against that new baseline, preserving both upstream fixes and the fork’s approved semantics. Then run `node deltas/build.mjs`, inspect the generated changes, run `node deltas/build.mjs --check`, compare with `check-upstream.mjs --local <checkout>`, and exercise affected workflow paths. A passing build check alone does not prove the snapshot is current. When upstream rewrites text an op's anchor depends on, the build fails loudly and names the op; a listed file that upstream removed fails the build too. One blind spot remains: an op whose anchor reaches the end of its file cannot detect text upstream appends after that anchor, so check the regenerated `skills/` diff for text that survived past the replacement.
-
-## Thanks
-
-The core of this repository is **[mattpocock/skills](https://github.com/mattpocock/skills)**. Thanks to Matt Pocock for building it and releasing it under MIT, and for the [skills.sh](https://skills.sh/mattpocock/skills) installer and the [newsletter](https://www.aihero.dev/s/skills-newsletter) that keep the ecosystem alive. Thanks also to the [Oh My Pi](https://github.com/can1357/oh-my-pi) project, the agent harness this extension targets.
+Built on [mattpocock/skills](https://github.com/mattpocock/skills). Thank you to Matt Pocock for the engineering workflow and MIT-licensed skills, to [skills.sh](https://skills.sh/mattpocock/skills) and the [AI Hero newsletter](https://www.aihero.dev/s/skills-newsletter), and to [Oh My Pi](https://github.com/can1357/oh-my-pi), the platform for the optional automation extension.
 
 ## License
 
-MIT. See [LICENSE](./LICENSE). Upstream copyright retained verbatim: *Copyright (c) 2026 Matt Pocock*.
+MIT; see [LICENSE](./LICENSE). The upstream copyright notice is preserved: *Copyright (c) 2026 Matt Pocock*.
