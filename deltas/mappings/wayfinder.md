@@ -37,6 +37,48 @@ insert: |
   
 ```
 
+### cross-ticket-filename
+
+Identify the target file in cross-ticket confirmation; ordinary navigation retains named links.
+
+```op
+anchor: |-
+  The id and URL don't vanish; a name wraps its link, but they ride _inside_ the name, never stand in for it.<oh-my-wayfinder:insert>
+insert: |-
+   For [cross-ticket confirmation](#cross-ticket-confirmation), identify the target by its ticket filename instead of its title.
+```
+
+### cross-ticket-claim-exception
+
+Partial publication is distinct from starting work on the target; preserve the target claim.
+
+```op
+anchor: |-
+  A session **claims** a ticket by assigning it to the dev driving the map, **first**, before any work, so concurrent sessions skip it. <oh-my-wayfinder:insert>That assignee _is_ the claim: an open, unassigned ticket is unclaimed.
+find: any work
+content: working it
+insert: |-
+  [Cross-ticket confirmation](#cross-ticket-confirmation) permits partial publication without starting or claiming the target ticket. 
+```
+
+### cross-ticket-confirmation
+
+Own the confirmation and partial-publication exception under Publication. Insert after local-ticket-handoff at the upstream Ticket Types anchor.
+
+```op
+anchor: |-
+  <oh-my-wayfinder:insert>## Ticket Types
+insert: |
+  #### Cross-ticket confirmation
+  
+  When the current discussion answers a question owned by another unfinished ticket, read that target's Question, current Lighthouse and claim to verify ownership and scope. For an unclaimed target, ask for confirmation showing only the decision content and the target ticket filename; use the filename rather than a translated title. User confirmation authorizes partial publication to that target's Lighthouse at the next [publication boundary](#publication), without switching to or claiming the target. Until confirmation, retain the choice as pending in the current discussion or working-ticket Handoff. If another session holds the claim, coordinate with it or offer the Pause detour.
+  
+  At publication, create or update the target Lighthouse with the confirmed scope and recoverable confirmation source; the working ticket links that authority. Keep the target decision ticket's body, status, assignee and other unanswered scope unchanged. An existing policy change still requires an explicit old-to-new ruling under Lighthouse's revision procedure. Mere downstream impact uses the existing authority, rather than creating another Lighthouse.
+  
+  Complete when the user has confirmed both the decision and its filename-identified owner, and publication leaves one authority with the target ticket unchanged.
+  
+```
+
 ### confirmed-result-index
 
 Index confirmed outcomes, including partial results, without turning the map into an open-ticket work list.
@@ -179,7 +221,7 @@ Recompute the saved frontier against intervening results and route missing cross
 anchor: |-
   <oh-my-wayfinder:insert>3. Resolve it as the type its `wayfinder:<type>` label names (see [Ticket Types](#ticket-types)). Read the label, not just the body: the body never states the type.
 insert: |-
-   Compare the saved stopping point with intervening results and recompute this ticket’s frontier. If the missing choice belongs to another ticket, identify that prerequisite and offer the Pause detour rather than deciding its scope under this claim. A design input need not be implemented, but one available input does not settle every prerequisite.
+   Compare the saved stopping point with intervening results and recompute this ticket’s frontier. If the missing choice belongs to another ticket, identify that prerequisite and offer the Pause detour. When the current discussion already answers a ready question owned by an unfinished ticket, use [cross-ticket confirmation](#cross-ticket-confirmation) for partial publication; further work on that ticket still goes through the detour. A design input need not be implemented, but one available input does not settle every prerequisite.
 ```
 
 ### grilling-opening-brief

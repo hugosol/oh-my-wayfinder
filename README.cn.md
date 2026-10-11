@@ -171,6 +171,8 @@ JSON 留存本次 TDD 结果、独立 retro 状态和错误；成功的 Markdown
 
 工作循环入口按行为分别维护：`processing-type-read` 读取类型，`grilling-context-reuse` 恢复已保存上下文，`grilling-frontier-refresh` 重算可讨论问题及跨票转向，`grilling-opening-brief` 展示目标句。这些 op 按上述顺序在同一个上游 resolution anchor 前追加，再由 `recorded-type-work` 替换该 anchor。`grilling-pause-trigger` 负责暂停请求与授权边界，`grilling-pause` 负责暂停流程。本次仅拆分 mapping，生成技能逐字节不变。
 
+[跨票确认](skills/wayfinder/SKILL.md#cross-ticket-confirmation) 负责提前回答其他票问题时的局部发布；对应行为、文件名提示与认领例外分别维护在 `cross-ticket-confirmation`、`cross-ticket-filename` 和 `cross-ticket-claim-exception` mapping op 中。
+
 直接在 `deltas/mappings/` 下的八份文档中编辑映射：
 
 - 文档以 `# <skill>` 开头，用 `## <skill>/<file>` 指定有改动且位于白名单内的目标，用 `### <op-id>` 标识每个 op。ID 使用小写 kebab-case，在同一 skill 内唯一。每个 op 包含简短理由和恰好一个反引号围栏的 `op` 块。

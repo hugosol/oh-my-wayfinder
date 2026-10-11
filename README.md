@@ -171,6 +171,8 @@ The ticket rules have distinct owners: wayfinder defines the decision lifecycle,
 
 The work-loop entry mappings have separate owners: `processing-type-read` reads the type, `grilling-context-reuse` reloads saved context, `grilling-frontier-refresh` recomputes the ready questions and cross-ticket detour, and `grilling-opening-brief` displays the goal sentence. These ops append in that order before the same upstream resolution anchor; `recorded-type-work` then replaces it. `grilling-pause-trigger` owns the pause request and authorization boundary, while `grilling-pause` owns the procedure. This mapping-only split preserves the generated skill byte for byte.
 
+[Cross-ticket confirmation](skills/wayfinder/SKILL.md#cross-ticket-confirmation) owns early partial decisions for another ticket. Maintain its behavior and filename/claim exceptions in the `cross-ticket-confirmation`, `cross-ticket-filename` and `cross-ticket-claim-exception` mapping ops.
+
 Edit mappings directly in the eight documents under `deltas/mappings/`:
 
 - Start with `# <skill>`. Use `## <skill>/<file>` for each changed, whitelisted target, then `### <op-id>` for each op. IDs use lowercase kebab-case and are unique within a skill. Each op has a short reason and exactly one backtick-fenced `op` block.

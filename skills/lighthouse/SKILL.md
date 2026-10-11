@@ -11,6 +11,8 @@ Synthesize choices and constraints explicitly confirmed by the user. Decision-re
 
 ### 1. Read the decision ticket
 
+For a result owned by another unfinished ticket, require the caller's [cross-ticket confirmation](../wayfinder/SKILL.md#cross-ticket-confirmation) before publishing to that target. Read that target as the decision owner; the working ticket supplies the conversation and links the authority.
+
 Read the question, saved discussion/handoff, existing Lighthouse, and the caller's confirmed changes. Summarize the question and link its source; the ticket retains the compact exploration record, rather than copying its entire body here. If there are no new confirmed results, retain the existing document and return without creating an empty decision.
 
 ### 2. Read the conversation
