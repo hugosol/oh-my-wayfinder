@@ -75,8 +75,6 @@ flowchart TB
 
 Skill 内的自动调用由 agent 执行指令，不是独立调度器；`/spec-to-code` 另外提供宿主驱动的编排。它以已有 spec 和已批准 contract 为输入，自动切票、串行执行 TDD，并自动调用 Retro。
 
-Grilling 叠加层新增一项实验：agent 汇总共同理由，推荐带有范围与取舍的候选约束，等待用户授权后再用它回答其他决策。frontier 批量轮次与决策树覆盖保持不变，详见[Grilling 实验](docs/upstream-differences.cn.md)。
-
 设计变化及其对应的 mapping op，见[上游对比蓝图](docs/upstream-differences.cn.md)。
 
 ## 快速开始

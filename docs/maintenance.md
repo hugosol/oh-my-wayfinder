@@ -2,34 +2,34 @@
 
 [中文文档](./maintenance.cn.md)
 
-This repository ships the nine reworked skills as a **delta overlay**: `upstream/` holds a snapshot of the original files, `deltas/mappings/*.md` describe every fork change as typed ops, and `skills/` is generated from the two. This guide covers the mechanics a maintainer needs — the manifest, the mapping format, the commands, and how to bump the snapshot. See the [README](../README.md) for what the repository is and how to install it, and the [upstream differences](./upstream-differences.md) for what the fork changes and why.
+This repository ships the eight reworked skills as a **delta overlay**: `upstream/` holds a snapshot of the original files, `deltas/mappings/*.md` describe every fork change as typed ops, and `skills/` is generated from the two. This guide covers the mechanics a maintainer needs — the manifest, the mapping format, the commands, and how to bump the snapshot. See the [README](../README.md) for what the repository is and how to install it, and the [upstream differences](./upstream-differences.md) for what the fork changes and why.
 
 ## Repository layout
 
 | Path | Role |
 | --- | --- |
-| `upstream/` | Hand-copied snapshot of the nine upstream skill directories (`wayfinder`, `setup-matt-pocock-skills`, `to-spec`, `to-tickets`, `ask-matt`, `prototype`, `code-review`, `tdd`, `grilling`). May carry CRLF; the build normalizes it on read. Files not listed in the manifest are ignored and never shipped. |
-| [deltas/manifest.json](../deltas/manifest.json) | The `files` whitelist: the exact 18 files this repo ships for the nine skills. |
-| `deltas/mappings/<skill>.md` | One mapping document per generated skill: the fork changes expressed as typed ops. The human review entry point; the nine documents are [wayfinder](../deltas/mappings/wayfinder.md), [setup-matt-pocock-skills](../deltas/mappings/setup-matt-pocock-skills.md), [to-spec](../deltas/mappings/to-spec.md), [to-tickets](../deltas/mappings/to-tickets.md), [ask-matt](../deltas/mappings/ask-matt.md), [prototype](../deltas/mappings/prototype.md), [code-review](../deltas/mappings/code-review.md), [tdd](../deltas/mappings/tdd.md) and [grilling](../deltas/mappings/grilling.md). |
+| `upstream/` | Hand-copied snapshot of the eight upstream skill directories (`wayfinder`, `setup-matt-pocock-skills`, `to-spec`, `to-tickets`, `ask-matt`, `prototype`, `code-review`, `tdd`). May carry CRLF; the build normalizes it on read. Files not listed in the manifest are ignored and never shipped. |
+| [deltas/manifest.json](../deltas/manifest.json) | The `files` whitelist: the exact 17 files this repo ships for the eight skills. |
+| `deltas/mappings/<skill>.md` | One mapping document per generated skill: the fork changes expressed as typed ops. The human review entry point; the eight documents are [wayfinder](../deltas/mappings/wayfinder.md), [setup-matt-pocock-skills](../deltas/mappings/setup-matt-pocock-skills.md), [to-spec](../deltas/mappings/to-spec.md), [to-tickets](../deltas/mappings/to-tickets.md), [ask-matt](../deltas/mappings/ask-matt.md), [prototype](../deltas/mappings/prototype.md), [code-review](../deltas/mappings/code-review.md) and [tdd](../deltas/mappings/tdd.md). |
 | [deltas/build.mjs](../deltas/build.mjs) | Regenerates `skills/` from `upstream/` + mappings; `--check` verifies without writing. |
 | [deltas/ops.mjs](../deltas/ops.mjs) | Op parsing and application, shared by the build and the preview so the two cannot disagree. |
 | [deltas/check-upstream.mjs](../deltas/check-upstream.mjs) | Compares the snapshot with `mattpocock/skills`, over the GitHub API or a local checkout. |
 | [deltas/preview.mjs](../deltas/preview.mjs) | Renders the mappings as a diff page (`deltas/preview.html`, gitignored). |
-| `skills/` | The install artifact: generated files for the nine skills, plus the hand-written `lighthouse`, `backtracer`, `traverse` and `to-contract`. |
+| `skills/` | The install artifact: generated files for the eight skills, plus the hand-written `lighthouse`, `backtracer`, `traverse` and `to-contract`. |
 
 ## Generated files vs hand-written skills
 
 `deltas/manifest.json` holds only a `files` array of `<skill>/<file>` paths. Only those paths are read from `upstream/` and written to `skills/`; the generated skill directories are derived from the first path segment.
 
-- **Generated skills.** The nine reworked skills above. Their `skills/<skill>/` directories hold exactly the manifest whitelist and nothing else.
+- **Generated skills.** The eight reworked skills above. Their `skills/<skill>/` directories hold exactly the manifest whitelist and nothing else.
 - **Hand-written skills.** [lighthouse](../skills/lighthouse/SKILL.md), [backtracer](../skills/backtracer/SKILL.md), [traverse](../skills/traverse/SKILL.md) and [to-contract](../skills/to-contract/SKILL.md) are native to this repository: not in the manifest, no `upstream/` counterpart, never touched by the build. Edit them directly.
 - **Verbatim files.** A listed file with no mapping ops is copied from the snapshot byte for byte (after line-ending normalization). It is still generated, and still subject to the pruning below.
 
-**Destructive pruning warning.** A writing build (`node deltas/build.mjs`) deletes every file inside a generated skill directory that is not in `manifest.files`, and removes the directories left empty. Never leave notes, scratch experiments or generated assets inside `skills/<skill>/` for one of the nine skills — they are removed without a prompt, including a committed file that upstream does not have. To ship an additional upstream file, copy it into `upstream/` and add it to the manifest.
+**Destructive pruning warning.** A writing build (`node deltas/build.mjs`) deletes every file inside a generated skill directory that is not in `manifest.files`, and removes the directories left empty. Never leave notes, scratch experiments or generated assets inside `skills/<skill>/` for one of the eight skills — they are removed without a prompt, including a committed file that upstream does not have. To ship an additional upstream file, copy it into `upstream/` and add it to the manifest.
 
 ## Edit mappings, not generated files
 
-Never edit the 18 generated files under `skills/`: the next build overwrites them, or prunes them when they leave the manifest. Every change to a generated skill is expressed in `deltas/mappings/<skill>.md`, and the workflow is:
+Never edit the 17 generated files under `skills/`: the next build overwrites them, or prunes them when they leave the manifest. Every change to a generated skill is expressed in `deltas/mappings/<skill>.md`, and the workflow is:
 
 1. Edit the mapping document (one per skill; a skill whose files need no edits still needs its document).
 2. Run `node deltas/build.mjs` to regenerate, or `node deltas/build.mjs --check` to verify without writing.
@@ -101,7 +101,7 @@ node deltas/check-upstream.mjs --local <dir>  # compare against a local upstream
 
 The current snapshot corresponds to `mattpocock/skills` commit `f3fc5632f401156837ee3872f14fe33ccf1024ea`. This is the single place the provenance is recorded; update it when the snapshot moves (the check output names the revision it compared against).
 
-1. Copy all nine complete skill directories from the selected upstream checkout into `upstream/`, replacing the previous snapshot. Copying extra files is fine: the build ignores anything not in the manifest.
+1. Copy all eight complete skill directories from the selected upstream checkout into `upstream/`, replacing the previous snapshot. Copying extra files is fine: the build ignores anything not in the manifest.
 2. Adapt every mapping anchor and edit against the new baseline, preserving both upstream's fixes and the fork's approved semantics. Expect some ops to fail the build with a named anchor — that is the review point, not an accident.
 3. Run `node deltas/build.mjs`, then inspect the regenerated diff (the preview page, or `git diff skills/`).
 4. Run `node deltas/build.mjs --check`.

@@ -155,21 +155,7 @@ Existing local projects need attention: implementation tickets move from `.scrat
 
 Storage and fields belong to the [local tracker template](../skills/setup-matt-pocock-skills/issue-tracker-local.md); completion and dependency dispositions belong to [Wayfinder](../skills/wayfinder/SKILL.md).
 
-## 8. Grilling experiment: reasons → proposed constraints
-
-Grilling now synthesizes common priorities from the reasons users give and recommends upgrading them into scoped constraints when that could answer several pending decisions. The proposal makes its rationale, affected decisions and tradeoffs visible. Inferred tendencies guide the discussion; only user-authorized constraints settle other nodes. Rejected proposals return to ordinary grilling, and uncertain applications remain questions. An explicit user constraint already provides authorization; changing an existing decision still requires approval.
-
-This experiment preserves upstream frontier-sized rounds, fact/decision ownership and the completion gate. It adds no requirement or reminder to provide reasons, no sequential-mode change and no Wayfinder route-selection change. Decision coverage remains intact: an approved constraint answers covered nodes rather than removing them. Publication uses the existing Wayfinder protocol.
-
-Source: [Grilling mapping](../deltas/mappings/grilling.md#reasons-to-constraints); generated [Grilling](../skills/grilling/SKILL.md). To try it, overlay the generated `grilling` directory; upstream `grill-me` remains the wrapper.
-
-### Verification boundary
-
-The generated prompt was exercised with six isolated `default` model continuations: recurring reasons before authorization, scoped approval with an unresolved exception, rejection, a directly stated constraint, a one-off deadline reason, and a conflict with an existing usage-preservation decision. Observed replies proposed constraints before applying them, respected rejection and explicit authorization, kept exceptions open, did not globalize the deadline reason, and preserved the existing decision. These are prompt smoke checks, not a real Wayfinder session, a cross-model guarantee or proof of improved discussion quality. The repository build and generated-file check pass for 18 files; the other 17 generated files were unchanged.
-
-The addition was subsequently shortened from 106 to 54 words. An initial short candidate failed to recommend a constraint in the recurring-reasons case; the final version retains the explicit instruction to synthesize and recommend adoption. Five fresh `default` continuations exercised recurring reasons with an existing decision, rejection, scoped approval, direct authorization and a one-off reason. The final replies proposed rather than silently applied the inferred constraint, respected authorization boundaries and kept exceptions open. This remains smoke evidence, not an efficiency benchmark.
-
-## 9. Other local changes
+## 8. Other local changes
 
 | Change | Difference from upstream | Implementation trace |
 |---|---|---|
