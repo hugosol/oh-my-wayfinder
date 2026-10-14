@@ -94,8 +94,8 @@ Markdown retro 只在成功交付时存在；失败记录仍然提交。实现�
 ## 源码
 
 - [共享命令入口与 Phase 1](../extensions/spec-to-code.ts)
-- [编排工具和主代理指导](../extensions/hyper-auto-coding/extension.ts)
+- [编排工具和主代理指导](../extensions/hyper-auto-coding/orchestration-tool.ts)
 - [工作流状态及验收门禁](../extensions/hyper-auto-coding/workflow.ts)
 - [本地 Git 和 worktree](../extensions/hyper-auto-coding/git.ts)
-- [新会话宿主执行](../extensions/hyper-auto-coding/host.ts)
-- [共享原会话 retro 调用](../extensions/spec-to-code/retro-host.ts)、[执行记录及终态等待](../extensions/spec-to-code/retro-workflow.ts)
+- [新会话宿主执行](../extensions/hyper-auto-coding/subagent-host.ts)
+- [共享原会话 retro 调用](../extensions/spec-to-code/retro-host.ts)、[执行记录及终态等待](../extensions/spec-to-code/execution-attempts.ts)

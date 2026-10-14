@@ -112,16 +112,16 @@ Phase 2——串行 TDD：
 - 同一时间只允许一次运行：已有运行进行中时，新的 `/spec-to-code` 会被拒绝。
 - 后台复盘暂不限制并发。
 
-上述行为详见 [`retro-workflow.ts`](../extensions/spec-to-code/retro-workflow.ts) 与 [`retro-host.ts`](../extensions/spec-to-code/retro-host.ts)。
+上述行为详见 [`execution-attempts.ts`](../extensions/spec-to-code/execution-attempts.ts) 与 [`retro-host.ts`](../extensions/spec-to-code/retro-host.ts)。
 
 ## 源码索引
 
 - 入口与安装布局：[`extensions/spec-to-code.ts`](../extensions/spec-to-code.ts)
 - 回复、预算与停止条件：[`turn-policy.ts`](../extensions/spec-to-code/turn-policy.ts)、[`workflow-session.ts`](../extensions/spec-to-code/workflow-session.ts)
 - judge 链：[`jev-judge.ts`](../extensions/spec-to-code/jev-judge.ts)
-- 宿主集成与预检：[`host-integration.ts`](../extensions/spec-to-code/host-integration.ts)
+- skill 激活与依赖预检：[`skill-activation.ts`](../extensions/spec-to-code/skill-activation.ts)
 - TDD agent：[`extensions/agents/tdd.md`](../extensions/agents/tdd.md)
-- 复盘行为、身份与输出文件：[`retro-host.ts`](../extensions/spec-to-code/retro-host.ts)、[`retro-workflow.ts`](../extensions/spec-to-code/retro-workflow.ts)
+- 复盘行为、身份与输出文件：[`retro-host.ts`](../extensions/spec-to-code/retro-host.ts)、[`execution-attempts.ts`](../extensions/spec-to-code/execution-attempts.ts)
 - 配置：[`config.json`](../extensions/spec-to-code/config.json)、[`config.ts`](../extensions/spec-to-code/config.ts)
 - 使用的 skill：[to-tickets](../skills/to-tickets/SKILL.md)、[tdd](../skills/tdd/SKILL.md)；上游 `retro` 与 `writing-for-agents` 原样使用。
 - fork 差异：[上游对比蓝图](./upstream-differences.cn.md)。

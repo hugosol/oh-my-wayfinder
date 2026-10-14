@@ -4,7 +4,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { SingleResult } from "@oh-my-pi/pi-coding-agent";
 import { HyperGit } from "./git";
-import type { HyperHost, HyperRole, HyperRun } from "./host";
+import type { HyperHost, HyperRole, HyperRun } from "./subagent-host";
 import { cleanupFixtures, git, initRepo, ticketFile, write } from "./test-support";
 import { HyperWorkflow } from "./workflow";
 

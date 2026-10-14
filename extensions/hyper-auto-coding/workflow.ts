@@ -3,9 +3,9 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { SingleResult } from "@oh-my-pi/pi-coding-agent";
-import { RetroWorkflow } from "../spec-to-code/retro-workflow";
+import { RetroWorkflow } from "../spec-to-code/execution-attempts";
 import { HyperGit, type TicketWorktree } from "./git";
-import type { HyperHost, HyperRole } from "./host";
+import type { HyperHost, HyperRole } from "./subagent-host";
 
 export interface TicketPlan {
 	ticket: string;

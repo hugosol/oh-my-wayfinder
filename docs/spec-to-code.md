@@ -112,16 +112,16 @@ Automation advances the session and records execution outcomes; it does not inde
 - One run at a time: starting a second run while one is active is rejected.
 - Background retros are not concurrency-capped.
 
-See [`retro-workflow.ts`](../extensions/spec-to-code/retro-workflow.ts) and [`retro-host.ts`](../extensions/spec-to-code/retro-host.ts) for these behaviors.
+See [`execution-attempts.ts`](../extensions/spec-to-code/execution-attempts.ts) and [`retro-host.ts`](../extensions/spec-to-code/retro-host.ts) for these behaviors.
 
 ## Sources
 
 - Entry and install layout: [`extensions/spec-to-code.ts`](../extensions/spec-to-code.ts)
 - Turn replies, budget, and stop conditions: [`turn-policy.ts`](../extensions/spec-to-code/turn-policy.ts), [`workflow-session.ts`](../extensions/spec-to-code/workflow-session.ts)
 - Judge chain: [`jev-judge.ts`](../extensions/spec-to-code/jev-judge.ts)
-- Host integration and preflight: [`host-integration.ts`](../extensions/spec-to-code/host-integration.ts)
+- Skill activation and dependency preflight: [`skill-activation.ts`](../extensions/spec-to-code/skill-activation.ts)
 - TDD agent: [`extensions/agents/tdd.md`](../extensions/agents/tdd.md)
-- Retro behavior, identity, and output files: [`retro-host.ts`](../extensions/spec-to-code/retro-host.ts), [`retro-workflow.ts`](../extensions/spec-to-code/retro-workflow.ts)
+- Retro behavior, identity, and output files: [`retro-host.ts`](../extensions/spec-to-code/retro-host.ts), [`execution-attempts.ts`](../extensions/spec-to-code/execution-attempts.ts)
 - Configuration: [`config.json`](../extensions/spec-to-code/config.json), [`config.ts`](../extensions/spec-to-code/config.ts)
 - Skills used: [to-tickets](../skills/to-tickets/SKILL.md), [tdd](../skills/tdd/SKILL.md); upstream `retro` and `writing-for-agents` are used unmodified.
 - Fork differences: [upstream comparison blueprint](./upstream-differences.md).

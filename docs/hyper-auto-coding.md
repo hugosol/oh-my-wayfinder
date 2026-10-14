@@ -94,8 +94,8 @@ One workflow runs through the extension at a time. This feature assumes a sessio
 ## Sources
 
 - [Shared command entry and Phase 1](../extensions/spec-to-code.ts)
-- [Orchestration tool and main-agent instructions](../extensions/hyper-auto-coding/extension.ts)
+- [Orchestration tool and main-agent instructions](../extensions/hyper-auto-coding/orchestration-tool.ts)
 - [Workflow state and acceptance boundaries](../extensions/hyper-auto-coding/workflow.ts)
 - [Local Git and worktrees](../extensions/hyper-auto-coding/git.ts)
-- [Fresh-session host dispatch](../extensions/hyper-auto-coding/host.ts)
-- [Shared original-session retro calls](../extensions/spec-to-code/retro-host.ts), [execution records and final draining](../extensions/spec-to-code/retro-workflow.ts)
+- [Fresh-session host dispatch](../extensions/hyper-auto-coding/subagent-host.ts)
+- [Shared original-session retro calls](../extensions/spec-to-code/retro-host.ts), [execution records and final draining](../extensions/spec-to-code/execution-attempts.ts)

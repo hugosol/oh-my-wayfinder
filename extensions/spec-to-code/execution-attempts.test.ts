@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { SingleResult } from "@oh-my-pi/pi-coding-agent";
-import { RetroWorkflow } from "./retro-workflow";
+import { RetroWorkflow } from "./execution-attempts";
 
 const roots: string[] = [];
 afterEach(async () => {
