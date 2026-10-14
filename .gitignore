@@ -1,2 +1,4 @@
 node_modules/
 .omp/
+.idea/
+deltas/preview.html

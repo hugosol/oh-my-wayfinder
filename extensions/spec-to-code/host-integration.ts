@@ -1,5 +1,6 @@
 /**
- * Host integration: this extension's single seam onto the OMP host.
+ * Planning skill activation and discovery through the OMP host.
+ * Retained subagent continuation and retrospective identity live in retro-host.ts.
  *
  * Everything here is host-owned: which skills are discoverable, the skill-prompt
  * message the host renders for a skill activation, and whether the host's own
