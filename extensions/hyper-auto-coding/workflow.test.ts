@@ -1,40 +1,63 @@
 import { afterEach, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs/promises";
-import * as os from "node:os";
 import * as path from "node:path";
 import type { SingleResult } from "@oh-my-pi/pi-coding-agent";
 import { HyperGit } from "./git";
-import type { HyperHost, HyperRun } from "./host";
+import type { HyperHost, HyperRole, HyperRun } from "./host";
+import { cleanupFixtures, git, initRepo, ticketFile, write } from "./test-support";
 import { HyperWorkflow } from "./workflow";
 
-const roots: string[] = [];
+/** Public `status` snapshot fields used for behavioral assertions. */
+interface TicketSnapshot {
+	ticket: string;
+	status: "ready" | "running" | "reported" | "accepted" | "integrated";
+	worktree?: { branch: string; cwd: string };
+	report?: string;
+}
+interface StatusSnapshot {
+	branch: string;
+	temporaryDir: string;
+	active: string[];
+	ready: string[];
+	tickets: TicketSnapshot[];
+}
+interface FinishSummary {
+	reports: string[];
+	warnings: string[];
+	retainedBranches: string[];
+}
+/** Published workflow ledger: enrolled executions and their retro outcomes. */
+interface Ledger {
+	attempts: { ticket: string; id: string; report?: string; error?: string }[];
+	executions: {
+		tool_call_id: string;
+		agent_id?: string;
+		ticket: string;
+		run_id: string;
+		tdd_status: string;
+		retro_status: string;
+		retro_error?: string;
+		retro_document?: string;
+	}[];
+}
+
 const workflows: HyperWorkflow[] = [];
 const releases: (() => void)[] = [];
 afterEach(async () => {
 	for (const release of releases.splice(0)) release();
 	for (const workflow of workflows.splice(0)) {
-		while ((workflow.status() as { active: string[] }).active.length) await workflow.execute({ action: "collect" });
+		while ((await status(workflow)).active.length) await workflow.execute({ action: "collect" });
 		await workflow.retro.finish();
 		for (const tree of workflow.git.worktrees.values()) {
 			if (await fs.stat(tree.cwd).catch(() => null))
 				await git(workflow.git.root, "worktree", "remove", "--force", tree.cwd);
 		}
-		await fs.rm(workflow.temporary, { recursive: true, force: true });
+		await fs.rm(workflow.temporaryDir, { recursive: true, force: true });
 	}
-	await Promise.all(roots.splice(0).map((root) => fs.rm(root, { recursive: true, force: true })));
+	await cleanupFixtures();
 });
 
-async function git(cwd: string, ...args: string[]): Promise<string> {
-	const process = Bun.spawn(["git", "-C", cwd, ...args], { stdout: "pipe", stderr: "pipe" });
-	const [out, error, code] = await Promise.all([
-		new Response(process.stdout).text(),
-		new Response(process.stderr).text(),
-		process.exited,
-	]);
-	if (code) throw new Error(error || out);
-	return out.trim();
-}
 function result(request: HyperRun, overrides: Partial<SingleResult> = {}): SingleResult {
 	return {
 		index: 0,
@@ -53,6 +76,33 @@ function result(request: HyperRun, overrides: Partial<SingleResult> = {}): Singl
 	};
 }
 
+async function status(workflow: HyperWorkflow): Promise<StatusSnapshot> {
+	return (await workflow.execute({ action: "status" })) as unknown as StatusSnapshot;
+}
+function ticketSnapshot(state: StatusSnapshot, ticket: string): TicketSnapshot {
+	const found = state.tickets.find((entry) => entry.ticket === ticket);
+	if (!found) throw new Error(`status snapshot has no ticket ${ticket}`);
+	return found;
+}
+function worktreeOf(state: StatusSnapshot, ticket: string): { branch: string; cwd: string } {
+	const worktree = ticketSnapshot(state, ticket).worktree;
+	if (!worktree) throw new Error(`status snapshot has no worktree for ${ticket}`);
+	return worktree;
+}
+
+interface Scene {
+	root: string;
+	workflow: HyperWorkflow;
+	/** Execution ids observed at the controlled retro boundary, in enrolment order. */
+	retroIds: string[];
+	/** Host results by dispatched run, in call order. */
+	runs: { role: HyperRole; id: string; name: string }[];
+	/** Retro warnings raised at the controlled boundary. */
+	retroWarnings: string[];
+	/** Boundary probes recorded while the workflow ran. */
+	events: string[];
+}
+
 async function fixture(
 	options: {
 		cap?: number;
@@ -61,55 +111,63 @@ async function fixture(
 		failIntegration?: boolean;
 		throwImplementation?: () => boolean;
 		mutateReadonly?: () => "review" | "verify" | undefined;
+		failRetro?: (ticket: string) => boolean;
 	} = {},
-) {
-	const root = await fs.mkdtemp(path.join(os.tmpdir(), "hyper-workflow-test-"));
-	roots.push(root);
-	await git(root, "init", "-b", "feature/delivery");
-	await git(root, "config", "user.name", "Workflow Test");
-	await git(root, "config", "user.email", "workflow@example.invalid");
-	await git(root, "config", "core.autocrlf", "false");
-	await git(root, "config", "commit.gpgsign", "false");
-	const scratch = path.join(root, ".scratch", "feature");
-	await fs.mkdir(scratch, { recursive: true });
-	await fs.writeFile(path.join(scratch, "spec.md"), "Deliver independent A and B, then dependent C.");
-	await fs.writeFile(path.join(scratch, "contract.md"), "P1: A; P2: B; P3: C sees A.");
-	await git(root, "add", ".scratch");
-	await git(root, "commit", "-m", "approved input documents");
-	const backend = await HyperGit.inspect(root, "feature");
-	await fs.mkdir(path.join(scratch, "implementation"));
+): Promise<Scene> {
+	const repo = await initRepo({
+		slug: "feature",
+		branch: "feature/delivery",
+		prefix: "hyper-workflow-test-",
+		spec: "Deliver independent A and B, then dependent C.",
+		contract: "P1: A; P2: B; P3: C sees A.",
+	});
+	const { root } = repo;
+	const backend = await HyperGit.inspect(root, repo.slug);
 	for (const name of ["a.md", "b.md", "c.md"])
-		await fs.writeFile(path.join(scratch, "implementation", name), `# ${name}\nAcceptance: deliver ${name[0]}.`);
+		await ticketFile(repo, name, `# ${name}\nAcceptance: deliver ${name[0]}.`);
+	const events: string[] = [];
 	const retroIds: string[] = [];
+	const runs: { role: HyperRole; id: string; name: string }[] = [];
+	const retroWarnings: string[] = [];
+	const published = async (): Promise<string[]> =>
+		(await fs.readdir(path.join(root, ".scratch", repo.slug))).sort();
 	let failIntegration = options.failIntegration ?? false;
 	const host: HyperHost = {
 		async run(request) {
+			const respond = (overrides: Partial<SingleResult> = {}): SingleResult => {
+				const execution = result(request, overrides);
+				runs.push({ role: request.role, id: execution.id, name: request.name });
+				return execution;
+			};
 			if (request.role === "implement") {
 				await options.implementationGate;
 				if (options.throwImplementation?.()) throw new Error("implementation transport failed");
 				const name = request.name.split(":")[0][0];
-				await fs.writeFile(path.join(request.cwd, `${name}.txt`), `delivered ${name}\n`);
+				await write(path.join(request.cwd, `${name}.txt`), `delivered ${name}\n`);
 				await git(request.cwd, "add", `${name}.txt`);
 				await git(request.cwd, "commit", "--allow-empty", "-m", `deliver ${name}`);
 			} else if (request.role === "integrate") {
 				if (request.cwd !== root) await git(request.cwd, "merge", "--no-edit", backend.branch);
 				else if (failIntegration) {
 					failIntegration = false;
-					return result(request, { exitCode: 1, output: "Integration regression failed." });
+					return respond({ exitCode: 1, output: "Integration regression failed." });
 				}
 			} else if (request.role === "fix") {
-				await fs.writeFile(path.join(root, "integration-fix.txt"), "regression corrected\n");
+				await write(path.join(root, "integration-fix.txt"), "regression corrected\n");
 				await git(root, "add", "integration-fix.txt");
 				await git(root, "commit", "-m", "fix integration regression");
 			}
 			if (options.mutateReadonly?.() === request.role) {
-				await fs.writeFile(path.join(root, "readonly-change.txt"), request.role);
+				await write(path.join(root, "readonly-change.txt"), request.role);
 				await git(root, "add", "readonly-change.txt");
 				await git(root, "commit", "-m", "illegal read-only change");
 			}
-			return result(request);
+			return respond();
 		},
-		async close() {},
+		async close() {
+			// Final boundary: by the time finish releases the host, publication must be complete.
+			events.push(`close:publication=${JSON.stringify(await published())}`);
+		},
 		retro: {
 			async identify(execution) {
 				return {
@@ -120,12 +178,22 @@ async function fixture(
 					execution_cwd: root,
 				};
 			},
-			async analyze(_record, execution) {
+			async analyze(record, execution) {
 				retroIds.push(execution.id);
 				await options.retroGate;
-				return { ...execution, output: "Keep the successful behavioral verification; no instruction changes applied." };
+				// External artifact boundary: while this retro is not yet terminal, the workflow
+				// must not have published any report or record into the integration checkout.
+				events.push(`retro:${record.ticket}:publication=${JSON.stringify(await published())}`);
+				if (options.failRetro?.(record.ticket))
+					return result(execution, { exitCode: 1, output: "", error: "retro turn returned no transcript" });
+				return {
+					...execution,
+					output: "Keep the successful behavioral verification; no instruction changes applied.",
+				};
 			},
-			warn() {},
+			warn(message) {
+				retroWarnings.push(message);
+			},
 		},
 	};
 	const workflow = await HyperWorkflow.create("feature", backend, host, options.cap ?? 2, "parent", "Main", null);
@@ -138,7 +206,7 @@ async function fixture(
 			{ ticket: "c.md", blockedBy: ["a.md"] },
 		],
 	});
-	return { root, workflow, backend, retroIds };
+	return { root, workflow, retroIds, runs, retroWarnings, events };
 }
 
 async function complete(workflow: HyperWorkflow, ticket: string) {
@@ -180,12 +248,17 @@ test("parallel slots are bounded and dependency C waits for A's merge AND main-a
 		release = resolve;
 	});
 	releases.push(release);
-	const { workflow, backend, root } = await fixture({ implementationGate: gate });
-	await workflow.execute({ action: "dispatch", tickets: ["a.md", "b.md"] });
-	expect([...backend.worktrees.keys()]).toEqual(["a.md", "b.md"]);
+	const { workflow, root } = await fixture({ implementationGate: gate });
+	const dispatched = (await workflow.execute({
+		action: "dispatch",
+		tickets: ["a.md", "b.md"],
+	})) as unknown as StatusSnapshot;
+	expect(dispatched.active).toEqual(["a.md", "b.md"]);
+	expect(ticketSnapshot(dispatched, "c.md").status).toBe("ready");
 	await expect(workflow.execute({ action: "dispatch", tickets: ["c.md"] })).rejects.toThrow("并发上限");
 	release();
-	while (workflow.tickets.get("a.md")!.status === "running") await workflow.execute({ action: "collect" });
+	while (ticketSnapshot(await status(workflow), "a.md").status === "running")
+		await workflow.execute({ action: "collect" });
 	await workflow.execute({
 		action: "accept",
 		ticket: "a.md",
@@ -202,17 +275,20 @@ test("parallel slots are bounded and dependency C waits for A's merge AND main-a
 		accepted: true,
 		reason: "Integrated A behavior and relevant regression passed.",
 	});
-	await workflow.execute({ action: "dispatch", tickets: ["c.md"] });
-	expect(await git(backend.worktrees.get("c.md")!.cwd, "show", "HEAD:a.txt")).toBe("delivered a");
+	const dispatchedC = (await workflow.execute({
+		action: "dispatch",
+		tickets: ["c.md"],
+	})) as unknown as StatusSnapshot;
+	expect(await git(worktreeOf(dispatchedC, "c.md").cwd, "show", "HEAD:a.txt")).toBe("delivered a");
 	await workflow.execute({ action: "collect" });
 });
 
 test("fresh failed continuation reuses the worktree but cannot be accepted with the previous successful invocation report", async () => {
 	let fail = false;
-	const { workflow, backend } = await fixture({ throwImplementation: () => fail });
+	const { workflow } = await fixture({ throwImplementation: () => fail });
 	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
 	await workflow.execute({ action: "collect" });
-	const original = backend.worktrees.get("a.md")!;
+	const original = worktreeOf(await status(workflow), "a.md");
 	await workflow.execute({
 		action: "accept",
 		ticket: "a.md",
@@ -222,7 +298,7 @@ test("fresh failed continuation reuses the worktree but cannot be accepted with 
 	fail = true;
 	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
 	await workflow.execute({ action: "collect" });
-	expect(backend.worktrees.get("a.md")).toEqual(original);
+	expect(worktreeOf(await status(workflow), "a.md")).toEqual(original);
 	expect(await fs.readFile(path.join(original.cwd, "a.txt"), "utf8")).toBe("delivered a\n");
 	await expect(
 		workflow.execute({ action: "accept", ticket: "a.md", accepted: true, reason: "Attempt to reuse previous report." }),
@@ -245,7 +321,7 @@ test("fresh failed continuation reuses the worktree but cannot be accepted with 
 });
 
 test("failed post-merge verification pauses new work until independent repair and acceptance; helper agents never retro", async () => {
-	const { workflow, retroIds } = await fixture({ failIntegration: true });
+	const { workflow, retroIds, runs, retroWarnings } = await fixture({ failIntegration: true });
 	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
 	await workflow.execute({ action: "collect" });
 	await workflow.execute({
@@ -271,8 +347,11 @@ test("failed post-merge verification pauses new work until independent repair an
 		accepted: true,
 		reason: "Repair report demonstrates corrected regression.",
 	});
+	// Scene barrier: drain the asynchronous retros before reading the boundary capture.
 	await workflow.retro.finish();
-	expect(retroIds).toEqual([workflow.retro.records[0].agent_id!]);
+	expect([...new Set(runs.map((run) => run.role))].sort()).toEqual(["fix", "implement", "integrate"]);
+	expect(retroIds).toEqual(runs.filter((run) => run.role === "implement").map((run) => run.id));
+	expect(retroWarnings).toEqual([]);
 	// This fixture ends after checking repair; no further dispatch after retro.finish.
 });
 
@@ -308,13 +387,16 @@ test("read-only reviewers and verifiers cannot publish an acceptable report afte
 	).rejects.toThrow("没有最终验证报告");
 }, 30000);
 
-test("final publication waits for retro, commits all reports with usable paths, cleans trees and retains branches; stale validation cannot finish", async () => {
+test("final publication waits for every retro terminal outcome, commits all records with usable paths, cleans trees and retains branches; stale validation cannot finish", async () => {
 	let release!: () => void;
 	const retroGate = new Promise<void>((resolve) => {
 		release = resolve;
 	});
 	releases.push(release);
-	const { workflow, root, backend, retroIds } = await fixture({ retroGate });
+	const { workflow, root, events, retroIds, runs, retroWarnings } = await fixture({
+		retroGate,
+		failRetro: (ticket) => ticket === "b.md",
+	});
 	await complete(workflow, "a.md");
 	await complete(workflow, "b.md");
 	await complete(workflow, "c.md");
@@ -330,21 +412,14 @@ test("final publication waits for retro, commits all reports with usable paths, 
 	await git(root, "commit", "--allow-empty", "-m", "change after verification");
 	await expect(workflow.execute({ action: "finish" })).rejects.toThrow("报告已过期");
 	await finalVerification(workflow);
-	expect(await fs.readdir(path.join(root, ".scratch", "feature"))).toEqual([
-		"contract.md",
-		"implementation",
-		"spec.md",
-	]);
-	const branches = [...backend.worktrees.values()].map((tree) => tree.branch);
-	let finished = false;
-	const finishing = workflow.execute({ action: "finish" }).then((value) => {
-		finished = true;
-		return value;
-	});
-	await Promise.resolve();
-	expect(finished).toBe(false);
+	const scratch = path.join(root, ".scratch", "feature");
+	expect((await fs.readdir(scratch)).sort()).toEqual(["contract.md", "implementation", "spec.md"]);
+	const before = await status(workflow);
+	expect(before.tickets.map((ticket) => ticket.status)).toEqual(["integrated", "integrated", "integrated"]);
+	const branches = before.tickets.map((ticket) => worktreeOf(before, ticket.ticket).branch);
+	const finishing = workflow.execute({ action: "finish" });
 	release();
-	const summary = (await finishing) as { commit: string; reports: string[]; warnings: string[] };
+	const summary = (await finishing) as unknown as FinishSummary;
 	expect(summary.warnings).toEqual([]);
 	expect(await git(root, "status", "--porcelain")).toBe("");
 	for (const branch of branches) expect(await git(root, "rev-parse", "--verify", branch)).toMatch(/^[a-f0-9]{40}$/);
@@ -353,10 +428,50 @@ test("final publication waits for retro, commits all reports with usable paths, 
 		expect(await git(root, "ls-files", "--error-unmatch", path.relative(root, file))).toBe(
 			path.relative(root, file).split(path.sep).join("/"),
 		);
+	expect(summary.retainedBranches.slice().sort()).toEqual(branches.slice().sort());
+
+	// Deterministic boundary signals: the host's retro boundary observes the integration
+	// checkout before any publication, the close boundary observes it published, and
+	// nothing is recorded after close — so publication is bracketed by the retro terminal
+	// outcomes instead of being sampled at an arbitrary scheduling point.
+	const unpublishedListing = JSON.stringify(["contract.md", "implementation", "spec.md"]);
+	const publishedListing = JSON.stringify(["contract.md", "execution", "implementation", "retro", "spec.md"]);
+	const retroProbes = events.filter((event) => event.startsWith("retro:"));
+	expect(retroProbes.map((event) => event.split(":")[1]).sort()).toEqual(["a.md", "b.md", "c.md"]);
+	expect(retroProbes.filter((event) => !event.endsWith(`publication=${unpublishedListing}`))).toEqual([]);
+	expect(events.filter((event) => event.startsWith("close:"))).toEqual([
+		`close:publication=${publishedListing}`,
+	]);
+	const closeIndex = events.findIndex((event) => event.startsWith("close:"));
+	expect(closeIndex).toBe(events.length - 1);
+	expect(events.slice(0, closeIndex).every((event) => event.startsWith("retro:"))).toBe(true);
+	expect(retroIds).toEqual(runs.filter((run) => run.role === "implement").map((run) => run.id));
 	const ledgerFile = summary.reports.find((file) => file.endsWith("workflow.json"))!;
-	const ledger = JSON.parse(await fs.readFile(ledgerFile, "utf8"));
-	for (const attempt of ledger.attempts)
-		expect(await fs.readFile(attempt.report, "utf8")).toContain("Required behavior verified");
-	expect(retroIds).toEqual(workflow.retro.records.map((record) => record.agent_id!));
-	expect(await fs.stat(workflow.temporary).catch(() => null)).toBeNull();
+	const ledger = JSON.parse(await fs.readFile(ledgerFile, "utf8")) as unknown as Ledger;
+	expect(ledger.executions.map((record) => record.agent_id).sort()).toEqual(retroIds.slice().sort());
+	expect(ledger.executions.map((record) => record.tool_call_id).sort()).toEqual(
+		ledger.attempts.map((attempt) => attempt.id).sort(),
+	);
+	for (const attempt of ledger.attempts) {
+		const record = ledger.executions.find((entry) => entry.tool_call_id === attempt.id)!;
+		expect(record.ticket).toBe(attempt.ticket);
+		expect(record.tdd_status).toBe("completed");
+		expect(record.retro_status).toBe(attempt.ticket === "b.md" ? "failed" : "completed");
+		const publishedRecord = path.join(scratch, "retro", attempt.ticket, `${record.run_id}.json`);
+		expect(summary.reports).toContain(publishedRecord);
+		if (attempt.ticket === "b.md") {
+			expect(record.retro_error).toBeTruthy();
+			expect(record.retro_document).toBeUndefined();
+		} else {
+			expect(await fs.readFile(record.retro_document!, "utf8")).toContain(
+				"Keep the successful behavioral verification",
+			);
+			expect(summary.reports).toContain(
+				path.join(scratch, "retro", attempt.ticket, `${record.run_id}.md`),
+			);
+		}
+		expect(await fs.readFile(attempt.report!, "utf8")).toContain("Required behavior verified");
+	}
+	expect(retroWarnings.some((warning) => warning.includes("b.md"))).toBe(true);
+	expect(await fs.stat(before.temporaryDir).catch(() => null)).toBeNull();
 }, 30000);

@@ -2,7 +2,7 @@
 
 [English](./hyper-auto-coding.md) · [串行工作流](./spec-to-code.cn.md) · [仓库 README](../README.cn.md)
 
-`/hyper-auto-coding <slug>` 是 OMP 专用命令。它与 `/spec-to-code` 共用原有 Phase 1，但 Phase 2 在每票独立的 branch/worktree 中并行实现，再串行集成到用户准备好的本地开发分支。旧命令仍然串行执行，不编排 Git worktree。
+`/hyper-auto-coding <slug>` 是 OMP 专用命令。它与 `/spec-to-code` 共用原有 Phase 1，但 Phase 2 在每票独立的 branch/worktree 中并行实现，再串行集成到用户准备好的本地集成分支。旧命令仍然串行执行，不编排 Git worktree。
 
 ## 安装与准备
 
@@ -12,11 +12,11 @@
 
 开始前，用户必须：
 
-1. 创建并检出一条独立的本地开发分支，不能是 `main`/`master` 或 detached HEAD。
+1. 创建并检出一条独立的本地集成分支，不能是 `main`/`master` 或 detached HEAD。
 2. 将 `.scratch/<slug>/spec.md`、`contract.md` 及相关输入文档提交到该分支。
 3. 保持工作区及暂存区干净，并提供可用的本地 Git 提交身份。
 
-所有 Git 操作仅在本地发生：不 push，不创建 PR，不合入 main。不自动创建交付分支、stash 或提交无关修改。slug 是单个安全路径片段。
+所有 Git 操作仅在本地发生：不 push，不创建 PR，不合入 main。不自动创建集成分支、stash 或提交无关修改。slug 是单个安全路径片段。
 
 ## 配置
 
@@ -87,7 +87,7 @@ Markdown retro 只在成功交付时存在；失败记录仍然提交。实现�
 
 ## 编排工具与边界
 
-主代理通过 `hyper_auto_coding` 的 `plan`、`dispatch`、`collect`、`accept`、`integrate`、`confirm_integration`、`repair_integration`、`review`、`assess_review`、`fix`、`verify`、`accept_verification`、`finish` 操作推进流程；`status` 只读状态。不得另用 native task 为这些票据绕过工作流派发。每项验收决定必须有原因或证据；宿主约束并发、依赖、会话归属和提交版本，不独立证明自然语言验收结论正确。
+主代理通过 `hyper_auto_coding` 的 `plan`、`dispatch`、`collect`、`accept`、`integrate`、`confirm_integration`、`repair_integration`、`review`、`assess_review`、`fix`、`verify`、`accept_verification`、`finish` 操作推进流程；`status` 只读状态。状态快照带有 `temporaryDir`：`finish` 发布前，报告与执行记录暂存于该系统临时目录。该字段替代原来的 `temporary`，不提供兼容别名。`finish` 返回含最终提交与已发布报告路径的交付摘要，而非状态快照；最终发布位置见上文“最终文件”。不得另用 native task 为这些票据绕过工作流派发。每项验收决定必须有原因或证据；宿主约束并发、依赖、会话归属和提交版本，不独立证明自然语言验收结论正确。
 
 同一扩展一次只承载一条工作流。此功能按一次会话完成全部票据设计，本次不提供中断、取消或自动恢复机制。
 

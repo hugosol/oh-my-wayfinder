@@ -37,6 +37,23 @@ export type HyperAction =
 	| "verify"
 	| "accept_verification"
 	| "finish";
+
+/** One implementation attempt of one ticket, recorded for the audit ledger. */
+interface ExecutionAttempt {
+	ticket: string;
+	id: string;
+	report?: string;
+	error?: string;
+}
+
+/** Main-agent acceptance decision recorded for one workflow action. */
+interface AcceptanceDecision {
+	action: HyperAction;
+	ticket?: string;
+	accepted: boolean;
+	reason: string;
+}
+
 export interface HyperInput {
 	action: HyperAction;
 	plan?: TicketPlan[];
@@ -50,13 +67,19 @@ function succeeded(result: SingleResult): boolean {
 	return result.exitCode === 0 && !result.error && !result.aborted && !result.truncated && !!result.output.trim();
 }
 
+/** Label for each read-only phase in HEAD-drift errors; the run must never move HEAD. */
+const READ_ONLY_PHASE_LABEL: Record<"review" | "verify", string> = {
+	review: "评审",
+	verify: "验证",
+};
+
 /** The main agent makes acceptance decisions; this class enforces workspace and scheduling boundaries. */
 export class HyperWorkflow {
 	readonly tickets = new Map<string, TicketState>();
 	readonly #running = new Map<string, Promise<void>>();
 	readonly #reports: string[] = [];
-	readonly #attempts: { ticket: string; id: string; report?: string; error?: string }[] = [];
-	readonly #decisions: { action: string; ticket?: string; accepted: boolean; reason: string }[] = [];
+	readonly #attempts: ExecutionAttempt[] = [];
+	readonly #decisions: AcceptanceDecision[] = [];
 	#busy = false;
 	#integration?: { ticket: string; report?: Report };
 	#review?: Report;
@@ -73,7 +96,7 @@ export class HyperWorkflow {
 		readonly maxParallelTickets: number,
 		readonly ownerSessionId: string,
 		readonly ownerAgentId: string,
-		readonly temporary: string,
+		readonly temporaryDir: string,
 		readonly baseline: string,
 		readonly retro: RetroWorkflow,
 	) {}
@@ -88,12 +111,12 @@ export class HyperWorkflow {
 		sessionFile: string | null,
 	): Promise<HyperWorkflow> {
 		const baseline = await git.commitTickets();
-		const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "hyper-auto-coding-"));
+		const temporaryDir = await fs.mkdtemp(path.join(os.tmpdir(), "hyper-auto-coding-"));
 		const entries = await fs.readdir(path.join(git.root, ".scratch", slug, "implementation"), { withFileTypes: true });
 		const names = entries.filter((entry) => entry.isFile() && entry.name.endsWith(".md")).map((entry) => entry.name);
 		const retro = new RetroWorkflow(slug, git.root, sessionId, agentId, sessionFile, new Set(names), host.retro, {
 			maxConcurrent: maxParallelTickets,
-			storageRoot: path.join(temporary, "retro"),
+			storageRoot: path.join(temporaryDir, "retro"),
 		});
 		const workflow = new HyperWorkflow(
 			slug,
@@ -102,7 +125,7 @@ export class HyperWorkflow {
 			maxParallelTickets,
 			sessionId,
 			agentId,
-			temporary,
+			temporaryDir,
 			baseline,
 			retro,
 		);
@@ -121,7 +144,7 @@ export class HyperWorkflow {
 		return {
 			branch: this.git.branch,
 			baseline: this.baseline,
-			temporary: this.temporary,
+			temporaryDir: this.temporaryDir,
 			maxParallelTickets: this.maxParallelTickets,
 			active: [...this.#running.keys()],
 			ready:
@@ -262,7 +285,7 @@ export class HyperWorkflow {
 			const previous = ticket.report?.path;
 			ticket.report = undefined;
 			ticket.status = "running";
-			const attempt = { ticket: name, id } as { ticket: string; id: string; report?: string; error?: string };
+			const attempt: ExecutionAttempt = { ticket: name, id };
 			this.#attempts.push(attempt);
 			await this.retro.begin(id, name);
 			const task = `在当前 worktree 实现唯一票据：${path.join(worktree.cwd, ".scratch", this.slug, "implementation", name)}。\n${this.#references()}\n${previous ? `接手此前实现进度，不丢弃已有修改。先读上次报告：${previous}` : "这是本票首次执行。"}\n遵守 tdd skill。逐项报告验收证据、实际验证命令及未完成事项。不要修改其他票据、retro 或工作流报告。不要操作集成分支工作区。完成前将集成分支最新 tip 合入当前票据分支，解决冲突并验证；提交本票实现。不得 reset 丢弃既有工作。只执行本票，不调用 retro、不派发其他票据。`;
@@ -275,7 +298,7 @@ export class HyperWorkflow {
 				} catch (error) {
 					failure = error instanceof Error ? error.message : String(error);
 					attempt.error = failure;
-					const file = path.join(this.temporary, `implement-${id}-error.md`);
+					const file = path.join(this.temporaryDir, `implement-${id}-error.md`);
 					await fs.writeFile(file, failure, "utf8");
 					this.#reports.push(file);
 					ticket.decision = failure;
@@ -370,19 +393,15 @@ export class HyperWorkflow {
 	}
 	async #runReview(): Promise<void> {
 		this.#allIntegrated();
-		await this.git.assertClean();
-		this.#reviewAccepted = false;
-		this.#verified = false;
-		this.#review = undefined;
-		const head = await this.git.head();
-		const review = await this.#run(
+		this.#review = await this.#runReadOnly(
 			"review",
-			this.git.root,
 			`加载并执行本仓库已安装的 code-review skill，对固定起点 ${this.baseline} 到当前 HEAD 的已提交变更进行评审，不评审默认未提交 diff。${this.#references()}\n显式读取 spec，contract 为补充依据。保留 Standards/Spec 双轴独立并行及分开汇总，按 skill 完整执行。评审只读，不应用修复、不提交、不运行 retro。只通过文档、提交和证据取材，不依赖主会话历史。`,
+			() => {
+				this.#reviewAccepted = false;
+				this.#verified = false;
+				this.#review = undefined;
+			},
 		);
-		await this.git.assertClean();
-		if ((await this.git.head()) !== head) throw new Error("只读评审期间集成分支提交被修改。");
-		this.#review = review;
 	}
 	async #assessReview(input: HyperInput): Promise<void> {
 		if (!this.#review) throw new Error("先完成独立 code-review。");
@@ -408,17 +427,14 @@ export class HyperWorkflow {
 		this.#allIntegrated();
 		if (!this.#reviewAccepted || !this.#review) throw new Error("先完成评审修复及独立复核。");
 		await this.#checkReport(this.#review);
-		this.#verified = false;
-		this.#verification = undefined;
-		const head = await this.git.head();
-		const verification = await this.#run(
+		this.#verification = await this.#runReadOnly(
 			"verify",
-			this.git.root,
 			`对当前集成分支做最终整体验证。${this.#references()}\n评审报告：${this.#review.path}。依据 contract 承诺、跨票据行为及项目要求选择并实际执行整体验证，逐项报告证据和未验证项。不得修改代码、需求或提交。不要调用 retro。`,
+			() => {
+				this.#verified = false;
+				this.#verification = undefined;
+			},
 		);
-		await this.git.assertClean();
-		if ((await this.git.head()) !== head) throw new Error("只读验证期间集成分支提交被修改。");
-		this.#verification = verification;
 	}
 	async #acceptVerification(input: HyperInput): Promise<void> {
 		if (!this.#verification) throw new Error("没有最终验证报告。");
@@ -431,12 +447,31 @@ export class HyperWorkflow {
 		await this.git.assertClean();
 		if ((await this.git.head()) !== report.head) throw new Error("验证或评审报告已过期，需要针对当前提交重新执行。");
 	}
+
+	/**
+	 * Run one read-only phase (`review` or `verify`) under the HEAD+clean
+	 * guard: the integration checkout is clean before and after, and HEAD must
+	 * be the same commit. The phase's prior state is reset before the run, so a
+	 * phase that mutated its own target can never leave an acceptable report.
+	 */
+	async #runReadOnly(role: "review" | "verify", task: string, reset: () => void): Promise<Report> {
+		await this.git.assertClean();
+		reset();
+		const head = await this.git.head();
+		const report = await this.#run(role, this.git.root, task);
+		await this.git.assertClean();
+		if ((await this.git.head()) !== head) {
+			throw new Error(`只读${READ_ONLY_PHASE_LABEL[role]}期间集成分支提交被修改。`);
+		}
+		return report;
+	}
+
 	async #run(role: HyperRole, cwd: string, task: string): Promise<Report> {
 		const result = await this.host.run({ role, cwd, task, name: `${role}-${randomUUID()}` });
 		return this.#save(role, result, await this.git.head());
 	}
 	async #save(role: HyperRole, result: SingleResult, head: string): Promise<Report> {
-		const file = path.join(this.temporary, `${role}-${randomUUID()}.md`);
+		const file = path.join(this.temporaryDir, `${role}-${randomUUID()}.md`);
 		const metadata = {
 			role,
 			agent: result.agent,
@@ -462,12 +497,12 @@ export class HyperWorkflow {
 		await this.#checkReport(this.#verification);
 		await this.retro.finish();
 		const files = await this.retro.publish(path.join(this.git.root, ".scratch", this.slug, "retro"));
-		const directory = path.join(this.git.root, ".scratch", this.slug, "execution", path.basename(this.temporary));
+		const directory = path.join(this.git.root, ".scratch", this.slug, "execution", path.basename(this.temporaryDir));
 		await fs.mkdir(directory, { recursive: true });
 		for (const source of this.#reports) {
 			const target = path.join(directory, path.basename(source));
 			const body = await fs.readFile(source, "utf8");
-			await fs.writeFile(target, body.split(this.temporary).join(directory), "utf8");
+			await fs.writeFile(target, body.split(this.temporaryDir).join(directory), "utf8");
 			files.push(target);
 		}
 		const ledger = path.join(directory, "workflow.json");
@@ -483,9 +518,9 @@ export class HyperWorkflow {
 			null,
 			2,
 		);
-		const encodedTemporary = JSON.stringify(this.temporary).slice(1, -1);
+		const encodedTemporaryDir = JSON.stringify(this.temporaryDir).slice(1, -1);
 		const encodedDirectory = JSON.stringify(directory).slice(1, -1);
-		await fs.writeFile(ledger, body.split(encodedTemporary).join(encodedDirectory));
+		await fs.writeFile(ledger, body.split(encodedTemporaryDir).join(encodedDirectory));
 		files.push(ledger);
 		const commit = await this.git.commitFiles(
 			files.map((file) => path.relative(this.git.root, file).split(path.sep).join("/")),
@@ -500,9 +535,9 @@ export class HyperWorkflow {
 		}
 		this.#finished = true;
 		try {
-			await fs.rm(this.temporary, { recursive: true });
+			await fs.rm(this.temporaryDir, { recursive: true });
 		} catch (error) {
-			warnings.push(`报告临时目录保留：${this.temporary}；${error instanceof Error ? error.message : String(error)}`);
+			warnings.push(`报告临时目录保留：${this.temporaryDir}；${error instanceof Error ? error.message : String(error)}`);
 		}
 		return {
 			branch: this.git.branch,

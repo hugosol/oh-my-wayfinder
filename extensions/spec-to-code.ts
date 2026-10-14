@@ -168,7 +168,7 @@ export default function specToCode(pi: ExtensionAPI): void {
 	const session = createWorkflowSession();
 	let retroWorkflow: RetroWorkflow | undefined;
 	let phase2Starting = false;
-	let parallel = false;
+	let hyperMode = false;
 	let hyperGit: HyperGit | undefined;
 	let hyperWorkflow: HyperWorkflow | undefined;
 	registerHyperTools(
@@ -371,7 +371,7 @@ export default function specToCode(pi: ExtensionAPI): void {
 			session.reset();
 			phase2Starting = true;
 			try {
-				if (parallel) {
+				if (hyperMode) {
 					if (!hyperGit) throw new Error("集成分支尚未初始化。");
 					const host = await createHyperHost(pi, ctx);
 					hyperWorkflow = await HyperWorkflow.create(
@@ -390,7 +390,7 @@ export default function specToCode(pi: ExtensionAPI): void {
 				}
 			} catch (error) {
 				ctx.ui.notify(
-					`${parallel ? "Hyper-Auto-Coding" : "Spec-to-Code"} 无法启动 Phase 2：${error instanceof Error ? error.message : String(error)}`,
+					`${hyperMode ? "Hyper-Auto-Coding" : "Spec-to-Code"} 无法启动 Phase 2：${error instanceof Error ? error.message : String(error)}`,
 					"error",
 				);
 			} finally {
@@ -410,12 +410,37 @@ export default function specToCode(pi: ExtensionAPI): void {
 		);
 	});
 
-	for (const command of ["spec-to-code", "hyper-auto-coding"] as const) {
-		pi.registerCommand(command, {
-			description:
-				command === "spec-to-code"
-					? "Autonomous serial Spec → Tickets → Code workflow"
-					: "Local integration-branch workflow with parallel ticket worktrees",
+	const commands = [
+		{
+			name: "spec-to-code",
+			description: "Autonomous serial Spec → Tickets → Code workflow",
+			hyperMode: false,
+		},
+		{
+			name: "hyper-auto-coding",
+			description: "Local integration-branch workflow with parallel ticket worktrees",
+			hyperMode: true,
+			async prepare(slug: string, ctx: ExtensionCommandContext): Promise<boolean> {
+				if (!(await hasSkill("code-review"))) {
+					ctx.ui.notify("缺少: code-review (skill)。请检查安装。", "error");
+					return false;
+				}
+				try {
+					hyperGit = await HyperGit.inspect(ctx.cwd, slug);
+					return true;
+				} catch (error) {
+					ctx.ui.notify(
+						`Hyper-Auto-Coding 无法启动：${error instanceof Error ? error.message : String(error)}`,
+						"error",
+					);
+					return false;
+				}
+			},
+		},
+	];
+	for (const command of commands) {
+		pi.registerCommand(command.name, {
+			description: command.description,
 			handler: async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
 				if (session.isActive || retroWorkflow || hyperWorkflow || phase2Starting) {
 					ctx.ui.notify("已有 Spec-to-Code / Hyper-Auto-Coding 工作流在运行，等待其结束后再启动。", "error");
@@ -425,7 +450,7 @@ export default function specToCode(pi: ExtensionAPI): void {
 				const slug = args.trim();
 
 				if (!slug) {
-					ctx.ui.notify(`用法: /${command} <slug>`, "error");
+					ctx.ui.notify(`用法: /${command.name} <slug>`, "error");
 					return;
 				}
 
@@ -454,22 +479,8 @@ export default function specToCode(pi: ExtensionAPI): void {
 					return;
 				}
 
-				if (command === "hyper-auto-coding") {
-					if (!(await hasSkill("code-review"))) {
-						ctx.ui.notify("缺少: code-review (skill)。请检查安装。", "error");
-						return;
-					}
-					try {
-						hyperGit = await HyperGit.inspect(ctx.cwd, slug);
-					} catch (error) {
-						ctx.ui.notify(
-							`Hyper-Auto-Coding 无法启动：${error instanceof Error ? error.message : String(error)}`,
-							"error",
-						);
-						return;
-					}
-				}
-				parallel = command === "hyper-auto-coding";
+				if (command.prepare && !(await command.prepare(slug, ctx))) return;
+				hyperMode = command.hyperMode;
 				session.begin(slug, ctx.sessionManager.getSessionId());
 				const success = await activateSkill(
 					pi,

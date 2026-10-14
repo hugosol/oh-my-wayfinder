@@ -213,17 +213,7 @@ export class HyperGit {
 			throw new Error(`实现票据目录中没有 *.md 票据文件：.scratch/${this.#slug}/implementation`);
 		}
 		await this.#rejectForeignStaged(files);
-		const pathspecs = files.map(literal);
-		await mustGit(this.root, ["add", "--", ...pathspecs]);
-		const diff = await git(this.root, ["diff", "--cached", "--quiet", "HEAD", "--", ...pathspecs]);
-		if (diff.code === 0) return this.head();
-		if (diff.code !== 1) {
-			throw new Error(
-				`git diff --cached 执行失败（退出码 ${diff.code}）：${firstLines(diff.stderr || diff.stdout) || "无输出"}`,
-			);
-		}
-		await mustGit(this.root, ["commit", "-m", `Publish implementation tickets for ${this.#slug}`, "--", ...pathspecs]);
-		return this.head();
+		return this.#commitStagedPaths(files, `Publish implementation tickets for ${this.#slug}`);
 	}
 
 	/**
@@ -303,17 +293,7 @@ export class HyperGit {
 		const paths = [...new Set(files.map((file) => this.#relativePath(file)))];
 		await this.#rejectForeignStaged(paths);
 		if (paths.length === 0) return this.head();
-		const pathspecs = paths.map(literal);
-		await mustGit(this.root, ["add", "--", ...pathspecs]);
-		const diff = await git(this.root, ["diff", "--cached", "--quiet", "HEAD", "--", ...pathspecs]);
-		if (diff.code === 0) return this.head();
-		if (diff.code !== 1) {
-			throw new Error(
-				`git diff --cached 执行失败（退出码 ${diff.code}）：${firstLines(diff.stderr || diff.stdout) || "无输出"}`,
-			);
-		}
-		await mustGit(this.root, ["commit", "-m", message, "--", ...pathspecs]);
-		return this.head();
+		return this.#commitStagedPaths(paths, message);
 	}
 
 	/**
@@ -466,6 +446,26 @@ export class HyperGit {
 		if (foreign.length > 0) {
 			throw new Error(`暂存区存在与本次提交无关的改动，已拒绝：${foreign.join("、")}`);
 		}
+	}
+
+	/**
+	 * Stage and commit exactly these already-validated repository-relative
+	 * paths with literal pathspecs. When the staged content matches HEAD the
+	 * current HEAD is returned without creating an empty commit. Callers must
+	 * pass at least one path, after `#rejectForeignStaged` accepted the index.
+	 */
+	async #commitStagedPaths(paths: readonly string[], message: string): Promise<string> {
+		const pathspecs = paths.map(literal);
+		await mustGit(this.root, ["add", "--", ...pathspecs]);
+		const diff = await git(this.root, ["diff", "--cached", "--quiet", "HEAD", "--", ...pathspecs]);
+		if (diff.code === 0) return this.head();
+		if (diff.code !== 1) {
+			throw new Error(
+				`git diff --cached 执行失败（退出码 ${diff.code}）：${firstLines(diff.stderr || diff.stdout) || "无输出"}`,
+			);
+		}
+		await mustGit(this.root, ["commit", "-m", message, "--", ...pathspecs]);
+		return this.head();
 	}
 
 	/** Validate and normalize one explicit repository-relative path. */

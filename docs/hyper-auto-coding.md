@@ -2,7 +2,7 @@
 
 [中文文档](./hyper-auto-coding.cn.md) · [Serial workflow](./spec-to-code.md) · [Repository README](../README.md)
 
-`/hyper-auto-coding <slug>` is an OMP-only command. It reuses `/spec-to-code` Phase 1 unchanged, then implements tickets concurrently in individual branches/worktrees and integrates them serially into the user's local development branch. The old command remains serial and does not orchestrate Git worktrees.
+`/hyper-auto-coding <slug>` is an OMP-only command. It reuses `/spec-to-code` Phase 1 unchanged, then implements tickets concurrently in individual branches/worktrees and integrates them serially into the user's local integration branch. The old command remains serial and does not orchestrate Git worktrees.
 
 ## Install and prepare
 
@@ -12,11 +12,11 @@ Required: this repository's `to-tickets`, `tdd`, and `code-review` skills, plus 
 
 Before starting:
 
-1. Create and check out a local development branch, not `main`/`master` or detached HEAD.
+1. Create and check out a local integration branch, not `main`/`master` or detached HEAD.
 2. Commit `.scratch/<slug>/spec.md`, `contract.md`, and related input documents to that branch.
 3. Keep the working tree and index clean, with a usable local Git commit identity.
 
-All Git operations are local: no push, PR, or merge to main. The command does not create the delivery branch, stash changes, or commit unrelated edits. The slug is a single safe path segment.
+All Git operations are local: no push, PR, or merge to main. The command does not create the integration branch, stash changes, or commit unrelated edits. The slug is a single safe path segment.
 
 ## Configuration
 
@@ -87,7 +87,7 @@ A copy or commit failure preserves temporary artifacts and reports an error; it 
 
 ## Orchestration surface and limits
 
-The main agent uses `hyper_auto_coding` actions `plan`, `dispatch`, `collect`, `accept`, `integrate`, `confirm_integration`, `repair_integration`, `review`, `assess_review`, `fix`, `verify`, `accept_verification`, and `finish`; `status` is read-only. Native task calls must not bypass the workflow to dispatch its tickets. Every acceptance decision needs a reason/evidence. The host enforces concurrency, dependencies, session ownership, and commit freshness; it does not independently establish the correctness of a natural-language acceptance conclusion.
+The main agent uses `hyper_auto_coding` actions `plan`, `dispatch`, `collect`, `accept`, `integrate`, `confirm_integration`, `repair_integration`, `review`, `assess_review`, `fix`, `verify`, `accept_verification`, and `finish`; `status` is read-only. Status snapshots report `temporaryDir`: the OS-temp directory holding reports and execution records until `finish` publishes them. This replaces the former `temporary` field without a compatibility alias. `finish` returns a delivery summary with the final commit and published report paths rather than a status snapshot; final outputs are listed above. Native task calls must not bypass the workflow to dispatch its tickets. Every acceptance decision needs a reason/evidence. The host enforces concurrency, dependencies, session ownership, and commit freshness; it does not independently establish the correctness of a natural-language acceptance conclusion.
 
 One workflow runs through the extension at a time. This feature assumes a session completes all tickets; interruption, cancellation, and automatic recovery are not part of this implementation.
 
