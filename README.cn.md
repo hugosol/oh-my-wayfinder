@@ -75,6 +75,8 @@ flowchart TB
 
 Skill 内的自动调用由 agent 执行指令，不是独立调度器；`/spec-to-code` 另外提供宿主驱动的编排。它以已有 spec 和已批准 contract 为输入，自动切票、串行执行 TDD，并自动调用 Retro。
 
+需要并行开发时，使用独立命令 [`/hyper-auto-coding`](docs/hyper-auto-coding.cn.md)：用户先创建本地集成分支并提交输入文档；切票后自动提交票据，每票在独立 worktree 中实现，按依赖持续派发、串行合并验证，最终独立评审、自动修复并提交报告。默认实现并发数为 4，可与 Jev 在同一配置文件调整；旧命令保持串行。
+
 设计变化及其对应的 mapping op，见[上游对比蓝图](docs/upstream-differences.cn.md)。
 
 ## 快速开始
@@ -96,7 +98,8 @@ Skill 内的自动调用由 agent 执行指令，不是独立调度器；`/spec-
 |---|---|
 | 选择下一步调用的 skill | [Ask Matt](skills/ask-matt/SKILL.md) |
 | 理解本仓库改了什么、改动在哪里 | [上游对比蓝图](docs/upstream-differences.cn.md) |
-| 安装、配置和使用 OMP 自动化 | [Spec-to-code 使用指南](docs/spec-to-code.cn.md) |
+| 安装、配置和使用串行 OMP 自动化 | [Spec-to-code 使用指南](docs/spec-to-code.cn.md) |
+| 在本地集成分支上并行开发 | [Hyper-auto-coding 使用指南](docs/hyper-auto-coding.cn.md) |
 | 修改 mapping、构建技能或同步上游 | [维护指南](docs/maintenance.cn.md) |
 
 ## 维护命令

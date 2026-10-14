@@ -75,6 +75,8 @@ flowchart TB
 
 Skill-level automatic calls are instructions executed by the agent, not an independent scheduler. `/spec-to-code` additionally provides host-driven orchestration. It starts with a prepared spec and approved contract, automates ticket creation and serial TDD, and adds automatic Retro calls.
 
+For parallel development, use the independent [`/hyper-auto-coding`](docs/hyper-auto-coding.md) command: prepare a local integration branch with committed inputs, publish and commit tickets, implement each ticket in its own worktree, continuously dispatch ready tickets, integrate and validate serially, then independently review, automatically fix, and commit reports. Implementation concurrency defaults to 4 and shares a configuration file with Jev; the old command remains serial.
+
 For the design changes and their mapping operations, see the [upstream comparison blueprint](docs/upstream-differences.md).
 
 ## Quick start
@@ -96,7 +98,8 @@ No agent modifications or custom installer are required for the skills: install 
 |---|---|
 | Choose the next skill | [Ask Matt](skills/ask-matt/SKILL.md) |
 | Understand what this fork changes and where | [Upstream comparison blueprint](docs/upstream-differences.md) |
-| Install, configure, and run OMP automation | [Spec-to-code guide](docs/spec-to-code.md) |
+| Install, configure, and run serial OMP automation | [Spec-to-code guide](docs/spec-to-code.md) |
+| Develop concurrently on a local integration branch | [Hyper-auto-coding guide](docs/hyper-auto-coding.md) |
 | Edit mappings, build skills, or update upstream | [Maintenance guide](docs/maintenance.md) |
 
 ## Maintenance commands

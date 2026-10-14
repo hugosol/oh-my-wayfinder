@@ -1,6 +1,6 @@
-# Spec-to-Code
+# Automated Implementation
 
-The OMP-only `/spec-to-code` workflow: turn an approved spec into implementation tickets, then execute them with serial TDD subagents. It shares its vocabulary with the planning pipeline that feeds it (`wayfinder` → `to-spec` → `to-contract` → `to-tickets`).
+The OMP-only `/spec-to-code` and `/hyper-auto-coding` workflows turn approved specs into implementation tickets and execute them serially or around a local integration branch. They share vocabulary with the planning pipeline (`wayfinder` → `to-spec` → `to-contract` → `to-tickets`).
 
 ## Language
 
@@ -42,6 +42,20 @@ _Avoid_: review, acceptance verification
 
 **Workflow settled**:
 Every dispatched execution attempt and its retrospective has reached a known outcome, including failures or undelivered retrospectives. Settlement does not mean every ticket passed acceptance.
+
+**Integration branch**:
+The user-prepared development branch that receives the assembled delivery. It is distinct from the individual ticket branches and the repository's main branch.
+_Avoid_: main, ticket branch
+
+**Integrated ticket**:
+An accepted implementation ticket whose work has been merged into the integration branch and whose integration verification has been accepted. A merge alone does not make a ticket integrated.
+
+**Implementation frontier**:
+The implementation tickets available to start because all their blocking tickets have been integrated.
+
+**Delivery complete**:
+All implementation tickets are integrated, final review and verification are accepted, and delivery reports are committed. Retrospective delivery remains an independent outcome.
+_Avoid_: workflow settled
 
 **Jev mode**:
 Turn-reply selection delegated to the judge chain instead of the built-in canned sequence. Off by default; the canned sequence is the deterministic alternative.

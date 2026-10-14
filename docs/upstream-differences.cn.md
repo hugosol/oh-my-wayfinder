@@ -135,6 +135,8 @@ Backtracer 的范围是相关已发布主题，包含未完成票中的已发布
 - 路由介绍：[omp-automation](../deltas/mappings/ask-matt.md#omp-automation)。
 - 安装、配置、输出目录与限制：[扩展使用指南](./spec-to-code.cn.md)。
 
+新增独立命令 [`/hyper-auto-coding`](./hyper-auto-coding.cn.md)，借鉴上游 `implement-spec` 的依赖 frontier 与每票 worktree，但集成分支由用户预先创建并提交 spec/contract。它原样复用现有 Phase 1，提交票据后并行实现、串行合并验证；最终由独立 reviewer/fixer 评审、自动修复并提交。只有票据实现执行触发 retro，报告先在系统临时目录生成，收尾统一提交；成功后清理 worktree、保留 branch。不增加 Phase 1 门禁、重试次数策略或中断恢复。实现见 [`hyper-auto-coding/`](../extensions/hyper-auto-coding/)，配置与 Jev 共用现有文件，默认实现并发数 4。
+
 其他 agent 用户可手动完成通用流程，不会仅靠复制 skills 获得 OMP 的自动调度。
 
 ## 7. 决策生命周期、适用范围与迁移影响

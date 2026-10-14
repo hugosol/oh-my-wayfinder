@@ -15,12 +15,13 @@ fork 改动的内容与位置由[上游对比蓝图](./upstream-differences.cn.m
 
 ### 安装
 
-从本仓库复制三个产物，保持相对布局：
+从本仓库复制以下产物，保持相对布局；同一入口还注册独立的[并行命令 `/hyper-auto-coding`](./hyper-auto-coding.cn.md)：
 
 ```text
 <extension root>/
   spec-to-code.ts        # 扩展入口
-  spec-to-code/          # 配套模块目录，入口以相对路径导入
+  spec-to-code/          # 共用 Phase 1、配置与 retro 模块
+  hyper-auto-coding/     # 并行命令配套模块，入口以相对路径导入
   agents/
     tdd.md               # blocking 的 `tdd` task agent，自动加载 `tdd` skill，自带模型声明
 ```
@@ -44,8 +45,10 @@ fork 改动的内容与位置由[上游对比蓝图](./upstream-differences.cn.m
 `extensions/spec-to-code/config.json` 只在扩展加载时读取一次，修改后需重新加载扩展：
 
 ```json
-{ "jev": { "enabled": false } }
+{ "jev": { "enabled": false }, "hyperAutoCoding": { "maxParallelTickets": 4 } }
 ```
+
+`hyperAutoCoding.maxParallelTickets` 只用于并行命令，不改变本命令的串行行为。
 
 开启 `jev.enabled: true`，且宿主 `judge` 角色能解析出原生 judge 模型（例如 TypeSafe Jev 的 `typesafe/jev-latest`）时，由 judge 选择每条自动回复。第一轮只提供「请你仔细思考后回答这些问题」／「请生成文件」，因此第一条自动回复绝不可能是空泛的「请继续」；「请继续」从第二轮起加入。没有可用 judge 或 judge 调用失败时，回退到固定序列。
 
@@ -97,7 +100,7 @@ Phase 2——串行 TDD：
 - 自动回复不是对 agent 提问的回答：固定回复要求 agent 自行思考或生成文件，judge 也只是在同一小组回复中选择。
 - 切票是否合理、是否验收、复盘结论是否成立，都由你复核；运行本身不以它们为门禁。运行结束会报告已尝试、未执行与已交付的工作，不代表工作正确。
 - 复盘只提建议：复盘被要求不执行建议，不修改代码、配置、skill 或代理指令，也不自行写文件。
-- 扩展不会运行 code review；整个流程只调用 `to-tickets`、`tdd`、`retro` 与 `writing-for-agents`。
+- `/spec-to-code` 不会运行 code review；串行流程只调用 `to-tickets`、`tdd`、`retro` 与 `writing-for-agents`。
 
 ## 实际限制
 

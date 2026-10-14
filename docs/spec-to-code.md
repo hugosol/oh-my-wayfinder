@@ -15,12 +15,13 @@ Both inputs live under `.scratch/<slug>/`:
 
 ### Install
 
-Copy three artifacts from this repository, keeping their relative layout:
+Copy the following artifacts, keeping their relative layout. The same entry also registers the independent [parallel `/hyper-auto-coding` command](./hyper-auto-coding.md):
 
 ```text
 <extension root>/
   spec-to-code.ts        # extension entry
-  spec-to-code/          # companion modules, imported relatively by the entry
+  spec-to-code/          # shared Phase 1, configuration, and retro modules
+  hyper-auto-coding/     # parallel command modules, imported relatively by the entry
   agents/
     tdd.md               # blocking `tdd` task agent; autoloads the `tdd` skill, pins its own model
 ```
@@ -44,8 +45,10 @@ Keep `agents/tdd.md` where OMP discovers task agents: as the `agents/` sibling o
 `extensions/spec-to-code/config.json` is read once, at extension load — reload the extension after editing it:
 
 ```json
-{ "jev": { "enabled": false } }
+{ "jev": { "enabled": false }, "hyperAutoCoding": { "maxParallelTickets": 4 } }
 ```
+
+`hyperAutoCoding.maxParallelTickets` affects only the parallel command; this command remains serial.
 
 With `jev.enabled: true`, and when the host `judge` role resolves a native judge model (for example a TypeSafe Jev model such as `typesafe/jev-latest`), the judge chooses each automatic reply. Round 1 offers only "请你仔细思考后回答这些问题" / "请生成文件", so the first automatic reply is never a bare "请继续"; "请继续" joins from round 2. Without a judge, or on any judge failure, the run falls back to the canned sequence.
 
@@ -97,7 +100,7 @@ Automation advances the session and records execution outcomes; it does not inde
 - Automatic replies are not answers to the agent's questions: the canned replies tell the agent to think it through or to publish, and the judge picks from that same small set.
 - Ticket splits, acceptance, and retro findings stay yours to review; the run does not gate on them. A finished run reports what was attempted, what was not, and what was delivered; it does not mean the work is correct.
 - Retro output is advice: the retro is instructed to propose only — it does not apply suggestions, and it does not modify code, config, skills, or agent instructions, or write files itself.
-- The extension runs no code review; the workflow invokes only `to-tickets`, `tdd`, `retro`, and `writing-for-agents`.
+- `/spec-to-code` runs no code review; the serial workflow invokes only `to-tickets`, `tdd`, `retro`, and `writing-for-agents`.
 
 ## Practical limits
 

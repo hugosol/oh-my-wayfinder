@@ -11,10 +11,12 @@ import * as fs from "node:fs";
 
 export interface SpecToCodeConfig {
 	jevEnabled: boolean;
+	maxParallelTickets: number;
 }
 
 /** `config.json` shape; every field is optional and falls back to the defaults. */
 interface SpecToCodeConfigFile {
+	hyperAutoCoding?: { maxParallelTickets?: number };
 	jev?: {
 		enabled?: boolean;
 	};
@@ -30,7 +32,7 @@ export interface LoadedSpecToCodeConfig {
 const CONFIG_URL = new URL("config.json", import.meta.url);
 
 function defaults(): SpecToCodeConfig {
-	return { jevEnabled: false };
+	return { jevEnabled: false, maxParallelTickets: 4 };
 }
 
 /** Validate parsed JSON, returning either a resolved config or a field-specific error. */
@@ -48,6 +50,18 @@ function validate(raw: unknown): { config?: SpecToCodeConfig; error?: string } {
 		if (jev.enabled !== undefined) {
 			if (typeof jev.enabled !== "boolean") return { error: '"jev.enabled" must be a boolean' };
 			config.jevEnabled = jev.enabled;
+		}
+	}
+	const parallel = file.hyperAutoCoding;
+	if (parallel !== undefined) {
+		if (parallel === null || typeof parallel !== "object" || Array.isArray(parallel)) {
+			return { error: '"hyperAutoCoding" must be an object' };
+		}
+		if (parallel.maxParallelTickets !== undefined) {
+			if (!Number.isSafeInteger(parallel.maxParallelTickets) || parallel.maxParallelTickets < 1) {
+				return { error: '"hyperAutoCoding.maxParallelTickets" must be a positive integer' };
+			}
+			config.maxParallelTickets = parallel.maxParallelTickets;
 		}
 	}
 	return { config };

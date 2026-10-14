@@ -135,6 +135,8 @@ There are no mapping operations for the extension itself:
 - Router introduction: [omp-automation](../deltas/mappings/ask-matt.md#omp-automation).
 - Installation, configuration, output locations, and limits: [extension guide](./spec-to-code.md).
 
+The independent [`/hyper-auto-coding`](./hyper-auto-coding.md) command borrows the upstream `implement-spec` dependency frontier and per-ticket worktrees, but the user prepares the integration branch with committed spec/contract inputs. It reuses Phase 1 unchanged, commits tickets, implements concurrently, integrates and verifies serially, then independently reviews, automatically fixes, and commits. Only ticket implementation executions get retro; reports are generated in OS temp and committed together at final draining. Success cleans worktrees while retaining branches. No new Phase 1 gate, retry-count policy, or interruption recovery. Sources: [`hyper-auto-coding/`](../extensions/hyper-auto-coding/); implementation concurrency defaults to 4 and shares the existing configuration file with Jev.
+
 Other agents can execute the portable workflow manually; copying skills does not provide OMP's host scheduling.
 
 ## 7. Decision lifecycle, scope, and migration implications
