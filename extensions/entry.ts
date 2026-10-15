@@ -23,7 +23,7 @@
  * landed. Any failure in that chain falls back to the pre-Jev canned sequence.
  *
  * This module is the composition root: planning state lives in `workflow-session.ts`,
- * execution/retro state and persistence in `execution-attempts.ts`, host continuation in `retro-host.ts`,
+ * execution/retro state and persistence in `implementation-node/tdd-execution.ts`, host continuation in `retro-host.ts`,
  * the turn decision in `turn-policy.ts`, the judge port in `jev-judge.ts`, config
  * resolution in `config.ts`, and skill activation and preflight in `skill-activation.ts`.
  */
@@ -36,12 +36,12 @@ import { activateSkill, hasSkill, hasTddAgent } from "./spec-to-code/skill-activ
 import { createJudgeDecider } from "./spec-to-code/jev-judge";
 import { lastAssistantStopReason, lastAssistantText, planTurn, type TurnPorts } from "./spec-to-code/turn-policy";
 import { createWorkflowSession, MAX_AUTO_ACTIONS } from "./spec-to-code/workflow-session";
-import { createRetroWorkflow, tddTicket, tddResult } from "./spec-to-code/retro-host";
-import type { RetroWorkflow } from "./spec-to-code/execution-attempts";
+import { createRetroWorkflow, tddTicket, tddResult } from "./implementation-node/retro-host";
+import type { RetroWorkflow } from "./implementation-node/tdd-execution";
 import { HyperGit } from "./hyper-auto-coding/git";
 import { createHyperHost } from "./hyper-auto-coding/subagent-host";
 import { HyperWorkflow } from "./hyper-auto-coding/workflow";
-import { registerHyperTools, startHyperPhase2 } from "./hyper-auto-coding/orchestration-tool";
+import { registerHyperTools, startHyperPhase2 } from "./hyper-auto-coding/agent-tools";
 
 // ============================================================================
 // Constants

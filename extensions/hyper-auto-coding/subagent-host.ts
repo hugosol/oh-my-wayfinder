@@ -36,8 +36,8 @@ import { AgentOutputManager } from "@oh-my-pi/pi-coding-agent/task/output-manage
 import { runStructuredSubagent } from "@oh-my-pi/pi-coding-agent/task/structured-subagent";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { createRetroPorts } from "../spec-to-code/retro-host";
-import type { RetroPorts } from "../spec-to-code/execution-attempts";
+import { createRetroPorts } from "../implementation-node/retro-host";
+import type { RetroPorts } from "../implementation-node/tdd-execution";
 
 /** Roles the orchestrator dispatches to fresh subagent sessions. */
 export type HyperRole = "implement" | "integrate" | "fix" | "verify";

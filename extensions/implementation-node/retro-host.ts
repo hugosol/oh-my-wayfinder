@@ -13,7 +13,7 @@ import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry
 import { discoverAgents } from "@oh-my-pi/pi-coding-agent/task";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { RetroWorkflow, type ExecutionIdentity, type RetroPorts } from "./execution-attempts";
+import { RetroWorkflow, type ExecutionIdentity, type RetroPorts } from "./tdd-execution";
 
 /**
  * Capture the original definition and source paths once, before any ticket

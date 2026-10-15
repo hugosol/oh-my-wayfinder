@@ -19,12 +19,17 @@ Copy the following artifacts, keeping their relative layout. The same entry also
 
 ```text
 <extension root>/
-  spec-to-code.ts        # extension entry
-  spec-to-code/          # shared Phase 1, configuration, and retro modules
+  entry.ts              # shared extension entry; registers both commands
+  implementation-node/  # shared TDD execution records and retrospective lifecycle
+  spec-to-code/          # shared Phase 1 and configuration modules
   hyper-auto-coding/     # parallel command modules, imported relatively by the entry
   agents/
     tdd.md               # blocking `tdd` task agent; autoloads the `tdd` skill, pins its own model
 ```
+
+`implementation-node/` groups the shared TDD execution records and independent retrospective lifecycle; TDD dispatch remains in the existing workflows. Integration scheduling remains in `hyper-auto-coding/workflow.ts`, while `agent-tools.ts` defines the main agent’s workflow tool. This layout changes naming and ownership only, not execution order or completion rules.
+
+When updating an existing installation, replace the previous layout and update any file-based extension configuration to `entry.ts`; load only one entry to avoid duplicate tool and command registration.
 
 The shipped `tdd.md` pins `deepseek/deepseek-flash:high` in its frontmatter; edit the installed copy if your model setup differs.
 
@@ -112,16 +117,16 @@ Automation advances the session and records execution outcomes; it does not inde
 - One run at a time: starting a second run while one is active is rejected.
 - Background retros are not concurrency-capped.
 
-See [`execution-attempts.ts`](../extensions/spec-to-code/execution-attempts.ts) and [`retro-host.ts`](../extensions/spec-to-code/retro-host.ts) for these behaviors.
+See [`tdd-execution.ts`](../extensions/implementation-node/tdd-execution.ts) and [`retro-host.ts`](../extensions/implementation-node/retro-host.ts) for these behaviors.
 
 ## Sources
 
-- Entry and install layout: [`extensions/spec-to-code.ts`](../extensions/spec-to-code.ts)
+- Entry and install layout: [`extensions/entry.ts`](../extensions/entry.ts)
 - Turn replies, budget, and stop conditions: [`turn-policy.ts`](../extensions/spec-to-code/turn-policy.ts), [`workflow-session.ts`](../extensions/spec-to-code/workflow-session.ts)
 - Judge chain: [`jev-judge.ts`](../extensions/spec-to-code/jev-judge.ts)
 - Skill activation and dependency preflight: [`skill-activation.ts`](../extensions/spec-to-code/skill-activation.ts)
 - TDD agent: [`extensions/agents/tdd.md`](../extensions/agents/tdd.md)
-- Retro behavior, identity, and output files: [`retro-host.ts`](../extensions/spec-to-code/retro-host.ts), [`execution-attempts.ts`](../extensions/spec-to-code/execution-attempts.ts)
+- Retro behavior, identity, and output files: [`retro-host.ts`](../extensions/implementation-node/retro-host.ts), [`tdd-execution.ts`](../extensions/implementation-node/tdd-execution.ts)
 - Configuration: [`config.json`](../extensions/spec-to-code/config.json), [`config.ts`](../extensions/spec-to-code/config.ts)
 - Skills used: [to-tickets](../skills/to-tickets/SKILL.md), [tdd](../skills/tdd/SKILL.md); upstream `retro` and `writing-for-agents` are used unmodified.
 - Fork differences: [upstream comparison blueprint](./upstream-differences.md).

@@ -130,8 +130,8 @@ Backtracer 的范围是相关已发布主题，包含未完成票中的已发布
 
 这部分没有 mapping op：
 
-- 扩展入口：[spec-to-code.ts](../extensions/spec-to-code.ts)。
-- 复盘编排与原会话调用：[execution-attempts.ts](../extensions/spec-to-code/execution-attempts.ts)、[retro-host.ts](../extensions/spec-to-code/retro-host.ts)。代码是内部机制的权威来源。
+- 扩展入口：[entry.ts](../extensions/entry.ts)。
+- 复盘编排与原会话调用：[tdd-execution.ts](../extensions/implementation-node/tdd-execution.ts)、[retro-host.ts](../extensions/implementation-node/retro-host.ts)。代码是内部机制的权威来源。
 - 路由介绍：[omp-automation](../deltas/mappings/ask-matt.md#omp-automation)。
 - 安装、配置、输出目录与限制：[扩展使用指南](./spec-to-code.cn.md)。
 

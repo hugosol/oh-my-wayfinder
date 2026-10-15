@@ -130,8 +130,8 @@ Retro already exists upstream. The addition is **host-driven invocation and outc
 
 There are no mapping operations for the extension itself:
 
-- Extension entry: [spec-to-code.ts](../extensions/spec-to-code.ts).
-- Retro orchestration and original-session invocation: [execution-attempts.ts](../extensions/spec-to-code/execution-attempts.ts), [retro-host.ts](../extensions/spec-to-code/retro-host.ts). Code owns the internal mechanism.
+- Extension entry: [entry.ts](../extensions/entry.ts).
+- Retro orchestration and original-session invocation: [tdd-execution.ts](../extensions/implementation-node/tdd-execution.ts), [retro-host.ts](../extensions/implementation-node/retro-host.ts). Code owns the internal mechanism.
 - Router introduction: [omp-automation](../deltas/mappings/ask-matt.md#omp-automation).
 - Installation, configuration, output locations, and limits: [extension guide](./spec-to-code.md).
 

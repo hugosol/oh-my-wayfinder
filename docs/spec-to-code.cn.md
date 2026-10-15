@@ -19,12 +19,17 @@ fork 改动的内容与位置由[上游对比蓝图](./upstream-differences.cn.m
 
 ```text
 <extension root>/
-  spec-to-code.ts        # 扩展入口
-  spec-to-code/          # 共用 Phase 1、配置与 retro 模块
+  entry.ts              # 共享扩展入口，注册两个命令
+  implementation-node/  # 共用 TDD 执行记录与 retro 生命周期
+  spec-to-code/          # 共用 Phase 1 与配置模块
   hyper-auto-coding/     # 并行命令配套模块，入口以相对路径导入
   agents/
     tdd.md               # blocking 的 `tdd` task agent，自动加载 `tdd` skill，自带模型声明
 ```
+
+`implementation-node/` 按职责归组共享的 TDD 执行记录与独立 retro 生命周期；TDD 派发仍由现有工作流负责。集成调度仍在 `hyper-auto-coding/workflow.ts` 中，`agent-tools.ts` 定义供主代理调用的工作流工具。此次布局调整只改变命名与归属，不改变执行顺序或完成规则。
+
+更新已有安装时，替换原有布局，并将按文件配置的扩展入口改为 `entry.ts`；只加载一个入口，避免重复注册工具和命令。
 
 自带的 `tdd.md` 在 frontmatter 中固定了 `deepseek/deepseek-flash:high`；模型配置不同时，请修改安装后的副本。
 
@@ -112,16 +117,16 @@ Phase 2——串行 TDD：
 - 同一时间只允许一次运行：已有运行进行中时，新的 `/spec-to-code` 会被拒绝。
 - 后台复盘暂不限制并发。
 
-上述行为详见 [`execution-attempts.ts`](../extensions/spec-to-code/execution-attempts.ts) 与 [`retro-host.ts`](../extensions/spec-to-code/retro-host.ts)。
+上述行为详见 [`tdd-execution.ts`](../extensions/implementation-node/tdd-execution.ts) 与 [`retro-host.ts`](../extensions/implementation-node/retro-host.ts)。
 
 ## 源码索引
 
-- 入口与安装布局：[`extensions/spec-to-code.ts`](../extensions/spec-to-code.ts)
+- 入口与安装布局：[`extensions/entry.ts`](../extensions/entry.ts)
 - 回复、预算与停止条件：[`turn-policy.ts`](../extensions/spec-to-code/turn-policy.ts)、[`workflow-session.ts`](../extensions/spec-to-code/workflow-session.ts)
 - judge 链：[`jev-judge.ts`](../extensions/spec-to-code/jev-judge.ts)
 - skill 激活与依赖预检：[`skill-activation.ts`](../extensions/spec-to-code/skill-activation.ts)
 - TDD agent：[`extensions/agents/tdd.md`](../extensions/agents/tdd.md)
-- 复盘行为、身份与输出文件：[`retro-host.ts`](../extensions/spec-to-code/retro-host.ts)、[`execution-attempts.ts`](../extensions/spec-to-code/execution-attempts.ts)
+- 复盘行为、身份与输出文件：[`retro-host.ts`](../extensions/implementation-node/retro-host.ts)、[`tdd-execution.ts`](../extensions/implementation-node/tdd-execution.ts)
 - 配置：[`config.json`](../extensions/spec-to-code/config.json)、[`config.ts`](../extensions/spec-to-code/config.ts)
 - 使用的 skill：[to-tickets](../skills/to-tickets/SKILL.md)、[tdd](../skills/tdd/SKILL.md)；上游 `retro` 与 `writing-for-agents` 原样使用。
 - fork 差异：[上游对比蓝图](./upstream-differences.cn.md)。

@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { SingleResult } from "@oh-my-pi/pi-coding-agent";
-import { RetroWorkflow } from "../spec-to-code/execution-attempts";
+import { RetroWorkflow } from "../implementation-node/tdd-execution";
 import { HyperGit, type TicketWorktree } from "./git";
 import type { HyperHost, HyperRole } from "./subagent-host";
 

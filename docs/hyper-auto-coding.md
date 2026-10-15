@@ -6,7 +6,7 @@
 
 ## Install and prepare
 
-Follow the [extension install guide](./spec-to-code.md#install) using the same `extensions/spec-to-code.ts` entry, and copy `spec-to-code/`, `hyper-auto-coding/`, and `agents/` together. This entry registers both commands; do not load it twice.
+Follow the [extension install guide](./spec-to-code.md#install) using the same `extensions/entry.ts` entry, and copy `implementation-node/`, `spec-to-code/`, `hyper-auto-coding/`, and `agents/` together. This entry registers both commands; do not load it twice.
 
 Required: this repository's `to-tickets` and `tdd` skills, plus the blocking `tdd` agent; `code-review` is no longer required. Retros use the installed upstream `retro` and `writing-for-agents` unchanged; missing either reports an undelivered retro without changing implementation outcomes. Implementations use the installed TDD agent's model; helpers use the host task agent's model settings.
 
@@ -111,9 +111,9 @@ One workflow runs through the extension at a time. It assumes a session complete
 ## Sources
 
 - [Approved decision and trade-offs](./adr/0004-asynchronous-ticket-integration.md)
-- [Shared command entry and Phase 1](../extensions/spec-to-code.ts)
-- [Orchestration tool and main-agent instructions](../extensions/hyper-auto-coding/orchestration-tool.ts)
+- [Shared command entry and Phase 1](../extensions/entry.ts)
+- [Orchestration tool and main-agent instructions](../extensions/hyper-auto-coding/agent-tools.ts)
 - [Workflow state and scheduling](../extensions/hyper-auto-coding/workflow.ts)
 - [Local Git and worktrees](../extensions/hyper-auto-coding/git.ts)
 - [Fresh sessions and integration continuations](../extensions/hyper-auto-coding/subagent-host.ts)
-- [Original TDD-session retro](../extensions/spec-to-code/retro-host.ts), [execution records and final draining](../extensions/spec-to-code/execution-attempts.ts)
+- [Original TDD-session retro](../extensions/implementation-node/retro-host.ts), [execution records and final draining](../extensions/implementation-node/tdd-execution.ts)
