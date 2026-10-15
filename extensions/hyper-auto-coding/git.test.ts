@@ -179,13 +179,19 @@ test("mergeTicket merges --no-ff and is a no-op when the branch is already merge
 	expect(ticketTip).toBe((await git(tree.cwd, "rev-parse", "HEAD")).trim());
 	await expect(backend.assertTicketClean(tree)).resolves.toBeUndefined();
 
-	await backend.mergeTicket(tree);
+	const first = await backend.mergeTicket(tree, false);
+	expect(first.merged).toBe(true);
+	expect(first.conflicts).toBe(false);
+	expect(first.head).toBe(await backend.head());
 
 	const parents = (await git(repo1.root, "rev-list", "--parents", "-n", "1", "HEAD")).trim().split(" ");
 	expect(parents.length).toBe(3);
 	expect(parents).toContain(ticketTip);
 	expect(await fs.readFile(path.join(repo1.root, "result.txt"), "utf8")).toContain("delivered by ticket");
-	await expect(backend.mergeTicket(tree)).resolves.toBeUndefined();
+
+	// Already merged: the same integration commit is reported without a new one.
+	expect(await backend.mergeTicket(tree, false)).toEqual({ merged: true, conflicts: false, head: first.head });
+	expect(await backend.head()).toBe(first.head);
 });
 
 test("mergeTicket requires the captured branch with a clean tree and an owned worktree", async () => {
@@ -196,18 +202,21 @@ test("mergeTicket requires the captured branch with a clean tree and an owned wo
 	const tree = await createTicket(backend, "01.md");
 
 	await write(path.join(repo1.root, "dirty.txt"), "uncommitted\n");
-	await expect(backend.mergeTicket(tree)).rejects.toThrow(/不干净/);
+	await expect(backend.mergeTicket(tree, false)).rejects.toThrow(/不干净/);
 	await fs.rm(path.join(repo1.root, "dirty.txt"));
 
 	await git(repo1.root, "checkout", "-q", "-b", "elsewhere");
-	await expect(backend.mergeTicket(tree)).rejects.toThrow(/集成分支已切换/);
+	await expect(backend.mergeTicket(tree, false)).rejects.toThrow(/集成分支已切换/);
 	await git(repo1.root, "checkout", "-q", "integration");
 
-	await expect(backend.mergeTicket({ branch: "not-ours", cwd: tree.cwd })).rejects.toThrow(/不属于本次运行/);
-	await expect(backend.mergeTicket(tree)).resolves.toBeUndefined();
+	await expect(backend.mergeTicket({ branch: "not-ours", cwd: tree.cwd }, false)).rejects.toThrow(/不属于本次运行/);
+
+	// Every rejection released the lock: a clean call still merges afterwards.
+	const done = await backend.mergeTicket(tree, false);
+	expect(done).toEqual({ merged: true, conflicts: false, head: await backend.head() });
 });
 
-test("mergeTicket leaves a conflict in place without reset or discard", async () => {
+test("mergeTicket aborts a conflicting integration merge and leaves the conflict in the ticket worktree", async () => {
 	const repo1 = await initRepo();
 	await write(path.join(repo1.root, "shared.txt"), "base\n");
 	await git(repo1.root, "add", "--", "shared.txt");
@@ -224,20 +233,144 @@ test("mergeTicket leaves a conflict in place without reset or discard", async ()
 	await git(repo1.root, "commit", "-q", "-m", "integration side");
 	const before = await backend.head();
 
-	const failure = await capture(() => backend.mergeTicket(tree));
-	expect(failure.message).toContain("冲突");
-	expect(failure.message).toContain(tree.branch);
+	// The integration side is aborted back to `before` and the same merge is
+	// retried in the ticket worktree, which is the only place a conflict stays.
+	const outcome = await backend.mergeTicket(tree, true);
+	expect(outcome).toEqual({ merged: false, conflicts: true, head: before });
 
-	// Nothing was aborted, reset, or discarded: both sides and MERGE_HEAD remain.
-	const content = await fs.readFile(path.join(repo1.root, "shared.txt"), "utf8");
-	expect(content).toContain("<<<<<<<");
-	expect(content).toContain("integration side");
-	expect(content).toContain("ticket side");
-	expect((await gitRaw(repo1.root, ["rev-parse", "--verify", "-q", "MERGE_HEAD"])).code).toBe(0);
-	expect((await git(repo1.root, "ls-files", "--unmerged")).trim()).not.toBe("");
-	expect((await git(repo1.root, "rev-parse", "HEAD")).trim()).toBe(before);
-	await expect(backend.assertClean()).rejects.toThrow(/未完成的合并/);
-	await expect(backend.mergeTicket(tree)).rejects.toThrow(/未完成的合并/);
+	await expect(backend.assertClean()).resolves.toBeUndefined();
+	expect(await backend.head()).toBe(before);
+	expect((await gitRaw(repo1.root, ["rev-parse", "--verify", "-q", "MERGE_HEAD"])).code).not.toBe(0);
+	expect((await git(repo1.root, "ls-files", "--unmerged")).trim()).toBe("");
+	expect(await fs.readFile(path.join(repo1.root, "shared.txt"), "utf8")).toBe("integration side\n");
+
+	const conflicted = await fs.readFile(path.join(tree.cwd, "shared.txt"), "utf8");
+	expect(conflicted).toContain("<<<<<<<");
+	expect(conflicted).toContain("integration side");
+	expect(conflicted).toContain("ticket side");
+	expect((await gitRaw(tree.cwd, ["rev-parse", "--verify", "-q", "MERGE_HEAD"])).code).toBe(0);
+	expect((await git(tree.cwd, "ls-files", "--unmerged")).trim()).not.toBe("");
+	// The conflict never needed another worktree: only the repo and this ticket.
+	expect((await git(repo1.root, "worktree", "list", "--porcelain")).match(/^worktree /gm)).toHaveLength(2);
+
+	// The integration agent resolves the conflict in the ticket worktree and
+	// commits; the next call finalises it against the untouched integration tip.
+	await write(path.join(tree.cwd, "shared.txt"), "resolved both sides\n");
+	await git(tree.cwd, "add", "--", "shared.txt");
+	await git(tree.cwd, "commit", "-q", "-m", "resolve the integration conflict");
+	const resolved = await backend.mergeTicket(tree, false);
+	expect(resolved.merged).toBe(true);
+	expect(resolved.conflicts).toBe(false);
+	expect(resolved.head).not.toBe(before);
+	expect(resolved.head).toBe(await backend.head());
+	expect(await fs.readFile(path.join(repo1.root, "shared.txt"), "utf8")).toBe("resolved both sides\n");
+	await expect(backend.assertClean()).resolves.toBeUndefined();
+});
+
+test("mergeTicket reports a non-conflict merge failure as an error and merges nothing", async () => {
+	const repo1 = await initRepo();
+	const backend = await HyperGit.inspect(repo1.root, repo1.slug);
+	await ticketFile(repo1, "01.md");
+	await backend.commitTickets();
+	const tree = await createTicket(backend, "01.md");
+	const before = await backend.head();
+
+	// An unrelated history makes `git merge` fail without starting a merge.
+	await git(tree.cwd, "checkout", "-q", "--orphan", "unrelated-seed");
+	await git(tree.cwd, "commit", "-q", "--allow-empty", "-m", "unrelated root");
+	await git(tree.cwd, "branch", "-M", "unrelated-seed", tree.branch);
+
+	const failure = await capture(() => backend.mergeTicket(tree, true));
+	expect(failure.message).toContain("退出码");
+	expect(failure.message).not.toContain("冲突");
+	expect(await backend.head()).toBe(before);
+	await expect(backend.assertClean()).resolves.toBeUndefined();
+});
+
+test("mergeTicket syncs the ticket worktree only when asked and never past its own merge commit", async () => {
+	const repo1 = await initRepo();
+	const backend = await HyperGit.inspect(repo1.root, repo1.slug);
+	await ticketFile(repo1, "01.md");
+	await ticketFile(repo1, "02.md");
+	await backend.commitTickets();
+	const synced = await createTicket(backend, "01.md");
+	const left = await createTicket(backend, "02.md");
+	for (const [tree, file] of [
+		[synced, "one.txt"],
+		[left, "two.txt"],
+	] as const) {
+		await write(path.join(tree.cwd, file), "work\n");
+		await git(tree.cwd, "add", "--", file);
+		await git(tree.cwd, "commit", "-q", "-m", `work for ${tree.branch}`);
+	}
+	const leftTip = await backend.ticketHead(left);
+
+	// syncAfterSuccess=false: the merge lands, the ticket worktree keeps its tip.
+	const first = await backend.mergeTicket(left, false);
+	expect(first).toEqual({ merged: true, conflicts: false, head: await backend.head() });
+	expect(await backend.ticketHead(left)).toBe(leftTip);
+
+	// syncAfterSuccess=true: the ticket worktree is synced onto this call's merge
+	// commit — the exact commit the lock produced, not a later or external tip.
+	const second = await backend.mergeTicket(synced, true);
+	expect(second.merged).toBe(true);
+	expect(second.conflicts).toBe(false);
+	expect(second.head).toBe(await backend.head());
+	expect(
+		(await gitRaw(synced.cwd, ["merge-base", "--is-ancestor", second.head, await backend.ticketHead(synced)])).code,
+	).toBe(0);
+	expect(await fs.readFile(path.join(synced.cwd, "one.txt"), "utf8")).toBe("work\n");
+	expect(await fs.readFile(path.join(synced.cwd, "two.txt"), "utf8")).toBe("work\n");
+	await backend.assertTicketClean(synced);
+	expect(await backend.head()).toBe(second.head);
+});
+
+test("mergeTicket serialises concurrent tickets in call order and createTicket waits for the in-flight merge", async () => {
+	const repo1 = await initRepo();
+	const backend = await HyperGit.inspect(repo1.root, repo1.slug);
+	for (const name of ["01.md", "02.md", "03.md"]) await ticketFile(repo1, name);
+	await backend.commitTickets();
+	const base = await backend.head();
+	const one = await createTicket(backend, "01.md");
+	const two = await createTicket(backend, "02.md");
+	const three = await createTicket(backend, "03.md");
+	for (const [tree, file] of [
+		[one, "one.txt"],
+		[two, "two.txt"],
+		[three, "three.txt"],
+	] as const) {
+		await write(path.join(tree.cwd, file), "work\n");
+		await git(tree.cwd, "add", "--", file);
+		await git(tree.cwd, "commit", "-q", "-m", `work for ${tree.branch}`);
+	}
+	const oneTip = await backend.ticketHead(one);
+	const twoTip = await backend.ticketHead(two);
+
+	// Both calls start before either finishes: the second merge must build on the
+	// commit the first one created, in call order, with no lost update.
+	const [first, second] = await Promise.all([backend.mergeTicket(one, false), backend.mergeTicket(two, true)]);
+	expect(first.merged).toBe(true);
+	expect(second.merged).toBe(true);
+	expect(second.head).toBe(await backend.head());
+	expect((await git(repo1.root, "rev-list", "--parents", "-n", "1", "HEAD")).trim().split(" ")).toEqual([
+		second.head,
+		first.head,
+		twoTip,
+	]);
+	expect((await git(repo1.root, "rev-list", "--parents", "-n", "1", first.head)).trim().split(" ")).toEqual([
+		first.head,
+		base,
+		oneTip,
+	]);
+
+	// A ticket created while a merge is queued is based on that merge's commit,
+	// never on the tip that was current when the call was made.
+	const inFlight = backend.mergeTicket(three, false);
+	const later = await createTicket(backend, "04.md");
+	const third = await inFlight;
+	expect(third.merged).toBe(true);
+	expect(await backend.ticketHead(later)).toBe(third.head);
+	expect(third.head).toBe(await backend.head());
 });
 
 test("assertClean and assertTicketClean reject switched branches and dirty worktrees", async () => {
@@ -288,8 +421,8 @@ test("cleanup removes only clean merged worktrees, keeps branches, and warns for
 		await git(tree.cwd, "add", "--", file);
 		await git(tree.cwd, "commit", "-q", "-m", `work for ${tree.branch}`);
 	}
-	await backend.mergeTicket(merged);
-	await backend.mergeTicket(dirty);
+	await backend.mergeTicket(merged, false);
+	await backend.mergeTicket(dirty, false);
 	await write(path.join(dirty.cwd, "three.txt"), "work in progress\n");
 
 	const warnings = await backend.cleanup();
@@ -399,7 +532,7 @@ test("smoke: the real git CLI backend drives the full ticket lifecycle", async (
 	expect(await backend.ticketHead(tree)).toBe((await git(tree.cwd, "rev-parse", "HEAD")).trim());
 	await backend.assertTicketClean(tree);
 
-	await backend.mergeTicket(tree);
+	await backend.mergeTicket(tree, true);
 	await backend.assertClean();
 
 	await write(path.join(repo1.root, ".scratch", "smoke", "retro", "01-slice.md", "run.md"), "# Retro\n");

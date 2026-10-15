@@ -1,19 +1,19 @@
-# `/hyper-auto-coding`: parallel delivery around an integration branch
+# `/hyper-auto-coding`: asynchronous delivery around an integration branch
 
 [中文文档](./hyper-auto-coding.cn.md) · [Serial workflow](./spec-to-code.md) · [Repository README](../README.md)
 
-`/hyper-auto-coding <slug>` is an OMP-only command. It reuses `/spec-to-code` Phase 1 unchanged, then implements tickets concurrently in individual branches/worktrees and integrates them serially into the user's local integration branch. The old command remains serial and does not orchestrate Git worktrees.
+`/hyper-auto-coding <slug>` is an OMP-only command. It reuses `/spec-to-code` Phase 1 unchanged, implements tickets concurrently in per-ticket branches/worktrees, and tests and repairs integrations asynchronously. Only short Git operations in the shared integration checkout are serialized. The old command remains serial and does not orchestrate worktrees.
 
 ## Install and prepare
 
 Follow the [extension install guide](./spec-to-code.md#install) using the same `extensions/spec-to-code.ts` entry, and copy `spec-to-code/`, `hyper-auto-coding/`, and `agents/` together. This entry registers both commands; do not load it twice.
 
-Required: this repository's `to-tickets`, `tdd`, and `code-review` skills, plus the blocking `tdd` agent. Retros use the installed upstream `retro` and `writing-for-agents` skills unchanged; missing either reports an undelivered retro without changing implementation outcomes. Implementations use the installed TDD agent's model; helpers use the host task agent's model settings.
+Required: this repository's `to-tickets` and `tdd` skills, plus the blocking `tdd` agent; `code-review` is no longer required. Retros use the installed upstream `retro` and `writing-for-agents` unchanged; missing either reports an undelivered retro without changing implementation outcomes. Implementations use the installed TDD agent's model; helpers use the host task agent's model settings.
 
 Before starting:
 
 1. Create and check out a local integration branch, not `main`/`master` or detached HEAD.
-2. Commit `.scratch/<slug>/spec.md`, `contract.md`, and related input documents to that branch.
+2. Commit `.scratch/<slug>/spec.md`, `contract.md`, and related input documents to it.
 3. Keep the working tree and index clean, with a usable local Git commit identity.
 
 All Git operations are local: no push, PR, or merge to main. The command does not create the integration branch, stash changes, or commit unrelated edits. The slug is a single safe path segment.
@@ -29,47 +29,62 @@ The concurrency limit shares `extensions/spec-to-code/config.json` with Jev and 
 }
 ```
 
-`maxParallelTickets` is a positive integer, defaulting to 4. It limits simultaneous ticket implementations, not retros or the final review's two child agents. `/spec-to-code` remains serial. Reload the extension after changing configuration.
+`maxParallelTickets` is a positive integer, defaulting to 4. It limits simultaneous ticket implementations, not integration children or retros. Reload after changing configuration. `/spec-to-code` remains serial.
 
 ## Execution
 
 ### Phase 1: reuse ticket cutting
 
-The existing `/to-tickets` activation, automatic answers, Jev decisions, 15-intervention budget, and ticket-file transition are unchanged. There is no new whole-ticket-set publication gate: existing nonempty tickets end Phase 1 under the original rules. The command then commits only the implementation ticket files before Phase 2.
+The existing `/to-tickets` activation, automatic answers, Jev decisions, 15-intervention budget, and ticket-file transition are unchanged. No new whole-ticket-set publication gate is added: existing nonempty tickets end Phase 1 under the original rules. The command then commits only implementation ticket files before Phase 2.
 
-### Phase 2: parallel implementation, serial integration
+### Phase 2: implementation and background integration
 
-The main agent reads published tickets and registers their execution dependency graph; this is Phase 2 scheduling input, not another ticket-cutting step. A downstream ticket starts only after its blockers are merged and their integration verification is explicitly accepted.
+The main agent reads published tickets and registers the execution dependency graph, without recutting tickets. It schedules only: it does not judge whether report evidence is sufficient or manually accept/confirm each ticket. Children own their acceptance; normal completion counts as success, without interpreting report prose.
 
-- First execution creates a ticket branch and an OS-temp worktree from the current integration branch tip.
-- Each ticket gets a fresh TDD subagent; ready tickets continuously fill available slots without a batch barrier.
-- Before reporting completion, implementers synchronize the integration tip, resolve conflicts, verify, and commit their ticket work.
-- The main agent reads reports and evidence and makes explicit acceptance decisions. A normal process exit is not acceptance.
-- Incomplete work is assigned to a fresh implementer in the same ticket branch/worktree. Existing progress is retained. Do not continue the old session once it has entered retro; there is no new retry-count policy.
-- Fresh integration helpers synchronize and validate; Git merges and integration-checkout code writes are serial. No additional integration worktree is created.
-- Failed post-merge verification pauses further merges and new worktree creation; implementations already running elsewhere may continue. A fresh repair helper fixes, verifies, and commits in the integration checkout before the main agent accepts the result. No default rollback.
+- First execution creates a ticket branch and an OS-temp worktree from the current integration tip.
+- A fresh TDD child implements, validates, and promptly commits its ticket, without an extra integration-tip synchronization stage. Ending implementation automatically starts background integration, outside implementation slot limits.
+- TDD and integration are different sessions taking sequential ownership of the same worktree and branch. They do not write code concurrently. No extra integration worktree is created.
+- The first successful merge releases downstream tickets immediately, before integration tests or repairs finish. Status lists implementation in `active` and background integration separately in `integrating`.
+- Failed implementations can retry with a fresh implementer in the original branch/worktree, retaining progress. An original TDD session already running retro is not continued for implementation.
 
-The main session receives status, report paths, and commit pointers. Implementation, integration, and verification run in independent sessions without inheriting the scheduling transcript.
+### The short bidirectional merge critical section
 
-### Final review and automatic fixes
+Attempts queue FIFO. The lock covers:
 
-After every ticket is integrated, a fresh reviewer loads this repository's `code-review` skill, targeting committed changes since the fixed Phase 1 ticket commit and receiving explicit spec/contract pointers. Standards and Spec remain independent parallel axes with separate summaries.
+1. Attempting to merge the development branch into the integration branch.
+2. On conflict, aborting that merge in the integration checkout to restore a clean shared workspace.
+3. On the first attempt, whether successful or conflicting, merging the integration commit fixed inside this critical section back into the original development branch. Later attempts do this only on conflict. The reverse merge may leave unresolved conflicts in the development worktree.
+4. Releasing the lock after these Git operations, before any agent handles code.
 
-The main agent reads the report. A fresh fixer receives its path, automatically applies justified fixes in the integration checkout, verifies, and commits, followed by another independent review. Routine fixes do not require per-finding user approval; requirements and acceptance criteria cannot be weakened, and unapplied suggestions need reasons. There is no fixed repair-round limit. A fresh verification agent then checks the overall delivery, which the main agent explicitly accepts.
+Never release the lock with an unresolved merge in the integration checkout. Ticket-worktree creation coordinates with this same lock rather than inspecting a half-completed merge. The lock never waits for an agent, tests, or repairs.
+
+### One integration child closes the loop
+
+The first attempt always starts a fresh integration child, distinct from the original TDD session. In the original development worktree it resolves existing conflicts, runs the project's global test suite, fixes issues directly, and commits. Integration acceptance requires only global tests; complex scripts, cross-ticket overall checks, and real-device smoke belong to the final gate.
+
+Then the workflow attempts to merge the result back: success (including no new commits) ends integration. A conflict triggers the abort/reverse-sync critical section, followed by a continuation of the exact same integration child outside the lock. That child resolves and commits, and the workflow queues another attempt. Later success does not trigger another full validation pass; subsequent rounds do not mandate a full test rerun. The child reads code and judges conflict resolutions itself, without main-agent approval or a fixed retry limit.
+
+Integration HEAD advancing is not a rejection condition: clean merges proceed without chasing new HEADs or reacceptance. Background repair and conflict handling do not pause other tickets' dispatch or merges. Only after processing ends and all resulting changes are merged is a ticket **integrated**; its first merge only makes it **merged**.
+
+### Final independent verification and fixes
+
+After all integration processing ends, `verify` starts a fresh independent verification child in the integration checkout. It runs overall verification against spec, contract, cross-ticket behavior, and project requirements, including necessary complex scripts or real-device smoke. It must not edit or commit. Normal completion passes automatically, without main-agent report acceptance.
+
+If verification returns an execution failure, `fix` dispatches an independent fixer; after repair and commit, run `verify` again. There is no code-review, Standards/Spec review pair, or review-driven repair loop, and no code-review skill requirement. Final verification applies only to the commit it checked; a changed commit requires another verification before finish.
 
 ## Retrospectives and report commits
 
-Only agents explicitly enrolled as ticket implementation executions get automatic retro: initial attempts, failed attempts, retries, and fresh continuations. Integration, conflict handling, verification, reviewers, final review fixers, auxiliary agents, and retros themselves do not. The agent name `tdd` alone is not sufficient.
+Only explicitly enrolled ticket implementations get retro, including first attempts, failures, and retries. Integration, conflict continuations, final verification, fixers, auxiliary agents, and retros themselves do not.
 
-Every implementation ending starts an asynchronous retro in its original session without waiting for merge. One retro per execution; repeated completion does not trigger another. Separate executions may have separate reports; no semantic cross-report deduplication. Retros propose advice only and do not apply changes or operate Git.
+Every implementation ending starts asynchronous retro in the original TDD session, without waiting for merge, once per execution. Integration takes the worktree in a different session; retro only assesses history and proposes advice, without editing code or operating Git. Retro outcomes remain independent of implementation outcomes.
 
-The host writes retros and other execution reports outside the Git checkout in a unique OS-temp directory: `%TEMP%` on Windows; otherwise the runtime's OS-temp location (usually selected by variables such as `TMPDIR`, defaulting to `/tmp`). There is no per-merge document movement.
+Reports are generated outside the Git checkout in a unique OS-temp directory (`%TEMP%` on Windows, otherwise the runtime OS-temp location). There is no per-merge report movement.
 
-After all code work and overall verification, the `hyper_auto_coding` finish operation:
+After all integration and final verification, `finish`:
 
 1. Waits for all retro success/failure terminal outcomes.
-2. Publishes reports and records into the integration checkout and commits only the explicit output files.
-3. Safely removes clean, integrated ticket worktrees while retaining ticket branches and the integration branch.
+2. Publishes reports and records into the integration checkout and commits only explicit output files.
+3. Safely removes clean, merged original ticket worktrees while retaining local ticket branches and the integration branch.
 4. Returns the final commit, report paths, independent retro outcomes, and cleanup warnings.
 
 Final outputs:
@@ -81,21 +96,24 @@ Final outputs:
 .scratch/<slug>/execution/<run-directory>/workflow.json
 ```
 
-Retro Markdown exists only for delivered retros; failure records are still committed. Implementation, review, fix, and verification reports and main-agent decisions are retained. Published report pointers are rebased to final locations before temporary files are removed.
+Retro Markdown exists only for delivered retros; failure records are still committed. Implementation, every integration round, fix, and verification reports and execution states are retained. Published report pointers are rebased to final locations. Main-agent acceptance decisions are no longer generated.
 
-A copy or commit failure preserves temporary artifacts and reports an error; it does not rerun implementation or claim all work is committed. Dirty, unmerged, or unsafe-to-remove worktrees are retained with warnings, never force-removed.
+Copy or commit failures preserve temporary artifacts and report errors, without rerunning implementation or claiming everything is committed. Dirty, unmerged, or unsafe-to-remove worktrees are retained with warnings, never force-removed.
 
 ## Orchestration surface and limits
 
-The main agent uses `hyper_auto_coding` actions `plan`, `dispatch`, `collect`, `accept`, `integrate`, `confirm_integration`, `repair_integration`, `review`, `assess_review`, `fix`, `verify`, `accept_verification`, and `finish`; `status` is read-only. Status snapshots report `temporaryDir`: the OS-temp directory holding reports and execution records until `finish` publishes them. This replaces the former `temporary` field without a compatibility alias. `finish` returns a delivery summary with the final commit and published report paths rather than a status snapshot; final outputs are listed above. Native task calls must not bypass the workflow to dispatch its tickets. Every acceptance decision needs a reason/evidence. The host enforces concurrency, dependencies, session ownership, and commit freshness; it does not independently establish the correctness of a natural-language acceptance conclusion.
+`hyper_auto_coding` exposes only `plan`, `dispatch`, `collect`, `verify`, `fix`, `finish`, and read-only `status`. `dispatch` returns after starting implementation; `collect` waits for task completion or a first-merge progress event, so the scheduler can dispatch released dependents while background tests are still running. Integration and conflict continuations are automatic; native task calls must not bypass the workflow to dispatch tickets.
 
-One workflow runs through the extension at a time. This feature assumes a session completes all tickets; interruption, cancellation, and automatic recovery are not part of this implementation.
+Status includes `temporaryDir`, `active`, `integrating`, the merge-released `ready` frontier, each ticket's first `mergedHead`, and report paths. `finish` returns a delivery summary, not a status snapshot.
+
+One workflow runs through the extension at a time. It assumes a session completes all tickets; interruption, cancellation, and automatic recovery are not implemented. Execution errors are recorded honestly; the normal-exit-is-success assumption adds no report-content acceptance logic.
 
 ## Sources
 
+- [Approved decision and trade-offs](./adr/0004-asynchronous-ticket-integration.md)
 - [Shared command entry and Phase 1](../extensions/spec-to-code.ts)
 - [Orchestration tool and main-agent instructions](../extensions/hyper-auto-coding/orchestration-tool.ts)
-- [Workflow state and acceptance boundaries](../extensions/hyper-auto-coding/workflow.ts)
+- [Workflow state and scheduling](../extensions/hyper-auto-coding/workflow.ts)
 - [Local Git and worktrees](../extensions/hyper-auto-coding/git.ts)
-- [Fresh-session host dispatch](../extensions/hyper-auto-coding/subagent-host.ts)
-- [Shared original-session retro calls](../extensions/spec-to-code/retro-host.ts), [execution records and final draining](../extensions/spec-to-code/execution-attempts.ts)
+- [Fresh sessions and integration continuations](../extensions/hyper-auto-coding/subagent-host.ts)
+- [Original TDD-session retro](../extensions/spec-to-code/retro-host.ts), [execution records and final draining](../extensions/spec-to-code/execution-attempts.ts)

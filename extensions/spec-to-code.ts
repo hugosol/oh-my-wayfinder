@@ -421,10 +421,6 @@ export default function specToCode(pi: ExtensionAPI): void {
 			description: "Local integration-branch workflow with parallel ticket worktrees",
 			hyperMode: true,
 			async prepare(slug: string, ctx: ExtensionCommandContext): Promise<boolean> {
-				if (!(await hasSkill("code-review"))) {
-					ctx.ui.notify("缺少: code-review (skill)。请检查安装。", "error");
-					return false;
-				}
 				try {
 					hyperGit = await HyperGit.inspect(ctx.cwd, slug);
 					return true;

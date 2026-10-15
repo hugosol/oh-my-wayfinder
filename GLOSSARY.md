@@ -47,14 +47,17 @@ Every dispatched execution attempt and its retrospective has reached a known out
 The user-prepared development branch that receives the assembled delivery. It is distinct from the individual ticket branches and the repository's main branch.
 _Avoid_: main, ticket branch
 
+**Merged ticket**:
+An implementation ticket whose work has first reached the integration branch. This releases its dependent tickets without claiming integration testing or repairs are complete.
+
 **Integrated ticket**:
-An accepted implementation ticket whose work has been merged into the integration branch and whose integration verification has been accepted. A merge alone does not make a ticket integrated.
+A merged implementation ticket whose integration testing and any resulting repairs and conflict resolution are complete, with all resulting changes merged into the integration branch. This does not certify later combinations of changes.
 
 **Implementation frontier**:
-The implementation tickets available to start because all their blocking tickets have been integrated.
+The implementation tickets available to start because all their blocking tickets have been merged; those blockers need not yet be integrated.
 
 **Delivery complete**:
-All implementation tickets are integrated, final review and verification are accepted, and delivery reports are committed. Retrospective delivery remains an independent outcome.
+All implementation tickets are integrated, final overall verification is complete, and delivery reports are committed. Retrospective delivery remains an independent outcome.
 _Avoid_: workflow settled
 
 **Jev mode**:

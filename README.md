@@ -75,7 +75,7 @@ flowchart TB
 
 Skill-level automatic calls are instructions executed by the agent, not an independent scheduler. `/spec-to-code` additionally provides host-driven orchestration. It starts with a prepared spec and approved contract, automates ticket creation and serial TDD, and adds automatic Retro calls.
 
-For parallel development, use the independent [`/hyper-auto-coding`](docs/hyper-auto-coding.md) command: prepare a local integration branch with committed inputs, publish and commit tickets, implement each ticket in its own worktree, continuously dispatch ready tickets, integrate and validate serially, then independently review, automatically fix, and commit reports. Implementation concurrency defaults to 4 and shares a configuration file with Jev; the old command remains serial.
+For parallel development, use the independent [`/hyper-auto-coding`](docs/hyper-auto-coding.md) command: prepare a local integration branch with committed inputs, publish and commit tickets, implement each ticket in its own worktree, release dependencies on first merge, and reuse each development worktree for asynchronous integration tests, repairs, and same-session conflict handling. Only short bidirectional merge attempts are serialized; final independent overall verification and any fixes precede report commits, without a code-review gate. Implementation concurrency defaults to 4 and shares a configuration file with Jev; the old command remains serial.
 
 For the design changes and their mapping operations, see the [upstream comparison blueprint](docs/upstream-differences.md).
 

@@ -8,26 +8,26 @@ import type { HyperHost, HyperRole, HyperRun } from "./subagent-host";
 import { cleanupFixtures, git, initRepo, ticketFile, write } from "./test-support";
 import { HyperWorkflow } from "./workflow";
 
-/** Public `status` snapshot fields used for behavioral assertions. */
 interface TicketSnapshot {
 	ticket: string;
-	status: "ready" | "running" | "reported" | "accepted" | "integrated";
+	status: "ready" | "running" | "integrating" | "integrated" | "failed";
+	mergedHead?: string;
 	worktree?: { branch: string; cwd: string };
-	report?: string;
+	error?: string;
 }
 interface StatusSnapshot {
-	branch: string;
 	temporaryDir: string;
 	active: string[];
+	integrating: string[];
 	ready: string[];
 	tickets: TicketSnapshot[];
+	verified: boolean;
 }
 interface FinishSummary {
 	reports: string[];
 	warnings: string[];
 	retainedBranches: string[];
 }
-/** Published workflow ledger: enrolled executions and their retro outcomes. */
 interface Ledger {
 	attempts: { ticket: string; id: string; report?: string; error?: string }[];
 	executions: {
@@ -47,7 +47,7 @@ const releases: (() => void)[] = [];
 afterEach(async () => {
 	for (const release of releases.splice(0)) release();
 	for (const workflow of workflows.splice(0)) {
-		while ((await status(workflow)).active.length) await workflow.execute({ action: "collect" });
+		await drain(workflow);
 		await workflow.retro.finish();
 		for (const tree of workflow.git.worktrees.values()) {
 			if (await fs.stat(tree.cwd).catch(() => null))
@@ -58,417 +58,293 @@ afterEach(async () => {
 	await cleanupFixtures();
 });
 
-function result(request: HyperRun, overrides: Partial<SingleResult> = {}): SingleResult {
-	return {
-		index: 0,
-		id: randomUUID(),
-		agent: request.role,
-		agentSource: "project",
-		task: request.task,
-		exitCode: 0,
-		output: "Required behavior verified; no unresolved acceptance items.",
-		stderr: "",
-		truncated: false,
-		durationMs: 1,
-		tokens: 1,
-		requests: 1,
-		...overrides,
-	};
+function result(request: Pick<HyperRun, "role" | "task">, overrides: Partial<SingleResult> = {}): SingleResult {
+	return { index: 0, id: randomUUID(), agent: request.role, agentSource: "project", task: request.task,
+		exitCode: 0, output: "Required behavior verified; no unresolved acceptance items.", stderr: "",
+		truncated: false, durationMs: 1, tokens: 1, requests: 1, ...overrides };
 }
-
 async function status(workflow: HyperWorkflow): Promise<StatusSnapshot> {
-	return (await workflow.execute({ action: "status" })) as unknown as StatusSnapshot;
+	return await workflow.execute({ action: "status" }) as unknown as StatusSnapshot;
 }
-function ticketSnapshot(state: StatusSnapshot, ticket: string): TicketSnapshot {
-	const found = state.tickets.find((entry) => entry.ticket === ticket);
-	if (!found) throw new Error(`status snapshot has no ticket ${ticket}`);
-	return found;
+function ticketSnapshot(state: StatusSnapshot, name: string): TicketSnapshot {
+	const entry = state.tickets.find((ticket) => ticket.ticket === name);
+	if (!entry) throw new Error(`Missing ticket ${name}`);
+	return entry;
 }
-function worktreeOf(state: StatusSnapshot, ticket: string): { branch: string; cwd: string } {
-	const worktree = ticketSnapshot(state, ticket).worktree;
-	if (!worktree) throw new Error(`status snapshot has no worktree for ${ticket}`);
-	return worktree;
+async function drain(workflow: HyperWorkflow): Promise<void> {
+	while (true) {
+		const state = await status(workflow);
+		if (!state.active.length && !state.integrating.length) return;
+		await workflow.execute({ action: "collect" });
+	}
 }
-
-interface Scene {
-	root: string;
-	workflow: HyperWorkflow;
-	/** Execution ids observed at the controlled retro boundary, in enrolment order. */
-	retroIds: string[];
-	/** Host results by dispatched run, in call order. */
-	runs: { role: HyperRole; id: string; name: string }[];
-	/** Retro warnings raised at the controlled boundary. */
-	retroWarnings: string[];
-	/** Boundary probes recorded while the workflow ran. */
-	events: string[];
+function gate() {
+	let release!: () => void;
+	const promise = new Promise<void>((resolve) => { release = resolve; });
+	releases.push(release);
+	return { promise, release };
 }
 
-async function fixture(
-	options: {
-		cap?: number;
-		implementationGate?: Promise<void>;
-		retroGate?: Promise<void>;
-		failIntegration?: boolean;
-		throwImplementation?: () => boolean;
-		mutateReadonly?: () => "review" | "verify" | undefined;
-		failRetro?: (ticket: string) => boolean;
-	} = {},
-): Promise<Scene> {
-	const repo = await initRepo({
-		slug: "feature",
-		branch: "feature/delivery",
-		prefix: "hyper-workflow-test-",
-		spec: "Deliver independent A and B, then dependent C.",
-		contract: "P1: A; P2: B; P3: C sees A.",
-	});
+async function fixture(options: {
+	cap?: number;
+	implementationGate?: Promise<void>;
+	retroGate?: Promise<void>;
+	throwImplementation?: () => boolean;
+	implementationWork?: (request: HyperRun) => Promise<void>;
+	integrationWork?: (request: HyperRun) => Promise<void>;
+	resumeWork?: (request: HyperRun & { id: string }) => Promise<void>;
+	mutateVerify?: () => boolean;
+	failVerify?: () => boolean;
+	failRetro?: (ticket: string) => boolean;
+} = {}) {
+	const repo = await initRepo({ slug: "feature", branch: "feature/delivery", prefix: "hyper-workflow-test-",
+		spec: "Deliver independent A and B, then dependent C.", contract: "P1: A; P2: B; P3: C sees A." });
 	const { root } = repo;
+	await write(path.join(root, "shared.txt"), "base\n");
+	await git(root, "add", "shared.txt");
+	await git(root, "commit", "-m", "shared base");
 	const backend = await HyperGit.inspect(root, repo.slug);
-	for (const name of ["a.md", "b.md", "c.md"])
-		await ticketFile(repo, name, `# ${name}\nAcceptance: deliver ${name[0]}.`);
+	for (const name of ["a.md", "b.md", "c.md"]) await ticketFile(repo, name);
 	const events: string[] = [];
 	const retroIds: string[] = [];
-	const runs: { role: HyperRole; id: string; name: string }[] = [];
+	const runs: { role: HyperRole; id: string; cwd: string; resumed: boolean }[] = [];
 	const retroWarnings: string[] = [];
-	const published = async (): Promise<string[]> =>
-		(await fs.readdir(path.join(root, ".scratch", repo.slug))).sort();
-	let failIntegration = options.failIntegration ?? false;
+	const published = async () => (await fs.readdir(path.join(root, ".scratch", repo.slug))).sort();
 	const host: HyperHost = {
 		async run(request) {
-			const respond = (overrides: Partial<SingleResult> = {}): SingleResult => {
-				const execution = result(request, overrides);
-				runs.push({ role: request.role, id: execution.id, name: request.name });
-				return execution;
-			};
+			const execution = result(request);
+			runs.push({ role: request.role, id: execution.id, cwd: request.cwd, resumed: false });
 			if (request.role === "implement") {
 				await options.implementationGate;
 				if (options.throwImplementation?.()) throw new Error("implementation transport failed");
-				const name = request.name.split(":")[0][0];
+				const name = request.name[0];
 				await write(path.join(request.cwd, `${name}.txt`), `delivered ${name}\n`);
-				await git(request.cwd, "add", `${name}.txt`);
+				await options.implementationWork?.(request);
+				await git(request.cwd, "add", ".");
 				await git(request.cwd, "commit", "--allow-empty", "-m", `deliver ${name}`);
 			} else if (request.role === "integrate") {
-				if (request.cwd !== root) await git(request.cwd, "merge", "--no-edit", backend.branch);
-				else if (failIntegration) {
-					failIntegration = false;
-					return respond({ exitCode: 1, output: "Integration regression failed." });
-				}
+				await options.integrationWork?.(request);
 			} else if (request.role === "fix") {
 				await write(path.join(root, "integration-fix.txt"), "regression corrected\n");
 				await git(root, "add", "integration-fix.txt");
 				await git(root, "commit", "-m", "fix integration regression");
+			} else if (request.role === "verify") {
+				if (options.mutateVerify?.()) {
+					await write(path.join(root, "readonly-change.txt"), "illegal mutation");
+					await git(root, "add", "readonly-change.txt");
+					await git(root, "commit", "-m", "illegal read-only change");
+				}
+				if (options.failVerify?.()) return { ...execution, exitCode: 1, output: "Global behavior failed." };
 			}
-			if (options.mutateReadonly?.() === request.role) {
-				await write(path.join(root, "readonly-change.txt"), request.role);
-				await git(root, "add", "readonly-change.txt");
-				await git(root, "commit", "-m", "illegal read-only change");
-			}
-			return respond();
+			return execution;
 		},
-		async close() {
-			// Final boundary: by the time finish releases the host, publication must be complete.
-			events.push(`close:publication=${JSON.stringify(await published())}`);
+		async resume(request) {
+			runs.push({ role: request.role, id: request.id, cwd: request.cwd, resumed: true });
+			await options.resumeWork?.(request);
+			return result(request, { id: request.id });
 		},
+		async close() { events.push(`close:publication=${JSON.stringify(await published())}`); },
 		retro: {
 			async identify(execution) {
-				return {
-					agent: execution.agent,
-					agent_id: execution.id,
-					session_id: `session-${execution.id}`,
-					session_file: null,
-					execution_cwd: root,
-				};
+				return { agent: execution.agent, agent_id: execution.id, session_id: `session-${execution.id}`,
+					session_file: null, execution_cwd: root };
 			},
 			async analyze(record, execution) {
 				retroIds.push(execution.id);
 				await options.retroGate;
-				// External artifact boundary: while this retro is not yet terminal, the workflow
-				// must not have published any report or record into the integration checkout.
 				events.push(`retro:${record.ticket}:publication=${JSON.stringify(await published())}`);
 				if (options.failRetro?.(record.ticket))
-					return result(execution, { exitCode: 1, output: "", error: "retro turn returned no transcript" });
-				return {
-					...execution,
-					output: "Keep the successful behavioral verification; no instruction changes applied.",
-				};
+					return { ...execution, exitCode: 1, output: "", error: "retro turn returned no transcript" };
+				return { ...execution, output: "Keep the successful behavioral verification; no instruction changes applied." };
 			},
-			warn(message) {
-				retroWarnings.push(message);
-			},
+			warn(message) { retroWarnings.push(message); },
 		},
 	};
 	const workflow = await HyperWorkflow.create("feature", backend, host, options.cap ?? 2, "parent", "Main", null);
 	workflows.push(workflow);
-	await workflow.execute({
-		action: "plan",
-		plan: [
-			{ ticket: "a.md", blockedBy: [] },
-			{ ticket: "b.md", blockedBy: [] },
-			{ ticket: "c.md", blockedBy: ["a.md"] },
-		],
-	});
+	await workflow.execute({ action: "plan", plan: [
+		{ ticket: "a.md", blockedBy: [] }, { ticket: "b.md", blockedBy: [] }, { ticket: "c.md", blockedBy: ["a.md"] },
+	] });
 	return { root, workflow, retroIds, runs, retroWarnings, events };
 }
-
-async function complete(workflow: HyperWorkflow, ticket: string) {
+async function complete(workflow: HyperWorkflow, ticket: string): Promise<void> {
 	await workflow.execute({ action: "dispatch", tickets: [ticket] });
-	await workflow.execute({ action: "collect" });
-	await workflow.execute({
-		action: "accept",
-		ticket,
-		accepted: true,
-		reason: "Read report: assigned criterion verified by actual command, no unresolved work.",
-	});
-	await workflow.execute({ action: "integrate", ticket });
-	await workflow.execute({
-		action: "confirm_integration",
-		ticket,
-		accepted: true,
-		reason: "Read integration report: related regression passed on current commit.",
-	});
+	await drain(workflow);
+	expect(ticketSnapshot(await status(workflow), ticket).status).toBe("integrated");
 }
 
-async function finalVerification(workflow: HyperWorkflow) {
-	await workflow.execute({ action: "review" });
-	await workflow.execute({
-		action: "assess_review",
-		accepted: true,
-		reason: "Both independent axes have no blocking findings.",
-	});
-	await workflow.execute({ action: "verify" });
-	await workflow.execute({
-		action: "accept_verification",
-		accepted: true,
-		reason: "Read final report: all contract promises have verified evidence.",
-	});
-}
-
-test("parallel slots are bounded and dependency C waits for A's merge AND main-agent integration acceptance", async () => {
-	let release!: () => void;
-	const gate = new Promise<void>((resolve) => {
-		release = resolve;
-	});
-	releases.push(release);
-	const { workflow, root } = await fixture({ implementationGate: gate });
-	const dispatched = (await workflow.execute({
-		action: "dispatch",
-		tickets: ["a.md", "b.md"],
-	})) as unknown as StatusSnapshot;
+test("implementation slots are bounded; first merge releases dependencies while integration remains asynchronous", async () => {
+	const implementing = gate(), integrating = gate();
+	const { workflow, root } = await fixture({ cap: 2, implementationGate: implementing.promise,
+		integrationWork: async () => { await integrating.promise; } });
+	const dispatched = await workflow.execute({ action: "dispatch", tickets: ["a.md", "b.md"] }) as unknown as StatusSnapshot;
 	expect(dispatched.active).toEqual(["a.md", "b.md"]);
-	expect(ticketSnapshot(dispatched, "c.md").status).toBe("ready");
 	await expect(workflow.execute({ action: "dispatch", tickets: ["c.md"] })).rejects.toThrow("并发上限");
-	release();
-	while (ticketSnapshot(await status(workflow), "a.md").status === "running")
+	implementing.release();
+	while (!ticketSnapshot(await status(workflow), "a.md").mergedHead)
 		await workflow.execute({ action: "collect" });
-	await workflow.execute({
-		action: "accept",
-		ticket: "a.md",
-		accepted: true,
-		reason: "A's acceptance has actual verification evidence.",
-	});
-	await expect(workflow.execute({ action: "dispatch", tickets: ["c.md"] })).rejects.toThrow("尚不可执行");
-	await workflow.execute({ action: "integrate", ticket: "a.md" });
+	while ((await status(workflow)).active.length) await workflow.execute({ action: "collect" });
+	const state = await status(workflow);
+	expect(ticketSnapshot(state, "a.md").status).toBe("integrating");
+	expect(state.ready).toContain("c.md");
 	expect(await fs.readFile(path.join(root, "a.txt"), "utf8")).toBe("delivered a\n");
-	await expect(workflow.execute({ action: "dispatch", tickets: ["c.md"] })).rejects.toThrow("集成验证未确认");
-	await workflow.execute({
-		action: "confirm_integration",
-		ticket: "a.md",
-		accepted: true,
-		reason: "Integrated A behavior and relevant regression passed.",
-	});
-	const dispatchedC = (await workflow.execute({
-		action: "dispatch",
-		tickets: ["c.md"],
-	})) as unknown as StatusSnapshot;
-	expect(await git(worktreeOf(dispatchedC, "c.md").cwd, "show", "HEAD:a.txt")).toBe("delivered a");
-	await workflow.execute({ action: "collect" });
+	await workflow.execute({ action: "dispatch", tickets: ["c.md"] });
+	const c = ticketSnapshot(await status(workflow), "c.md").worktree!;
+	expect(await git(c.cwd, "show", "HEAD:a.txt")).toBe("delivered a");
+	await expect(workflow.execute({ action: "verify" })).rejects.toThrow("全部票据");
+	integrating.release();
+	await drain(workflow);
 });
 
-test("fresh failed continuation reuses the worktree but cannot be accepted with the previous successful invocation report", async () => {
-	let fail = false;
+test("failed implementation retries reuse the original branch and worktree without main-agent acceptance", async () => {
+	let fail = true;
 	const { workflow } = await fixture({ throwImplementation: () => fail });
 	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
-	await workflow.execute({ action: "collect" });
-	const original = worktreeOf(await status(workflow), "a.md");
-	await workflow.execute({
-		action: "accept",
-		ticket: "a.md",
-		accepted: false,
-		reason: "One qualitative acceptance item remains unresolved despite normal exit.",
-	});
-	fail = true;
-	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
-	await workflow.execute({ action: "collect" });
-	expect(worktreeOf(await status(workflow), "a.md")).toEqual(original);
-	expect(await fs.readFile(path.join(original.cwd, "a.txt"), "utf8")).toBe("delivered a\n");
-	await expect(
-		workflow.execute({ action: "accept", ticket: "a.md", accepted: true, reason: "Attempt to reuse previous report." }),
-	).rejects.toThrow("本次执行失败");
-	await workflow.execute({
-		action: "accept",
-		ticket: "a.md",
-		accepted: false,
-		reason: "New execution failed; retain existing work for another fresh continuation.",
-	});
+	await drain(workflow);
+	const first = ticketSnapshot(await status(workflow), "a.md");
+	expect(first.status).toBe("ready");
+	expect(first.mergedHead).toBeUndefined();
 	fail = false;
-	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
-	await workflow.execute({ action: "collect" });
-	await workflow.execute({
-		action: "accept",
-		ticket: "a.md",
-		accepted: true,
-		reason: "Fresh implementation report now resolves the remaining item.",
-	});
-});
-
-test("failed post-merge verification pauses new work until independent repair and acceptance; helper agents never retro", async () => {
-	const { workflow, retroIds, runs, retroWarnings } = await fixture({ failIntegration: true });
-	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
-	await workflow.execute({ action: "collect" });
-	await workflow.execute({
-		action: "accept",
-		ticket: "a.md",
-		accepted: true,
-		reason: "A ticket passed its own verification.",
-	});
-	await workflow.execute({ action: "integrate", ticket: "a.md" });
-	await expect(
-		workflow.execute({
-			action: "confirm_integration",
-			ticket: "a.md",
-			accepted: true,
-			reason: "Cannot trust failed integration.",
-		}),
-	).rejects.toThrow("执行失败");
-	await expect(workflow.execute({ action: "dispatch", tickets: ["b.md"] })).rejects.toThrow("集成验证未确认");
-	await workflow.execute({ action: "repair_integration" });
-	await workflow.execute({
-		action: "confirm_integration",
-		ticket: "a.md",
-		accepted: true,
-		reason: "Repair report demonstrates corrected regression.",
-	});
-	// Scene barrier: drain the asynchronous retros before reading the boundary capture.
-	await workflow.retro.finish();
-	expect([...new Set(runs.map((run) => run.role))].sort()).toEqual(["fix", "implement", "integrate"]);
-	expect(retroIds).toEqual(runs.filter((run) => run.role === "implement").map((run) => run.id));
-	expect(retroWarnings).toEqual([]);
-	// This fixture ends after checking repair; no further dispatch after retro.finish.
-});
-
-test("read-only reviewers and verifiers cannot publish an acceptable report after changing the reviewed commit", async () => {
-	let mutation: "review" | "verify" | undefined = "review";
-	const { workflow } = await fixture({ mutateReadonly: () => mutation });
 	await complete(workflow, "a.md");
-	await complete(workflow, "b.md");
-	await complete(workflow, "c.md");
-	await expect(workflow.execute({ action: "review" })).rejects.toThrow("只读评审期间");
-	await expect(
-		workflow.execute({
-			action: "assess_review",
-			accepted: true,
-			reason: "Cannot accept a report whose author changed its target.",
-		}),
-	).rejects.toThrow("先完成独立 code-review");
-	mutation = undefined;
-	await workflow.execute({ action: "review" });
-	await workflow.execute({
-		action: "assess_review",
-		accepted: true,
-		reason: "Fresh read-only review now applies to the current commit.",
+	expect(ticketSnapshot(await status(workflow), "a.md").worktree).toEqual(first.worktree);
+	expect(await fs.readFile(path.join(first.worktree!.cwd, "a.txt"), "utf8")).toBe("delivered a\n");
+});
+
+test("post-test merge conflicts resume the same integration session in the original worktree and then terminate", async () => {
+	const aTesting = gate(), releaseA = gate();
+	const { workflow, root, runs } = await fixture({
+		implementationWork: async (request) => {
+			if (request.name.startsWith("b.md")) await write(path.join(request.cwd, "shared.txt"), "B\n");
+		},
+		integrationWork: async (request) => {
+			if (!request.name.includes("a.md")) return;
+			aTesting.release();
+			await releaseA.promise;
+			await write(path.join(request.cwd, "shared.txt"), "A fix\n");
+			await git(request.cwd, "add", "shared.txt");
+			await git(request.cwd, "commit", "-m", "A test fix");
+		},
+		resumeWork: async (request) => {
+			expect(await git(root, "status", "--porcelain")).toBe("");
+			expect(await git(request.cwd, "diff", "--name-only", "--diff-filter=U")).toBe("shared.txt");
+			await write(path.join(request.cwd, "shared.txt"), "A fix with B\n");
+			await git(request.cwd, "add", "shared.txt");
+			await git(request.cwd, "commit", "-m", "resolve A and B");
+		},
 	});
-	mutation = "verify";
+	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
+	await aTesting.promise;
+	await workflow.execute({ action: "dispatch", tickets: ["b.md"] });
+	while (ticketSnapshot(await status(workflow), "b.md").status !== "integrated")
+		await workflow.execute({ action: "collect" });
+	releaseA.release();
+	await drain(workflow);
+	expect(ticketSnapshot(await status(workflow), "a.md").status).toBe("integrated");
+	expect(await fs.readFile(path.join(root, "shared.txt"), "utf8")).toBe("A fix with B\n");
+	const aTree = ticketSnapshot(await status(workflow), "a.md").worktree!;
+	const aIntegration = runs.filter((run) => run.role === "integrate" && run.cwd === aTree.cwd);
+	expect(aIntegration.map((run) => run.resumed)).toEqual([false, true]);
+	expect(aIntegration[1].id).toBe(aIntegration[0].id);
+	expect([...workflow.git.worktrees.values()].map((tree) => tree.cwd).sort()).toEqual(
+		(await status(workflow)).tickets.filter((ticket) => ticket.worktree).map((ticket) => ticket.worktree!.cwd).sort(),
+	);
+	expect((await git(root, "worktree", "list", "--porcelain")).match(/^worktree /gm)?.length).toBe(3);
+});
+
+test("first-merge conflict starts one integration child; its successful merge does not run validation again", async () => {
+	const implementationDone = gate(), beginImplementation = gate();
+	const { workflow, root, runs } = await fixture({
+		implementationWork: async (request) => {
+			if (!request.name.startsWith("a.md")) return;
+			await write(path.join(request.cwd, "shared.txt"), "A\n");
+			implementationDone.release();
+			await beginImplementation.promise;
+		},
+		integrationWork: async (request) => {
+			expect(await git(root, "status", "--porcelain")).toBe("");
+			expect(await git(request.cwd, "diff", "--name-only", "--diff-filter=U")).toBe("shared.txt");
+			await write(path.join(request.cwd, "shared.txt"), "resolved A and integration\n");
+			await git(request.cwd, "add", "shared.txt");
+			await git(request.cwd, "commit", "-m", "resolve initial integration conflict");
+		},
+	});
+	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
+	await implementationDone.promise;
+	await write(path.join(root, "shared.txt"), "integration change\n");
+	await git(root, "add", "shared.txt");
+	await git(root, "commit", "-m", "parallel change");
+	expect((await status(workflow)).ready).not.toContain("c.md");
+	beginImplementation.release();
+	await drain(workflow);
+	expect(await fs.readFile(path.join(root, "shared.txt"), "utf8")).toBe("resolved A and integration\n");
+	expect((await status(workflow)).ready).toContain("c.md");
+	expect(runs.filter((run) => run.role === "integrate").map((run) => run.resumed)).toEqual([false]);
+});
+
+test("final verification is independent, read-only, and must rerun after its fixer", async () => {
+	let mutate = true, fail = true;
+	const { workflow, root } = await fixture({ mutateVerify: () => mutate, failVerify: () => fail });
+	for (const name of ["a.md", "b.md", "c.md"]) await complete(workflow, name);
 	await expect(workflow.execute({ action: "verify" })).rejects.toThrow("只读验证期间");
-	await expect(
-		workflow.execute({
-			action: "accept_verification",
-			accepted: true,
-			reason: "Cannot accept validation that changed its own target.",
-		}),
-	).rejects.toThrow("没有最终验证报告");
+	await expect(workflow.execute({ action: "finish" })).rejects.toThrow("最终验证");
+	mutate = false;
+	await workflow.execute({ action: "verify" });
+	expect((await status(workflow)).verified).toBe(false);
+	await workflow.execute({ action: "fix" });
+	expect(await fs.readFile(path.join(root, "integration-fix.txt"), "utf8")).toBe("regression corrected\n");
+	await expect(workflow.execute({ action: "finish" })).rejects.toThrow("最终验证");
+	fail = false;
+	await workflow.execute({ action: "verify" });
+	expect((await status(workflow)).verified).toBe(true);
 }, 30000);
 
-test("final publication waits for every retro terminal outcome, commits all records with usable paths, cleans trees and retains branches; stale validation cannot finish", async () => {
-	let release!: () => void;
-	const retroGate = new Promise<void>((resolve) => {
-		release = resolve;
-	});
-	releases.push(release);
+test("publication waits for retro terminal outcomes, commits usable reports, cleans original trees and retains branches", async () => {
+	const retros = gate();
 	const { workflow, root, events, retroIds, runs, retroWarnings } = await fixture({
-		retroGate,
-		failRetro: (ticket) => ticket === "b.md",
+		retroGate: retros.promise, failRetro: (ticket) => ticket === "b.md",
 	});
-	await complete(workflow, "a.md");
-	await complete(workflow, "b.md");
-	await complete(workflow, "c.md");
-	await workflow.execute({ action: "review" });
-	await workflow.execute({
-		action: "assess_review",
-		accepted: false,
-		reason: "Spec axis identifies integration behavior needing correction.",
-	});
-	await workflow.execute({ action: "fix" });
-	await expect(workflow.execute({ action: "verify" })).rejects.toThrow("评审修复及独立复核");
-	await finalVerification(workflow);
+	for (const name of ["a.md", "b.md", "c.md"]) await complete(workflow, name);
+	await workflow.execute({ action: "verify" });
 	await git(root, "commit", "--allow-empty", "-m", "change after verification");
 	await expect(workflow.execute({ action: "finish" })).rejects.toThrow("报告已过期");
-	await finalVerification(workflow);
+	await workflow.execute({ action: "verify" });
 	const scratch = path.join(root, ".scratch", "feature");
 	expect((await fs.readdir(scratch)).sort()).toEqual(["contract.md", "implementation", "spec.md"]);
 	const before = await status(workflow);
-	expect(before.tickets.map((ticket) => ticket.status)).toEqual(["integrated", "integrated", "integrated"]);
-	const branches = before.tickets.map((ticket) => worktreeOf(before, ticket.ticket).branch);
+	const branches = before.tickets.map((ticket) => ticket.worktree!.branch);
 	const finishing = workflow.execute({ action: "finish" });
-	release();
-	const summary = (await finishing) as unknown as FinishSummary;
+	retros.release();
+	const summary = await finishing as unknown as FinishSummary;
 	expect(summary.warnings).toEqual([]);
 	expect(await git(root, "status", "--porcelain")).toBe("");
 	for (const branch of branches) expect(await git(root, "rev-parse", "--verify", branch)).toMatch(/^[a-f0-9]{40}$/);
 	expect((await git(root, "worktree", "list", "--porcelain")).match(/^worktree /gm)).toEqual(["worktree "]);
 	for (const file of summary.reports)
-		expect(await git(root, "ls-files", "--error-unmatch", path.relative(root, file))).toBe(
-			path.relative(root, file).split(path.sep).join("/"),
-		);
+		expect(await git(root, "ls-files", "--error-unmatch", path.relative(root, file))).toBe(path.relative(root, file).split(path.sep).join("/"));
 	expect(summary.retainedBranches.slice().sort()).toEqual(branches.slice().sort());
-
-	// Deterministic boundary signals: the host's retro boundary observes the integration
-	// checkout before any publication, the close boundary observes it published, and
-	// nothing is recorded after close — so publication is bracketed by the retro terminal
-	// outcomes instead of being sampled at an arbitrary scheduling point.
-	const unpublishedListing = JSON.stringify(["contract.md", "implementation", "spec.md"]);
-	const publishedListing = JSON.stringify(["contract.md", "execution", "implementation", "retro", "spec.md"]);
-	const retroProbes = events.filter((event) => event.startsWith("retro:"));
-	expect(retroProbes.map((event) => event.split(":")[1]).sort()).toEqual(["a.md", "b.md", "c.md"]);
-	expect(retroProbes.filter((event) => !event.endsWith(`publication=${unpublishedListing}`))).toEqual([]);
-	expect(events.filter((event) => event.startsWith("close:"))).toEqual([
-		`close:publication=${publishedListing}`,
-	]);
-	const closeIndex = events.findIndex((event) => event.startsWith("close:"));
-	expect(closeIndex).toBe(events.length - 1);
-	expect(events.slice(0, closeIndex).every((event) => event.startsWith("retro:"))).toBe(true);
-	expect(retroIds).toEqual(runs.filter((run) => run.role === "implement").map((run) => run.id));
+	const unpublished = JSON.stringify(["contract.md", "implementation", "spec.md"]);
+	const published = JSON.stringify(["contract.md", "execution", "implementation", "retro", "spec.md"]);
+	const probes = events.filter((event) => event.startsWith("retro:"));
+	expect(probes.map((event) => event.split(":")[1]).sort()).toEqual(["a.md", "b.md", "c.md"]);
+	expect(probes.filter((event) => !event.endsWith(`publication=${unpublished}`))).toEqual([]);
+	expect(events.filter((event) => event.startsWith("close:"))).toEqual([`close:publication=${published}`]);
+	expect(events[events.length - 1]).toBe(`close:publication=${published}`);
+	expect(retroIds.slice().sort()).toEqual(runs.filter((run) => run.role === "implement").map((run) => run.id).sort());
 	const ledgerFile = summary.reports.find((file) => file.endsWith("workflow.json"))!;
-	const ledger = JSON.parse(await fs.readFile(ledgerFile, "utf8")) as unknown as Ledger;
+	const ledger = JSON.parse(await fs.readFile(ledgerFile, "utf8")) as Ledger;
 	expect(ledger.executions.map((record) => record.agent_id).sort()).toEqual(retroIds.slice().sort());
-	expect(ledger.executions.map((record) => record.tool_call_id).sort()).toEqual(
-		ledger.attempts.map((attempt) => attempt.id).sort(),
-	);
+	expect(ledger.executions.map((record) => record.tool_call_id).sort()).toEqual(ledger.attempts.map((attempt) => attempt.id).sort());
 	for (const attempt of ledger.attempts) {
 		const record = ledger.executions.find((entry) => entry.tool_call_id === attempt.id)!;
 		expect(record.ticket).toBe(attempt.ticket);
 		expect(record.tdd_status).toBe("completed");
 		expect(record.retro_status).toBe(attempt.ticket === "b.md" ? "failed" : "completed");
-		const publishedRecord = path.join(scratch, "retro", attempt.ticket, `${record.run_id}.json`);
-		expect(summary.reports).toContain(publishedRecord);
+		expect(summary.reports).toContain(path.join(scratch, "retro", attempt.ticket, `${record.run_id}.json`));
 		if (attempt.ticket === "b.md") {
 			expect(record.retro_error).toBeTruthy();
 			expect(record.retro_document).toBeUndefined();
 		} else {
-			expect(await fs.readFile(record.retro_document!, "utf8")).toContain(
-				"Keep the successful behavioral verification",
-			);
-			expect(summary.reports).toContain(
-				path.join(scratch, "retro", attempt.ticket, `${record.run_id}.md`),
-			);
+			expect(await fs.readFile(record.retro_document!, "utf8")).toContain("Keep the successful behavioral verification");
 		}
 		expect(await fs.readFile(attempt.report!, "utf8")).toContain("Required behavior verified");
 	}

@@ -11,8 +11,11 @@
  *  - every call is an argv array (`Bun.spawn`), never a shell string;
  *  - `commitTickets`/`commitFiles` only ever stage the exact paths they were
  *    asked to commit and refuse preexisting staged edits outside that set;
- *  - a conflicted merge throws and leaves the conflict in place: no abort, no
- *    reset, no discard, so the workflow can dispatch a repair agent;
+ *  - merges and ticket creation share one FIFO lock per run, so no two of them
+ *    ever overlap on the integration checkout;
+ *  - a conflicting integration-side merge is aborted and retried inside the
+ *    ticket worktree (never a new or temporary worktree): the conflict stays
+ *    there for the integration agent, and nothing is reset or discarded;
  *  - `cleanup` never passes `--force`, never deletes a branch, and only removes
  *    worktrees that are clean and already merged into the integration branch.
  */
@@ -26,6 +29,19 @@ import * as path from "node:path";
 export interface TicketWorktree {
 	branch: string;
 	cwd: string;
+}
+
+/** What one `mergeTicket` call did to the integration branch and the ticket worktree. */
+export interface MergeTicketResult {
+	/** True when the ticket branch is now merged into the integration branch. */
+	merged: boolean;
+	/** True when the ticket worktree still holds an unresolved merge to finish. */
+	conflicts: boolean;
+	/**
+	 * Integration-branch commit this call settled on inside its lock: the new
+	 * merge commit, or the unchanged tip after an aborted conflicting merge.
+	 */
+	head: string;
 }
 
 /** Raw outcome of one `git` subprocess. */
@@ -152,6 +168,8 @@ export class HyperGit {
 	#slug: string;
 	/** Random per-run token that keeps ticket branches unique across runs. */
 	#runToken: string;
+	/** Tail of this run's FIFO queue over the integration checkout; see `#withLock`. */
+	#queue: Promise<void> = Promise.resolve();
 
 	private constructor(root: string, branch: string, slug: string) {
 		this.root = root;
@@ -221,12 +239,21 @@ export class HyperGit {
 	 * The branch is named uniquely per run and ticket, based on the integration
 	 * branch's tip at call time, and lives in an OS-temp directory outside the
 	 * repository. A repeated call for the same ticket returns the same worktree
-	 * so retries keep their work.
+	 * so retries keep their work. Creation waits for the integration-checkout
+	 * lock, so a concurrent merge can never base a branch on a half-merged tip.
 	 */
 	async createTicket(ticket: string): Promise<TicketWorktree> {
 		const existing = this.worktrees.get(ticket);
 		if (existing !== undefined) return existing;
+		return this.#withLock(async () => {
+			const raced = this.worktrees.get(ticket);
+			if (raced !== undefined) return raced;
+			return this.#createTicket(ticket);
+		});
+	}
 
+	/** Body of `createTicket`, already holding the integration-checkout lock. */
+	async #createTicket(ticket: string): Promise<TicketWorktree> {
 		const current = await this.#currentBranch();
 		if (current !== this.branch) {
 			throw new Error(`集成分支已切换（期望 ${this.branch}，实际 ${current ?? "detached HEAD"}），拒绝创建票据工作树`);
@@ -258,27 +285,71 @@ export class HyperGit {
 	/**
 	 * Merge one ticket worktree's branch into the captured integration branch
 	 * with `--no-ff`, after re-checking that the checkout is still on that branch
-	 * with a clean tree and index. On conflict nothing is aborted, reset, or
-	 * discarded: the conflict stays in place for the workflow repair agent.
+	 * with a clean tree and index. The whole cycle — merge, abort, reverse merge —
+	 * runs inside this run's FIFO lock, so concurrent tickets serialise on the
+	 * integration checkout and each caller sees the tip the previous one left.
+	 *
+	 * A conflicting integration-side merge is aborted first, leaving the
+	 * integration branch exactly where it was, and the same integration commit is
+	 * then merged into the ticket worktree: unresolved conflicts always stay in
+	 * the original ticket worktree for the integration agent, never in the
+	 * integration checkout and never in a new worktree. `syncAfterSuccess` also
+	 * merges that integration commit into the ticket worktree when the
+	 * integration-side merge succeeded, so the first integration attempt starts
+	 * from the tip this call produced. Failures that are not conflicts throw: they
+	 * must never be reported as a completed merge.
 	 */
-	async mergeTicket(worktree: TicketWorktree): Promise<void> {
+	async mergeTicket(worktree: TicketWorktree, syncAfterSuccess: boolean): Promise<MergeTicketResult> {
 		const owned = this.#owned(worktree);
-		await this.assertClean();
-		const result = await git(this.root, [
+		return this.#withLock(async () => {
+			await this.assertClean();
+			const merged = await git(this.root, [
+				"merge",
+				"--no-ff",
+				"-m",
+				`Merge ticket branch ${owned.branch}`,
+				`refs/heads/${owned.branch}`,
+			]);
+			if (merged.code === 0) {
+				const head = await this.head();
+				if (!syncAfterSuccess) return { merged: true, conflicts: false, head };
+				return { merged: true, conflicts: await this.#syncTicket(owned, head), head };
+			}
+			const output = firstLines(merged.stderr || merged.stdout) || "无输出";
+			if (!(await this.#mergeInProgress(this.root))) {
+				throw new Error(`合并 ${owned.branch} 失败（退出码 ${merged.code}）：${output}`);
+			}
+			const aborted = await git(this.root, ["merge", "--abort"]);
+			if (aborted.code !== 0) {
+				throw new Error(
+					`合并 ${owned.branch} 冲突后无法中止集成分支合并（退出码 ${aborted.code}）：${firstLines(aborted.stderr || aborted.stdout) || "无输出"}；请手工处理：${this.root}`,
+				);
+			}
+			const head = await this.head();
+			return { merged: false, conflicts: await this.#syncTicket(owned, head), head };
+		});
+	}
+
+	/**
+	 * Merge the integration commit this call settled on into the ticket worktree,
+	 * fast-forwarding when the ticket branch is behind. A conflicting sync is left
+	 * in the ticket worktree for the integration agent to resolve and commit, and
+	 * reports `true`; every other failure throws, because the integration commit
+	 * is not in the ticket worktree and the caller must not treat it as merged.
+	 */
+	async #syncTicket(owned: TicketWorktree, head: string): Promise<boolean> {
+		await this.assertTicketClean(owned);
+		const result = await git(owned.cwd, [
 			"merge",
-			"--no-ff",
 			"-m",
-			`Merge ticket branch ${owned.branch}`,
-			`refs/heads/${owned.branch}`,
+			`Merge integration branch ${this.branch} into ${owned.branch}`,
+			head,
 		]);
-		if (result.code === 0) return;
-		const output = firstLines(result.stderr || result.stdout) || "无输出";
-		if (await this.#mergeInProgress(this.root)) {
-			throw new Error(
-				`合并 ${owned.branch} 未完成（冲突已保留现场：不 reset、不 discard、不 abort），请由集成修复代理解决并提交后再继续：\n${output}`,
-			);
-		}
-		throw new Error(`合并 ${owned.branch} 失败（退出码 ${result.code}）：${output}`);
+		if (result.code === 0) return false;
+		if (await this.#mergeInProgress(owned.cwd)) return true;
+		throw new Error(
+			`无法把集成分支 ${this.branch}（${head}）同步到票据工作树（退出码 ${result.code}）：${firstLines(result.stderr || result.stdout) || "无输出"}（${owned.cwd}）`,
+		);
 	}
 
 	/**
@@ -519,6 +590,25 @@ export class HyperGit {
 	/** True while a merge left MERGE_HEAD behind (conflict or stop). */
 	async #mergeInProgress(cwd: string): Promise<boolean> {
 		return (await git(cwd, ["rev-parse", "--quiet", "--verify", "MERGE_HEAD"])).code === 0;
+	}
+
+	/**
+	 * Run one action with exclusive use of the integration checkout, queued behind
+	 * every earlier caller in call order. The lock is released even when the action
+	 * throws, so one failed merge never wedges the tickets that follow it.
+	 */
+	async #withLock<T>(action: () => Promise<T>): Promise<T> {
+		const previous = this.#queue;
+		let release!: () => void;
+		this.#queue = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		await previous;
+		try {
+			return await action();
+		} finally {
+			release();
+		}
 	}
 
 	/** The same worktree object must have been created by this run. */

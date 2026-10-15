@@ -17,26 +17,16 @@ interface Report {
 	head: string;
 }
 interface TicketState extends TicketPlan {
-	status: "ready" | "running" | "reported" | "accepted" | "integrated";
+	status: "ready" | "running" | "integrating" | "integrated" | "failed";
 	worktree?: TicketWorktree;
 	report?: Report;
-	decision?: string;
+	/** First successful merge releases dependencies independently of integration settlement. */
+	mergedHead?: string;
+	integrationReport?: string;
+	integrationAgentId?: string;
+	error?: string;
 }
-export type HyperAction =
-	| "status"
-	| "plan"
-	| "dispatch"
-	| "collect"
-	| "accept"
-	| "integrate"
-	| "confirm_integration"
-	| "repair_integration"
-	| "review"
-	| "assess_review"
-	| "fix"
-	| "verify"
-	| "accept_verification"
-	| "finish";
+export type HyperAction = "status" | "plan" | "dispatch" | "collect" | "verify" | "fix" | "finish";
 
 /** One implementation attempt of one ticket, recorded for the audit ledger. */
 interface ExecutionAttempt {
@@ -45,45 +35,26 @@ interface ExecutionAttempt {
 	report?: string;
 	error?: string;
 }
-
-/** Main-agent acceptance decision recorded for one workflow action. */
-interface AcceptanceDecision {
-	action: HyperAction;
-	ticket?: string;
-	accepted: boolean;
-	reason: string;
-}
-
 export interface HyperInput {
 	action: HyperAction;
 	plan?: TicketPlan[];
 	tickets?: string[];
-	ticket?: string;
-	accepted?: boolean;
-	reason?: string;
 }
 
+/** Completion is an execution outcome, not a main-agent judgment of report quality. */
 function succeeded(result: SingleResult): boolean {
-	return result.exitCode === 0 && !result.error && !result.aborted && !result.truncated && !!result.output.trim();
+	return result.exitCode === 0 && !result.error && !result.aborted && !result.truncated;
 }
 
-/** Label for each read-only phase in HEAD-drift errors; the run must never move HEAD. */
-const READ_ONLY_PHASE_LABEL: Record<"review" | "verify", string> = {
-	review: "评审",
-	verify: "验证",
-};
-
-/** The main agent makes acceptance decisions; this class enforces workspace and scheduling boundaries. */
+/** Scheduling only: children own acceptance; Git serializes the shared merge workspace. */
 export class HyperWorkflow {
 	readonly tickets = new Map<string, TicketState>();
 	readonly #running = new Map<string, Promise<void>>();
+	readonly #integrating = new Map<string, Promise<void>>();
+	readonly #progressWaiters = new Set<() => void>();
 	readonly #reports: string[] = [];
 	readonly #attempts: ExecutionAttempt[] = [];
-	readonly #decisions: AcceptanceDecision[] = [];
 	#busy = false;
-	#integration?: { ticket: string; report?: Report };
-	#review?: Report;
-	#reviewAccepted = false;
 	#verification?: Report;
 	#verified = false;
 	#finished = false;
@@ -119,15 +90,7 @@ export class HyperWorkflow {
 			storageRoot: path.join(temporaryDir, "retro"),
 		});
 		const workflow = new HyperWorkflow(
-			slug,
-			git,
-			host,
-			maxParallelTickets,
-			sessionId,
-			agentId,
-			temporaryDir,
-			baseline,
-			retro,
+			slug, git, host, maxParallelTickets, sessionId, agentId, temporaryDir, baseline, retro,
 		);
 		for (const ticket of names) workflow.tickets.set(ticket, { ticket, blockedBy: [], status: "ready" });
 		return workflow;
@@ -147,21 +110,15 @@ export class HyperWorkflow {
 			temporaryDir: this.temporaryDir,
 			maxParallelTickets: this.maxParallelTickets,
 			active: [...this.#running.keys()],
-			ready:
-				this.#planned && !this.#integration
-					? [...this.tickets.values()].filter((ticket) => this.#ready(ticket)).map((ticket) => ticket.ticket)
-					: [],
+			integrating: [...this.#integrating.keys()],
+			ready: this.#planned
+				? [...this.tickets.values()].filter((ticket) => this.#ready(ticket)).map((ticket) => ticket.ticket)
+				: [],
 			tickets: [...this.tickets.values()].map(({ report, ...ticket }) => ({
 				...ticket,
 				report: report?.path,
 				reportSuccessful: report && succeeded(report.result),
 			})),
-			integrationPending: this.#integration && {
-				ticket: this.#integration.ticket,
-				report: this.#integration.report?.path,
-			},
-			review: this.#review?.path,
-			reviewAccepted: this.#reviewAccepted,
 			verification: this.#verification?.path,
 			verified: this.#verified,
 			finished: this.#finished,
@@ -172,56 +129,17 @@ export class HyperWorkflow {
 	async execute(input: HyperInput): Promise<object> {
 		if (input.action === "status") return this.status();
 		if (this.#finished) throw new Error("Hyper-Auto-Coding 已完成。");
-		if (this.#busy) throw new Error("另一个编排操作仍在执行；集成工作区只能有一个写入者。");
+		if (this.#busy) throw new Error("另一个编排操作仍在执行。");
 		this.#busy = true;
 		try {
 			switch (input.action) {
-				case "plan":
-					this.#plan(input.plan ?? []);
-					break;
-				case "dispatch":
-					await this.#dispatch(input.tickets ?? []);
-					break;
-				case "collect":
-					await this.#collect();
-					break;
-				case "accept":
-					await this.#accept(input);
-					break;
-				case "integrate":
-					await this.#integrate(this.#ticket(input.ticket));
-					break;
-				case "confirm_integration":
-					await this.#confirmIntegration(input);
-					break;
-				case "repair_integration":
-					await this.#repairIntegration();
-					break;
-				case "review":
-					await this.#runReview();
-					break;
-				case "assess_review":
-					await this.#assessReview(input);
-					break;
-				case "fix":
-					await this.#fix();
-					break;
-				case "verify":
-					await this.#verify();
-					break;
-				case "accept_verification":
-					await this.#acceptVerification(input);
-					break;
-				case "finish":
-					return await this.#finish();
-			}
-			if (typeof input.accepted === "boolean" && input.reason) {
-				this.#decisions.push({
-					action: input.action,
-					ticket: input.ticket,
-					accepted: input.accepted,
-					reason: input.reason,
-				});
+				case "plan": this.#plan(input.plan ?? []); break;
+				case "dispatch": await this.#dispatch(input.tickets ?? []); break;
+				case "collect": await this.#collect(); break;
+				case "verify": await this.#verify(); break;
+				case "fix": await this.#fix(); break;
+				case "finish": return await this.#finish();
+				default: throw new Error(`未知编排操作：${String(input.action)}`);
 			}
 			return this.status();
 		} finally {
@@ -238,13 +156,12 @@ export class HyperWorkflow {
 			this.#ticket(item.ticket);
 			for (const blocker of item.blockedBy) if (!graph.has(blocker)) throw new Error(`未知依赖票据：${blocker}`);
 		}
-		const visited = new Set<string>(),
-			visiting = new Set<string>();
+		const visited = new Set<string>(), visiting = new Set<string>();
 		const visit = (name: string): void => {
-			if (visiting.has(name)) throw new Error(`循环依赖：${name}`);
+			if (visiting.has(name)) throw new Error(`票据依赖有环：${name}`);
 			if (visited.has(name)) return;
 			visiting.add(name);
-			for (const blocker of graph.get(name) ?? []) visit(blocker);
+			for (const blocker of graph.get(name)!) visit(blocker);
 			visiting.delete(name);
 			visited.add(name);
 		};
@@ -252,31 +169,23 @@ export class HyperWorkflow {
 		for (const item of plan) this.#ticket(item.ticket).blockedBy = [...item.blockedBy];
 		this.#planned = true;
 	}
-
-	#ticket(name: string | undefined): TicketState {
-		const ticket = name && this.tickets.get(name);
-		if (!ticket) throw new Error(`未知票据：${name ?? "未提供"}`);
+	#ticket(name: string): TicketState {
+		const ticket = this.tickets.get(name);
+		if (!ticket) throw new Error(`未知票据：${name}`);
 		return ticket;
 	}
 	#ready(ticket: TicketState): boolean {
-		return ticket.status === "ready" && ticket.blockedBy.every((name) => this.#ticket(name).status === "integrated");
-	}
-	#decision(input: HyperInput): boolean {
-		if (typeof input.accepted !== "boolean" || !input.reason?.trim())
-			throw new Error("主代理必须明确 accepted 并提供验收依据或未完成原因。");
-		return input.accepted;
+		return ticket.status === "ready" && ticket.blockedBy.every((name) => !!this.#ticket(name).mergedHead);
 	}
 	#references(): string {
-		return `集成分支：${this.git.branch}\n固定评审起点：${this.baseline}\nspec：${path.join(this.git.root, ".scratch", this.slug, "spec.md")}\ncontract：${path.join(this.git.root, ".scratch", this.slug, "contract.md")}`;
+		return `集成分支：${this.git.branch}\nspec：${path.join(this.git.root, ".scratch", this.slug, "spec.md")}\ncontract：${path.join(this.git.root, ".scratch", this.slug, "contract.md")}`;
 	}
 
 	async #dispatch(names: string[]): Promise<void> {
 		if (!this.#planned) throw new Error("先读取票据并登记 Phase 2 依赖图。");
-		if (this.#integration) throw new Error("集成验证未确认通过，暂停新票据执行。");
 		if (!names.length || new Set(names).size !== names.length) throw new Error("dispatch 必须提供不重复的票据名称。");
 		if (this.#running.size + names.length > this.maxParallelTickets) throw new Error("已达到实现并发上限。");
 		for (const name of names) if (!this.#ready(this.#ticket(name))) throw new Error(`票据尚不可执行：${name}`);
-		await this.git.assertClean();
 		for (const name of names) {
 			const ticket = this.#ticket(name);
 			const worktree = await this.git.createTicket(name);
@@ -284,27 +193,30 @@ export class HyperWorkflow {
 			const id = randomUUID();
 			const previous = ticket.report?.path;
 			ticket.report = undefined;
+			ticket.error = undefined;
 			ticket.status = "running";
 			const attempt: ExecutionAttempt = { ticket: name, id };
 			this.#attempts.push(attempt);
 			await this.retro.begin(id, name);
-			const task = `在当前 worktree 实现唯一票据：${path.join(worktree.cwd, ".scratch", this.slug, "implementation", name)}。\n${this.#references()}\n${previous ? `接手此前实现进度，不丢弃已有修改。先读上次报告：${previous}` : "这是本票首次执行。"}\n遵守 tdd skill。逐项报告验收证据、实际验证命令及未完成事项。不要修改其他票据、retro 或工作流报告。不要操作集成分支工作区。完成前将集成分支最新 tip 合入当前票据分支，解决冲突并验证；提交本票实现。不得 reset 丢弃既有工作。只执行本票，不调用 retro、不派发其他票据。`;
+			const task = `在当前 worktree 实现唯一票据：${path.join(worktree.cwd, ".scratch", this.slug, "implementation", name)}。\n${this.#references()}\n${previous ? `接手此前实现进度，不丢弃已有修改。上次报告：${previous}` : "这是本票首次执行。"}\n遵守 tdd skill，自行负责本票验收并报告实际验证与未完成事项。完成后尽快提交本票实现，交出 worktree，由独立集成子代理接管。不要修改其他票据或工作流报告，不操作集成分支工作区，不自行合入集成分支，不调用 retro、不派发其他票据。不得 reset 丢弃既有工作。`;
 			const job = (async () => {
 				let result: SingleResult | undefined, failure: string | undefined;
 				try {
 					result = await this.host.run({ role: "implement", cwd: worktree.cwd, name: `${name}-${id}`, task });
 					ticket.report = await this.#save("implement", result, await this.git.ticketHead(worktree));
 					attempt.report = ticket.report.path;
+					if (!succeeded(result)) throw new Error(`实现执行未正常完成：${ticket.report.path}`);
+					await this.git.assertTicketClean(worktree);
+					ticket.status = "integrating";
+					this.#startIntegration(ticket);
 				} catch (error) {
 					failure = error instanceof Error ? error.message : String(error);
 					attempt.error = failure;
-					const file = path.join(this.temporaryDir, `implement-${id}-error.md`);
-					await fs.writeFile(file, failure, "utf8");
-					this.#reports.push(file);
-					ticket.decision = failure;
+					ticket.error = failure;
+					ticket.status = "ready";
+					await this.#saveError("implement", id, failure);
 				} finally {
 					await this.retro.settle(id, result, failure);
-					ticket.status = "reported";
 					this.#running.delete(name);
 				}
 			})();
@@ -313,188 +225,116 @@ export class HyperWorkflow {
 	}
 
 	async #collect(): Promise<void> {
-		if (this.#running.size) {
-			await Promise.race(this.#running.values());
-		} else if (![...this.tickets.values()].some((ticket) => ticket.status === "reported")) {
-			throw new Error("没有运行中的实现；请验收现有报告或派发 ready 票据。");
+		const pending = [...this.#running.values(), ...this.#integrating.values()];
+		if (!pending.length) throw new Error("没有运行中的实现或集成；请派发 ready 票据或进入最终验证。");
+		let wake!: () => void;
+		const progress = new Promise<void>((resolve) => {
+			wake = resolve;
+			this.#progressWaiters.add(wake);
+		});
+		try {
+			await Promise.race([...pending, progress]);
+		} finally {
+			this.#progressWaiters.delete(wake);
 		}
 	}
-	async #accept(input: HyperInput): Promise<void> {
-		const ticket = this.#ticket(input.ticket);
-		if (ticket.status !== "reported") throw new Error("只能验收已结束的本次实现执行。");
-		const accepted = this.#decision(input);
-		if (accepted) {
-			if (!ticket.report || !succeeded(ticket.report.result))
-				throw new Error("本次执行失败或报告不完整，不能标记验收通过。");
-			await this.git.assertTicketClean(ticket.worktree!);
-			if ((await this.git.ticketHead(ticket.worktree!)) !== ticket.report.head)
-				throw new Error("报告对应的票据提交已改变。");
-		}
-		ticket.status = accepted ? "accepted" : "ready";
-		ticket.decision = input.reason;
+
+	#startIntegration(ticket: TicketState): void {
+		const job = this.#integrate(ticket).catch(async (error) => {
+			ticket.status = "failed";
+			ticket.error = error instanceof Error ? error.message : String(error);
+			await this.#saveError("integrate", randomUUID(), ticket.error);
+		}).finally(() => this.#integrating.delete(ticket.ticket));
+		this.#integrating.set(ticket.ticket, job);
 	}
 
 	async #integrate(ticket: TicketState): Promise<void> {
-		if (this.#integration) throw new Error("先完成当前集成验证或修复。");
-		if (ticket.status !== "accepted" || !ticket.worktree) throw new Error("票据尚未由主代理验收通过。");
-		await this.git.assertClean();
-		await this.git.assertTicketClean(ticket.worktree);
-		if ((await this.git.ticketHead(ticket.worktree)) !== ticket.report!.head)
-			throw new Error("票据验收后的提交已改变。");
-		const sync = await this.#run(
-			"integrate",
-			ticket.worktree.cwd,
-			`同步集成分支 ${this.git.branch} 最新 tip 到当前票据分支，解决冲突，重新运行本票验收及相关回归。票据：${ticket.ticket}。已验收报告：${ticket.report!.path}。${this.#references()}\n不要修改集成分支工作区。必要修复提交到当前票据分支；不要 reset 丢弃工作。返回实际验证结果和未解决事项。`,
-		);
-		if (!succeeded(sync.result)) {
-			ticket.status = "ready";
-			ticket.decision = `同步验证未完成：${sync.path}`;
-			return;
+		const worktree = ticket.worktree!;
+		const first = await this.git.mergeTicket(worktree, true);
+		if (first.merged) {
+			ticket.mergedHead = first.head;
+			for (const wake of this.#progressWaiters) wake();
 		}
-		await this.git.assertTicketClean(ticket.worktree);
-		ticket.report = { ...ticket.report!, head: await this.git.ticketHead(ticket.worktree) };
-		this.#integration = { ticket: ticket.ticket };
-		await this.git.mergeTicket(ticket.worktree);
-		this.#integration.report = await this.#run(
-			"integrate",
-			this.git.root,
-			`在集成分支当前工作区执行合并后的针对性验证。票据：${ticket.ticket}。票据验收报告：${ticket.report!.path}；同步验证报告：${sync.path}。${this.#references()}\n验证本票验收、受影响交互和项目必要构建/检查，不机械重跑无关场景。只验证，不修改代码，不操作其他 worktree。报告实际命令、结果、未验证项和需修复事项。`,
-		);
-	}
-	async #confirmIntegration(input: HyperInput): Promise<void> {
-		const pending = this.#integration;
-		if (!pending || pending.ticket !== input.ticket || !pending.report)
-			throw new Error("没有该票可供确认的集成验证报告。");
-		const accepted = this.#decision(input);
-		if (!accepted) return;
-		await this.#checkReport(pending.report);
-		this.#ticket(pending.ticket).status = "integrated";
-		this.#integration = undefined;
-	}
-	async #repairIntegration(): Promise<void> {
-		if (!this.#integration) throw new Error("没有待修复的集成。");
-		const ticket = this.#ticket(this.#integration.ticket);
-		this.#integration.report = await this.#run(
-			"fix",
-			this.git.root,
-			`修复当前集成失败，包括必要的未完成合并。票据：${ticket.ticket}。票据报告：${ticket.report?.path}。集成报告：${this.#integration.report?.path ?? "合并操作失败，检查 Git 状态"}。${this.#references()}\n只处理集成阻断问题，不改变验收含义、不 reset 或自动回滚。解决冲突或修复后实际运行本票及相关回归并提交代码。报告证据与未解决项。不要调用 retro。`,
-		);
+		const name = `integrate-${ticket.ticket}-${randomUUID()}`;
+		const request = {
+			role: "integrate" as const,
+			cwd: worktree.cwd,
+			name,
+			task: `接管本票原开发 worktree 和 branch，TDD 会话已结束，不复用它。票据：${ticket.ticket}。实现报告：${ticket.report!.path}。\n${this.#references()}\n首次合入${first.merged ? "已成功" : "有冲突，集成工作区已 abort"}，宿主已将集成提交 ${first.head} merge 回当前开发分支。${first.conflicts ? "当前 worktree 有待解决冲突，请自行阅读代码判断并解决。" : "检查当前同步结果。"}\n本轮自行完成集成验收：只要求运行项目全局测试，通过前直接修复问题。复杂脚本、实机 smoke 与跨票据整体验收留给最后独立门禁。解决冲突及修复均提交到当前开发分支，保持工作区干净。不得操作集成工作区、切换分支、新建 worktree、reset 丢弃工作或调用 retro。不要直接合入集成分支；返回后宿主排队合并。如再次冲突，会在此同一会话继续，不另派 fixer。`,
+		};
+		let result = await this.host.run(request);
+		ticket.integrationAgentId = result.id;
+		while (true) {
+			const report = await this.#save("integrate", result, await this.git.ticketHead(worktree));
+			ticket.integrationReport = report.path;
+			if (!succeeded(result)) throw new Error(`集成执行未正常完成：${report.path}`);
+			await this.git.assertTicketClean(worktree);
+			const merge = await this.git.mergeTicket(worktree, false);
+			if (merge.merged) {
+				ticket.mergedHead ??= merge.head;
+				ticket.status = "integrated";
+				return;
+			}
+			result = await this.host.resume({
+				...request,
+				id: ticket.integrationAgentId,
+				task: `本票回合并发生冲突，集成工作区已 abort。宿主已将集成提交 ${merge.head} merge 回此原开发 worktree。${merge.conflicts ? "请解决当前 Git 冲突。" : "逆向同步已完成。"}沿用本会话的代码上下文，自行阅读判断、完成必要调整并提交，保持工作区干净。不新建 worktree、不操作集成工作区、不修改需求。仅首次调用强制运行全局测试；本轮自行判断必要验证，不启动新一轮完整验收。返回后宿主再次排队合入，合入成功即结束。`,
+			});
+		}
 	}
 
 	#allIntegrated(): void {
-		if (
-			!this.#planned ||
-			!this.tickets.size ||
-			this.#running.size ||
-			this.#integration ||
-			[...this.tickets.values()].some((ticket) => ticket.status !== "integrated")
-		)
-			throw new Error("全部票据集成并通过验证后才能进入最终阶段。");
-	}
-	async #runReview(): Promise<void> {
-		this.#allIntegrated();
-		this.#review = await this.#runReadOnly(
-			"review",
-			`加载并执行本仓库已安装的 code-review skill，对固定起点 ${this.baseline} 到当前 HEAD 的已提交变更进行评审，不评审默认未提交 diff。${this.#references()}\n显式读取 spec，contract 为补充依据。保留 Standards/Spec 双轴独立并行及分开汇总，按 skill 完整执行。评审只读，不应用修复、不提交、不运行 retro。只通过文档、提交和证据取材，不依赖主会话历史。`,
-			() => {
-				this.#reviewAccepted = false;
-				this.#verified = false;
-				this.#review = undefined;
-			},
-		);
-	}
-	async #assessReview(input: HyperInput): Promise<void> {
-		if (!this.#review) throw new Error("先完成独立 code-review。");
-		await this.#checkReport(this.#review);
-		this.#reviewAccepted = this.#decision(input);
-	}
-	async #fix(): Promise<void> {
-		this.#allIntegrated();
-		if (!this.#review || this.#reviewAccepted) throw new Error("先评审并确认仍有需要处理的发现。");
-		this.#verified = false;
-		const fixed = await this.#run(
-			"fix",
-			this.git.root,
-			`根据独立评审报告自动 apply 修复：${this.#review.path}。${this.#references()}\n已确认错误、遗漏、规范违反必须处理；有依据且不改变需求的建议可自动应用。不成立、重复或冲突的建议解释理由。不得修改需求、contract 或弱化验收，不扩大范围。运行相关验证并 commit 修复代码。只处理评审发现，不复盘、不自行宣布最终交付。报告每个发现的处置与证据，供下一次独立 reviewer 复核。`,
-		);
-		if (succeeded(fixed.result)) {
-			await this.git.assertClean();
-			this.#review = undefined;
-		}
-		this.#reviewAccepted = false;
+		if (!this.#planned || !this.tickets.size || this.#running.size || this.#integrating.size ||
+			[...this.tickets.values()].some((ticket) => ticket.status !== "integrated"))
+			throw new Error("全部票据集成处理结束后才能进入最终阶段。");
 	}
 	async #verify(): Promise<void> {
 		this.#allIntegrated();
-		if (!this.#reviewAccepted || !this.#review) throw new Error("先完成评审修复及独立复核。");
-		await this.#checkReport(this.#review);
-		this.#verification = await this.#runReadOnly(
-			"verify",
-			`对当前集成分支做最终整体验证。${this.#references()}\n评审报告：${this.#review.path}。依据 contract 承诺、跨票据行为及项目要求选择并实际执行整体验证，逐项报告证据和未验证项。不得修改代码、需求或提交。不要调用 retro。`,
-			() => {
-				this.#verified = false;
-				this.#verification = undefined;
-			},
-		);
-	}
-	async #acceptVerification(input: HyperInput): Promise<void> {
-		if (!this.#verification) throw new Error("没有最终验证报告。");
-		const accepted = this.#decision(input);
-		if (accepted) await this.#checkReport(this.#verification);
-		this.#verified = accepted;
-	}
-	async #checkReport(report: Report): Promise<void> {
-		if (!succeeded(report.result)) throw new Error(`执行失败或报告不完整：${report.path}`);
+		this.#verified = false;
+		this.#verification = undefined;
 		await this.git.assertClean();
-		if ((await this.git.head()) !== report.head) throw new Error("验证或评审报告已过期，需要针对当前提交重新执行。");
-	}
-
-	/**
-	 * Run one read-only phase (`review` or `verify`) under the HEAD+clean
-	 * guard: the integration checkout is clean before and after, and HEAD must
-	 * be the same commit. The phase's prior state is reset before the run, so a
-	 * phase that mutated its own target can never leave an acceptable report.
-	 */
-	async #runReadOnly(role: "review" | "verify", task: string, reset: () => void): Promise<Report> {
-		await this.git.assertClean();
-		reset();
 		const head = await this.git.head();
-		const report = await this.#run(role, this.git.root, task);
+		const report = await this.#run("verify", this.git.root,
+			`对当前集成分支做最终整体验证。${this.#references()}\n不执行 code-review。依据 contract 承诺、跨票据行为及项目要求实际执行整体验证，包括必要的复杂脚本或实机 smoke；逐项报告实际证据、失败与未验证项。自行负责验收，通过则正常完成，失败明确以执行失败返回供 fixer 接手。不得修改代码、需求或提交，不调用 retro。`);
 		await this.git.assertClean();
-		if ((await this.git.head()) !== head) {
-			throw new Error(`只读${READ_ONLY_PHASE_LABEL[role]}期间集成分支提交被修改。`);
-		}
-		return report;
+		if ((await this.git.head()) !== head) throw new Error("只读验证期间集成分支提交被修改。");
+		this.#verification = report;
+		this.#verified = succeeded(report.result);
 	}
-
+	async #fix(): Promise<void> {
+		this.#allIntegrated();
+		if (!this.#verification || this.#verified) throw new Error("先执行最终验证并取得失败报告。");
+		const previous = this.#verification;
+		this.#verified = false;
+		await this.#run("fix", this.git.root,
+			`修复最终整体验证发现的问题，报告：${previous.path}。${this.#references()}\n不执行 code-review，不改变需求或弱化验收。根据失败证据阅读代码、修复、运行必要检查并提交，保持工作区干净。完成后由独立 verify 子代理重新验证；不要自行宣布交付，不调用 retro。`);
+		await this.git.assertClean();
+	}
+	async #checkVerification(): Promise<void> {
+		if (!this.#verified || !this.#verification) throw new Error("最终验证尚未正常完成。");
+		await this.git.assertClean();
+		if ((await this.git.head()) !== this.#verification.head) throw new Error("验证报告已过期，需要针对当前提交重新执行。");
+	}
 	async #run(role: HyperRole, cwd: string, task: string): Promise<Report> {
 		const result = await this.host.run({ role, cwd, task, name: `${role}-${randomUUID()}` });
 		return this.#save(role, result, await this.git.head());
 	}
+	async #saveError(role: HyperRole, id: string, message: string): Promise<void> {
+		const file = path.join(this.temporaryDir, `${role}-${id}-error.md`);
+		await fs.writeFile(file, message, "utf8");
+		this.#reports.push(file);
+	}
 	async #save(role: HyperRole, result: SingleResult, head: string): Promise<Report> {
 		const file = path.join(this.temporaryDir, `${role}-${randomUUID()}.md`);
-		const metadata = {
-			role,
-			agent: result.agent,
-			agent_id: result.id,
-			head,
-			exitCode: result.exitCode,
-			error: result.error,
-			aborted: result.aborted,
-			truncated: result.truncated,
-		};
-		await fs.writeFile(
-			file,
-			`# ${role}\n\n\`\`\`json\n${JSON.stringify(metadata, null, 2)}\n\`\`\`\n\n${result.output}\n`,
-			"utf8",
-		);
+		const metadata = { role, agent: result.agent, agent_id: result.id, head,
+			exitCode: result.exitCode, error: result.error, aborted: result.aborted, truncated: result.truncated };
+		await fs.writeFile(file, `# ${role}\n\n\`\`\`json\n${JSON.stringify(metadata, null, 2)}\n\`\`\`\n\n${result.output}\n`, "utf8");
 		this.#reports.push(file);
 		return { path: file, result, head };
 	}
 	async #finish(): Promise<object> {
 		this.#allIntegrated();
-		if (!this.#reviewAccepted || !this.#verified || !this.#verification)
-			throw new Error("评审与最终验证尚未由主代理确认通过。");
-		await this.#checkReport(this.#verification);
+		await this.#checkVerification();
 		await this.retro.finish();
 		const files = await this.retro.publish(path.join(this.git.root, ".scratch", this.slug, "retro"));
 		const directory = path.join(this.git.root, ".scratch", this.slug, "execution", path.basename(this.temporaryDir));
@@ -506,18 +346,8 @@ export class HyperWorkflow {
 			files.push(target);
 		}
 		const ledger = path.join(directory, "workflow.json");
-		const body = JSON.stringify(
-			{
-				branch: this.git.branch,
-				baseline: this.baseline,
-				attempts: this.#attempts,
-				decisions: this.#decisions,
-				tickets: this.status(),
-				executions: this.retro.records,
-			},
-			null,
-			2,
-		);
+		const body = JSON.stringify({ branch: this.git.branch, baseline: this.baseline,
+			attempts: this.#attempts, tickets: this.status(), executions: this.retro.records }, null, 2);
 		const encodedTemporaryDir = JSON.stringify(this.temporaryDir).slice(1, -1);
 		const encodedDirectory = JSON.stringify(directory).slice(1, -1);
 		await fs.writeFile(ledger, body.split(encodedTemporaryDir).join(encodedDirectory));
@@ -528,24 +358,11 @@ export class HyperWorkflow {
 		);
 		const retainedBranches = [...this.git.worktrees.values()].map((tree) => tree.branch);
 		const warnings = await this.git.cleanup();
-		try {
-			await this.host.close();
-		} catch (error) {
-			warnings.push(`宿主临时产物清理失败：${error instanceof Error ? error.message : String(error)}`);
-		}
+		try { await this.host.close(); }
+		catch (error) { warnings.push(`宿主临时产物清理失败：${error instanceof Error ? error.message : String(error)}`); }
 		this.#finished = true;
-		try {
-			await fs.rm(this.temporaryDir, { recursive: true });
-		} catch (error) {
-			warnings.push(`报告临时目录保留：${this.temporaryDir}；${error instanceof Error ? error.message : String(error)}`);
-		}
-		return {
-			branch: this.git.branch,
-			commit,
-			reports: files,
-			executions: this.retro.records,
-			warnings,
-			retainedBranches,
-		};
+		try { await fs.rm(this.temporaryDir, { recursive: true }); }
+		catch (error) { warnings.push(`报告临时目录保留：${this.temporaryDir}；${error instanceof Error ? error.message : String(error)}`); }
+		return { branch: this.git.branch, commit, reports: files, executions: this.retro.records, warnings, retainedBranches };
 	}
 }

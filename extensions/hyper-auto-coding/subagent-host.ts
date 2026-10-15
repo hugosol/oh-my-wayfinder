@@ -10,19 +10,21 @@
  *
  * `implement` runs the `tdd` agent captured from the integration root — injected
  * into every child session, so a project-only `.omp/agents` install survives a
- * worktree spawn — and is the only role kept addressable (`keepAlive` plus
- * retained artifacts) so the retro callbacks can continue the exact original
- * session. Helper roles run inline definitions that never autoload the `tdd`
- * skill; only `review` may spawn nested subagents, and `review`/`verify` are
- * additionally limited to read-only tools. Isolation is never requested:
- * worktrees are the caller's concern and the retro continuation rejects
- * isolated sessions.
+ * worktree spawn. `implement` and `integrate` are the two roles kept addressable
+ * (`keepAlive` plus retained artifacts): the retro callbacks continue the exact
+ * original implementation session, and `resume` continues the exact original
+ * integration session across its conflict/repair rounds instead of spawning a
+ * replacement. Helper roles run inline definitions that never autoload the `tdd`
+ * skill; `verify` is additionally limited to read-only tools. Isolation is never
+ * requested: worktrees are the caller's concern and the retro continuation
+ * rejects isolated sessions.
  */
 import {
 	type AgentDefinition,
 	type AgentSession,
 	type ExtensionAPI,
 	type ExtensionContext,
+	runSubagentFollowUpTurn,
 	type SingleResult,
 	type ToolSession,
 } from "@oh-my-pi/pi-coding-agent";
@@ -38,7 +40,7 @@ import { createRetroPorts } from "../spec-to-code/retro-host";
 import type { RetroPorts } from "../spec-to-code/execution-attempts";
 
 /** Roles the orchestrator dispatches to fresh subagent sessions. */
-export type HyperRole = "implement" | "integrate" | "review" | "fix" | "verify";
+export type HyperRole = "implement" | "integrate" | "fix" | "verify";
 
 /** One fresh-session dispatch request. */
 export interface HyperRun {
@@ -63,15 +65,31 @@ export interface HyperHost {
 	 * Resolves with the child's settled `SingleResult` exactly as the host
 	 * produced it. A run that failed still resolves (`exitCode !== 0`, `error`,
 	 * `aborted`, or `truncated` set; `output` may be empty) — the caller owns
-	 * acceptance. It rejects only when no child result exists: unknown role,
-	 * invalid cwd, missing calling session, or a structured subagent
-	 * preflight/execution failure (`StructuredSubagentError`).
+	 * what a normal exit means. It rejects only when no child result exists:
+	 * unknown role, invalid cwd, missing calling session, or a structured
+	 * subagent preflight/execution failure (`StructuredSubagentError`).
 	 *
 	 * `result.output` carries the child's final yield text (its Markdown
 	 * report); no output schema is imposed, so the agent's own completion
 	 * contract decides the body.
+	 *
+	 * `implement` and `integrate` runs keep their child session alive; every
+	 * other run ends with its session.
 	 */
 	run(request: HyperRun): Promise<SingleResult>;
+	/**
+	 * Continue the exact child session an earlier `integrate` run created, with
+	 * one more turn on its retained conversation history, and resolve with that
+	 * turn's `SingleResult`. `id` is the `id` of the original run's result;
+	 * `task` is the follow-up assignment.
+	 *
+	 * The continuation never spawns a replacement session: an `id` this host did
+	 * not keep alive (or whose session was released) fails instead of silently
+	 * starting a new one, and `cwd` is ignored because the session keeps the
+	 * working directory it was spawned with. Any failure rejects with the
+	 * underlying error.
+	 */
+	resume(request: HyperRun & { id: string }): Promise<SingleResult>;
 	/**
 	 * Retro callbacks bound to this host, captured before any implement
 	 * dispatch: `identify(result)` resolves the retained original session of an
@@ -79,23 +97,24 @@ export interface HyperHost {
 	 */
 	retro: RetroPorts;
 	/**
-	 * Release artifact directories retained for `implement` runs whose lease was
-	 * temporary. Call once the workflow is finished — after every retro and the
-	 * final report commit — because a retained directory holds the original
-	 * session a later retro continuation must revive. A persisted calling
-	 * session owns its artifacts directory outright, so nothing is retained and
-	 * this is a no-op; the calling session's history is never touched.
+	 * Release artifact directories retained for `implement` and `integrate` runs
+	 * whose lease was temporary. Call once the workflow is finished — after every
+	 * retro, the last integration round, and the final report commit — because a
+	 * retained directory holds the original session a later retro or integration
+	 * continuation must revive. A persisted calling session owns its artifacts
+	 * directory outright, so nothing is retained and this is a no-op; the calling
+	 * session's history is never touched.
 	 */
 	close(): Promise<void>;
 }
 
-const ROLES: readonly HyperRole[] = ["implement", "integrate", "review", "fix", "verify"];
+const ROLES: readonly HyperRole[] = ["implement", "integrate", "fix", "verify"];
 const IMPLEMENT_AGENT = "tdd";
 type HelperRole = Exclude<HyperRole, "implement">;
-const HELPER_ROLES: readonly HelperRole[] = ["integrate", "review", "fix", "verify"];
+const HELPER_ROLES: readonly HelperRole[] = ["integrate", "fix", "verify"];
 /**
- * Explicit tool set for `review` and `verify`: file readers, LSP, and `bash`
- * so `git diff`/`log`, builds, and checks actually run, minus every
+ * Explicit tool set for `verify`: file readers, LSP, and `bash` so
+ * `git diff`/`log`, builds, and checks actually run, minus every
  * file-writing tool. The host has no read-only bash mode (its read-only agent
  * policy excludes `bash` entirely), so write prevention rides the role prompt
  * and the orchestrator's own post-run assertions.
@@ -107,8 +126,6 @@ interface HelperSpec {
 	systemPrompt: string;
 	/** Tool allowlist; absent keeps the bundled task agent's full toolset. */
 	tools?: string[];
-	/** Nested-spawn policy; only `review` spawns its two axes. */
-	spawns?: "*";
 }
 
 const HELPER_SPECS: Record<HelperRole, HelperSpec> = {
@@ -120,18 +137,8 @@ const HELPER_SPECS: Record<HelperRole, HelperSpec> = {
 			"Do not work outside the assignment and do not modify unrelated files. When finished, report through yield: the concrete result, the commands you ran with their observed outcomes, and any blocker with its exact error. Never fabricate an outcome you did not observe.",
 		].join("\n\n"),
 	},
-	review: {
-		description: "Hyper-auto-coding helper: independent two-axis review of integrated work",
-		systemPrompt: [
-			"You are the review helper of the hyper-auto-coding pipeline, running as one fresh child session. You receive one complete assignment and no parent conversation exists.",
-			"Load the repository's code-review skill and follow it: run each axis as its own nested subagent so the axes stay independent, then report them side by side. Run the commands the skill needs (`git diff`/`log`, builds, checks) — every command must be read-only.",
-			"Keep the axes separate. Aggregate under `## Standards` and `## Spec` headings, do not merge or rerank findings across axes, and never pick a single winner across them; end with one line of per-axis totals and the worst issue within each axis. Never modify code, the index, or HEAD: report only findings with file/line evidence, or state explicitly that an axis found none.",
-		].join("\n\n"),
-		tools: [...HELPER_TOOLS, "task"],
-		spawns: "*",
-	},
 	fix: {
-		description: "Hyper-auto-coding helper: apply review fixes, validate, and commit",
+		description: "Hyper-auto-coding helper: apply the assigned fixes, validate, and commit",
 		systemPrompt: [
 			"You are the fixer helper of the hyper-auto-coding pipeline, running as one fresh child session. You receive one complete assignment and no parent conversation exists.",
 			"Apply exactly the fixes the assignment describes, validate them with the project's own checks, and commit the result when the assignment calls for a commit. Every claim in your report must come from a command you actually ran in this session.",
@@ -151,8 +158,8 @@ const HELPER_SPECS: Record<HelperRole, HelperSpec> = {
 
 /**
  * Inline helper definitions, built on the bundled `task` agent exactly as the
- * host's own session agents are. Only review autoloads code-review; helpers
- * never inherit the implementation agent's tdd skill.
+ * host's own session agents are. Helpers never inherit the implementation
+ * agent's `tdd` skill.
  */
 function buildHelperAgents(): AgentDefinition[] {
 	const base = getBundledAgent("task");
@@ -163,8 +170,6 @@ function buildHelperAgents(): AgentDefinition[] {
 		description: HELPER_SPECS[role].description,
 		systemPrompt: HELPER_SPECS[role].systemPrompt,
 		tools: HELPER_SPECS[role].tools,
-		autoloadSkills: role === "review" ? ["code-review"] : undefined,
-		spawns: HELPER_SPECS[role].spawns,
 		filePath: undefined,
 	}));
 }
@@ -291,7 +296,7 @@ export async function createHyperHost(pi: ExtensionAPI, ctx: ExtensionContext): 
 	const outputManager = new AgentOutputManager(
 		() => AgentRegistry.global().get(ctx.agent.id)?.session?.sessionManager.getArtifactsDir() ?? null,
 	);
-	// Cleanup closures for implement runs whose artifact lease was temporary
+	// Cleanup closures for kept-alive runs whose artifact lease was temporary
 	// (a calling session with no session file of its own). A persisted calling
 	// session owns its artifacts directory outright, so the host never receives
 	// a temporary lease and never retains anything to release.
@@ -309,34 +314,60 @@ export async function createHyperHost(pi: ExtensionAPI, ctx: ExtensionContext): 
 			throw new Error(`hyper ${request.role} cwd is not a directory: ${cwd}`);
 		}
 		const isImplement = request.role === "implement";
+		// Implement sessions outlive the run so the retro callbacks can continue
+		// the exact original session; integration sessions outlive it so `resume`
+		// can continue the same session across its conflict/repair rounds. Either
+		// way the artifacts directory holding the session is retained until
+		// `close`, including across a park/revive cycle.
+		const keptAlive = isImplement || request.role === "integrate";
 		const parent = requireCallerSession(ctx);
 		const session = deriveChildSession({ parent, cwd, pi, ctx, implement, helpers, outputManager });
 		if (isImplement) await assertImplementReady(cwd, parent, session);
-		if (request.role === "review" && !session.skills?.some((skill) => skill.name === "code-review")) {
-			throw new Error("hyper-auto-coding reviewer requires the installed code-review skill in the calling session.");
-		}
 		const { result } = await runStructuredSubagent({
 			session,
 			invocationKind: "task",
 			assignment,
 			agent: isImplement ? IMPLEMENT_AGENT : `hyper-${request.role}`,
 			identity: { label: request.name },
-			// Implement sessions must outlive the run so the retro callbacks can
-			// continue the exact original session (including after a park/revive
-			// cycle), which also means retaining the artifacts holding it.
-			keepAlive: isImplement,
-			retainArtifacts: isImplement,
-			onArtifactsRetained: isImplement ? (cleanup) => retainedCleanups.add(cleanup) : undefined,
+			keepAlive: keptAlive,
+			retainArtifacts: keptAlive,
+			onArtifactsRetained: keptAlive ? (cleanup) => retainedCleanups.add(cleanup) : undefined,
 		});
 		return result;
 	}
 
-	/** Release the temporary artifact directories retained for implement runs. */
+	/**
+	 * Continue the exact integration session `id` names. The turn runs on the
+	 * retained conversation history through the SDK's own follow-up entry point,
+	 * so no replacement session is ever created; an unknown or released id
+	 * rejects with the SDK's own error. `cwd` and `name` are ignored: the
+	 * continued session keeps the working directory and id it was spawned with.
+	 */
+	async function resume(request: HyperRun & { id: string }): Promise<SingleResult> {
+		if (request.role !== "integrate") {
+			throw new Error(`hyper resume only continues "integrate" sessions, not "${String(request.role)}".`);
+		}
+		const id = request.id.trim();
+		if (!id) throw new Error("hyper integrate resume needs the id of the run to continue.");
+		const assignment = request.task.trim();
+		if (!assignment) throw new Error("hyper integrate resume needs a non-empty task.");
+		const agent = helpers.find((candidate) => candidate.name === "hyper-integrate");
+		if (!agent) throw new Error('hyper-auto-coding has no "hyper-integrate" agent definition.');
+		return runSubagentFollowUpTurn({
+			id,
+			agent,
+			message: assignment,
+			parentToolCallId: `hyper:integrate:${id}`,
+			eventBus: pi.events,
+		});
+	}
+
+	/** Release the temporary artifact directories retained for kept-alive runs. */
 	async function close(): Promise<void> {
 		const cleanups = [...retainedCleanups];
 		retainedCleanups.clear();
 		await Promise.all(cleanups.map((cleanup) => cleanup()));
 	}
 
-	return { run, retro, close };
+	return { run, resume, retro, close };
 }
