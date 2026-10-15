@@ -48,10 +48,10 @@ The user-prepared development branch that receives the assembled delivery. It is
 _Avoid_: main, ticket branch
 
 **Ticket integration**:
-The process of bringing an implementation ticket's worktree branch into the integration branch, including integration testing, repairs, conflict resolution, and any further merge attempts needed to land the resulting changes. It is distinct from final overall verification.
+The process of bringing an implementation ticket's worktree branch into the integration branch, including integration testing, repairs, conflict resolution, and any further merge attempts needed to land the resulting changes. Integration does not certify later combinations of changes.
 
-**Final overall verification**:
-An independent acceptance process over the assembled delivery after all implementation tickets are integrated. It is not a ticket integration round.
+**Acceptance ticket**:
+An optional ticket explicitly scoped to confirm specified behavior of the assembled delivery, with its scope, steps, and evidence stated in the ticket.
 
 **Merged ticket**:
 An implementation ticket whose work has first reached the integration branch. This releases its dependent tickets without claiming integration testing or repairs are complete.
@@ -63,7 +63,7 @@ A merged implementation ticket whose integration testing and any resulting repai
 The implementation tickets available to start because all their blocking tickets have been merged; those blockers need not yet be integrated.
 
 **Delivery complete**:
-All implementation tickets are integrated, final overall verification is complete, and delivery reports are committed. Retrospective delivery remains an independent outcome.
+All planned implementation tickets are integrated and delivery reports are committed. Retrospective delivery remains an independent outcome.
 _Avoid_: workflow settled
 
 **Jev mode**:

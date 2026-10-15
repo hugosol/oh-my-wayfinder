@@ -5,7 +5,6 @@ import * as path from "node:path";
 import type { SingleResult } from "@oh-my-pi/pi-coding-agent";
 import { TddWorkFlow } from "../implementation-node/tdd-execution";
 import { TicketIntegration } from "../integration-node/ticket-integration";
-import { FinalVerification } from "./final-verification";
 import { HyperGit, type TicketWorktree } from "./git";
 import type { HyperHost, HyperRole } from "./subagent-host";
 
@@ -25,7 +24,7 @@ interface TicketState extends TicketPlan {
 	integration?: TicketIntegration;
 	error?: string;
 }
-export type HyperAction = "status" | "plan" | "dispatch" | "collect" | "verify" | "fix" | "finish";
+export type HyperAction = "status" | "plan" | "dispatch" | "collect" | "finish";
 
 /** One implementation attempt of one ticket, recorded for the audit ledger. */
 interface ExecutionAttempt {
@@ -54,7 +53,6 @@ export class HyperWorkflow {
 	readonly #reports: string[] = [];
 	readonly #attempts: ExecutionAttempt[] = [];
 	#busy = false;
-	readonly #finalVerification: FinalVerification;
 	#finished = false;
 	#planned = false;
 
@@ -68,10 +66,7 @@ export class HyperWorkflow {
 		readonly temporaryDir: string,
 		readonly baseline: string,
 		readonly retro: TddWorkFlow,
-	) {
-		this.#finalVerification = new FinalVerification(git, host, this.#references(),
-			(role, result, head) => this.#save(role, result, head));
-	}
+	) {}
 
 	static async create(
 		slug: string,
@@ -121,7 +116,6 @@ export class HyperWorkflow {
 				report: report?.path,
 				reportSuccessful: report && succeeded(report.result),
 			})),
-			...this.#finalVerification.snapshot,
 			finished: this.#finished,
 			lastReport: this.#reports[this.#reports.length - 1],
 		};
@@ -137,8 +131,6 @@ export class HyperWorkflow {
 				case "plan": this.#plan(input.plan ?? []); break;
 				case "dispatch": await this.#dispatch(input.tickets ?? []); break;
 				case "collect": await this.#collect(); break;
-				case "verify": this.#allIntegrated(); await this.#finalVerification.verify(); break;
-				case "fix": this.#allIntegrated(); await this.#finalVerification.fix(); break;
 				case "finish": return await this.#finish();
 				default: throw new Error(`未知编排操作：${String(input.action)}`);
 			}
@@ -258,7 +250,7 @@ export class HyperWorkflow {
 	#allIntegrated(): void {
 		if (!this.#planned || !this.tickets.size || this.#running.size || this.#integrating.size ||
 			[...this.tickets.values()].some((ticket) => ticket.status !== "integrated"))
-			throw new Error("全部票据集成处理结束后才能进入最终阶段。");
+			throw new Error("全部票据集成处理结束后才能结束工作流。");
 	}
 	async #saveError(role: HyperRole, id: string, message: string): Promise<void> {
 		const file = path.join(this.temporaryDir, `${role}-${id}-error.md`);
@@ -275,7 +267,6 @@ export class HyperWorkflow {
 	}
 	async #finish(): Promise<object> {
 		this.#allIntegrated();
-		await this.#finalVerification.check();
 		await this.retro.finish();
 		const files = await this.retro.publish(path.join(this.git.root, ".scratch", this.slug, "retro"));
 		const directory = path.join(this.git.root, ".scratch", this.slug, "execution", path.basename(this.temporaryDir));

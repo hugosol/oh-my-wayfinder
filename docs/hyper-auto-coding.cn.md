@@ -60,27 +60,27 @@
 
 ### 同一个集成子代理完成闭环
 
-首次尝试无论成功还是冲突，都启动一个新的集成子代理；它与原 TDD 会话不同。它在原开发 worktree 解决已有冲突，运行项目全局测试，直接修复问题并提交。集成验收只要求全局测试，复杂脚本、跨票据整体验证与实机 smoke 留给最终门禁。
+首次尝试无论成功还是冲突，都启动一个新的集成子代理；它与原 TDD 会话不同。它在原开发 worktree 解决已有冲突，运行项目全局测试，直接修复问题并提交。全局测试仍属于单票集成。复杂脚本、跨票据检查或实机 smoke 等额外验收，需要时写入范围明确的普通 ticket，而不由工作流自动创建最终门禁。
 
 随后尝试将结果合回集成分支：成功（包括没有新增提交）就结束；冲突则按上述临界区 abort、逆向同步，锁外续跑同一个集成子代理处理并提交，再次排队。后续成功不再触发完整集成验证，不强制每轮重跑全局测试。冲突处理由 agent 自行阅读代码判断，不增加主代理审批或固定重试次数上限。
 
 集成分支 HEAD 前进不是失败条件：干净 merge 直接接受，不强制追赶新 HEAD 或重新验收。后台修复与冲突处理不暂停其他票据的领取或合入。仅在集成处理结束且全部结果已合入后，票据才是“已集成”；首次合入只表示“已合并”。
 
-### 最终独立验证与修复
+### 可选的验收 ticket
 
-全部票据集成处理结束后，`verify` 启动全新的独立验证子代理，在集成工作区依据 spec、contract、跨票据行为与项目要求运行整体验证，包括必要的复杂脚本或实机 smoke。验证只读，不能修改代码或提交，正常完成自动通过，不需要主代理接受报告。
+需要最终或跨票据验收时，可通过 `/to-tickets` 生成一张 ticket，并在 ticket 内容中明确范围、步骤和证据要求。该 ticket 是可选项，与其他 ticket 一样经过普通依赖调度、独立 worktree、执行、集成测试和合并。工作流不会另行创建验证者或修复者，也不评判 ticket 报告。
 
-若验证执行返回失败，调用 `fix` 派发独立修复者，修复并提交后重新调用 `verify`。没有 code-review、Standards/Spec 双轴评审或评审驱动的修复循环，不要求安装 code-review skill。最终验证只适用于它检查的提交；提交变化后需重新验证再 finish。
+阻塞 ticket 首次成功合并后即可释放依赖，即使其集成测试或修复仍在进行。因此验收 ticket 可能基于稍早的代码运行；之后的干净合并不会触发重新验收。这是为并行开发接受的取舍，不是隐藏的交付门禁。
 
 ## Retro 与报告提交
 
-只有登记为某张票据实现执行的子代理触发 retro，包括首次实现、失败和重试；集成、冲突处理、最终验证、fixer、辅助 agent 和 retro 自身不触发。
+只有登记为某张票据实现执行的子代理触发 retro，包括首次实现、失败和重试；集成、冲突处理、辅助 agent 和 retro 自身不触发。
 
 实现结束即在原 TDD 会话异步 retro，不等待 merge，每次执行一次。集成在另一个会话接管原 worktree；retro 只依据历史提建议，不修改代码或操作 Git。复盘结果独立于实现结果。
 
 报告保存在工作区外、每次运行独立的系统临时目录（Windows `%TEMP%`，其他系统使用运行时 OS 临时目录），不逐次 merge 搬运。
 
-所有集成及最终验证完成后，`finish`：
+所有 ticket 集成处理完成后，`finish`：
 
 1. 等待所有 retro 成功或失败终态。
 2. 发布报告与执行记录到集成工作区，并显式提交本次文件。
@@ -115,7 +115,6 @@ Markdown retro 只在交付成功时存在，失败记录仍然提交。实现�
 - [编排工具和主代理指导](../extensions/hyper-auto-coding/agent-tools.ts)
 - [工作流调度与报告发布](../extensions/hyper-auto-coding/workflow.ts)
 - [单票集成状态、合并尝试与冲突续跑](../extensions/integration-node/ticket-integration.ts)
-- [独立最终验收、修复与报告有效性](../extensions/hyper-auto-coding/final-verification.ts)
 - [本地 Git 和 worktree](../extensions/hyper-auto-coding/git.ts)
 - [新会话与原集成会话续跑](../extensions/hyper-auto-coding/subagent-host.ts)
 - [原 TDD 会话 retro](../extensions/implementation-node/retro-host.ts)、[执行记录及终态等待](../extensions/implementation-node/tdd-execution.ts)

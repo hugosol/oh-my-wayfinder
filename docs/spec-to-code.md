@@ -28,7 +28,7 @@ Copy the following artifacts, keeping their relative layout. The same entry also
     tdd.md               # blocking `tdd` task agent; autoloads the `tdd` skill, pins its own model
 ```
 
-`implementation-node/tdd-execution.ts` exposes `TddWorkFlow`: TDD execution attempts are primary, with independent retrospectives as subsequent actions; TDD dispatch remains in the existing workflows. `integration-node/ticket-integration.ts` owns each ticket’s merge attempts, integration reports, and resumable integration session. `hyper-auto-coding/final-verification.ts` owns the separate final acceptance process, not ticket integration. `hyper-auto-coding/workflow.ts` schedules these modules and publishes their reports; `agent-tools.ts` defines the main agent’s workflow tool. Execution order and completion rules are unchanged.
+`implementation-node/tdd-execution.ts` exposes `TddWorkFlow`: TDD execution attempts are primary, with independent retrospectives as subsequent actions; TDD dispatch remains in the existing workflows. `integration-node/ticket-integration.ts` owns each ticket’s merge attempts, integration reports, and resumable integration session. `hyper-auto-coding/workflow.ts` schedules ticket work, integration, and report publication; any optional acceptance scope is carried by an ordinary ticket rather than a separate final-verification process. `agent-tools.ts` defines the main agent’s workflow tool.
 
 When updating an existing installation, replace the previous layout and update any file-based extension configuration to `entry.ts`; load only one entry to avoid duplicate tool and command registration.
 

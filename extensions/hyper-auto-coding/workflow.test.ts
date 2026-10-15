@@ -21,7 +21,6 @@ interface StatusSnapshot {
 	integrating: string[];
 	ready: string[];
 	tickets: TicketSnapshot[];
-	verified: boolean;
 }
 interface FinishSummary {
 	reports: string[];
@@ -93,8 +92,6 @@ async function fixture(options: {
 	implementationWork?: (request: HyperRun) => Promise<void>;
 	integrationWork?: (request: HyperRun) => Promise<void>;
 	resumeWork?: (request: HyperRun & { id: string }) => Promise<void>;
-	mutateVerify?: () => boolean;
-	failVerify?: () => boolean;
 	failRetro?: (ticket: string) => boolean;
 } = {}) {
 	const repo = await initRepo({ slug: "feature", branch: "feature/delivery", prefix: "hyper-workflow-test-",
@@ -124,17 +121,6 @@ async function fixture(options: {
 				await git(request.cwd, "commit", "--allow-empty", "-m", `deliver ${name}`);
 			} else if (request.role === "integrate") {
 				await options.integrationWork?.(request);
-			} else if (request.role === "fix") {
-				await write(path.join(root, "integration-fix.txt"), "regression corrected\n");
-				await git(root, "add", "integration-fix.txt");
-				await git(root, "commit", "-m", "fix integration regression");
-			} else if (request.role === "verify") {
-				if (options.mutateVerify?.()) {
-					await write(path.join(root, "readonly-change.txt"), "illegal mutation");
-					await git(root, "add", "readonly-change.txt");
-					await git(root, "commit", "-m", "illegal read-only change");
-				}
-				if (options.failVerify?.()) return { ...execution, exitCode: 1, output: "Global behavior failed." };
 			}
 			return execution;
 		},
@@ -191,7 +177,6 @@ test("implementation slots are bounded; first merge releases dependencies while 
 	await workflow.execute({ action: "dispatch", tickets: ["c.md"] });
 	const c = ticketSnapshot(await status(workflow), "c.md").worktree!;
 	expect(await git(c.cwd, "show", "HEAD:a.txt")).toBe("delivered a");
-	await expect(workflow.execute({ action: "verify" })).rejects.toThrow("全部票据");
 	integrating.release();
 	await drain(workflow);
 });
@@ -281,33 +266,12 @@ test("first-merge conflict starts one integration child; its successful merge do
 	expect(runs.filter((run) => run.role === "integrate").map((run) => run.resumed)).toEqual([false]);
 });
 
-test("final verification is independent, read-only, and must rerun after its fixer", async () => {
-	let mutate = true, fail = true;
-	const { workflow, root } = await fixture({ mutateVerify: () => mutate, failVerify: () => fail });
-	for (const name of ["a.md", "b.md", "c.md"]) await complete(workflow, name);
-	await expect(workflow.execute({ action: "verify" })).rejects.toThrow("只读验证期间");
-	await expect(workflow.execute({ action: "finish" })).rejects.toThrow("最终验证");
-	mutate = false;
-	await workflow.execute({ action: "verify" });
-	expect((await status(workflow)).verified).toBe(false);
-	await workflow.execute({ action: "fix" });
-	expect(await fs.readFile(path.join(root, "integration-fix.txt"), "utf8")).toBe("regression corrected\n");
-	await expect(workflow.execute({ action: "finish" })).rejects.toThrow("最终验证");
-	fail = false;
-	await workflow.execute({ action: "verify" });
-	expect((await status(workflow)).verified).toBe(true);
-}, 30000);
-
-test("publication waits for retro terminal outcomes, commits usable reports, cleans original trees and retains branches", async () => {
+test("integrated tickets can be published without independent final verification", async () => {
 	const retros = gate();
 	const { workflow, root, events, retroIds, runs, retroWarnings } = await fixture({
 		retroGate: retros.promise, failRetro: (ticket) => ticket === "b.md",
 	});
 	for (const name of ["a.md", "b.md", "c.md"]) await complete(workflow, name);
-	await workflow.execute({ action: "verify" });
-	await git(root, "commit", "--allow-empty", "-m", "change after verification");
-	await expect(workflow.execute({ action: "finish" })).rejects.toThrow("报告已过期");
-	await workflow.execute({ action: "verify" });
 	const scratch = path.join(root, ".scratch", "feature");
 	expect((await fs.readdir(scratch)).sort()).toEqual(["contract.md", "implementation", "spec.md"]);
 	const before = await status(workflow);
@@ -343,10 +307,7 @@ test("publication waits for retro terminal outcomes, commits usable reports, cle
 		if (attempt.ticket === "b.md") {
 			expect(record.retro_error).toBeTruthy();
 			expect(record.retro_document).toBeUndefined();
-		} else {
-			expect(await fs.readFile(record.retro_document!, "utf8")).toContain("Keep the successful behavioral verification");
 		}
-		expect(await fs.readFile(attempt.report!, "utf8")).toContain("Required behavior verified");
 	}
 	expect(retroWarnings.some((warning) => warning.includes("b.md"))).toBe(true);
 	expect(await fs.stat(before.temporaryDir).catch(() => null)).toBeNull();

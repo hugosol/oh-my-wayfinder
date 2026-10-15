@@ -14,10 +14,9 @@
  * (`keepAlive` plus retained artifacts): the retro callbacks continue the exact
  * original implementation session, and `resume` continues the exact original
  * integration session across its conflict/repair rounds instead of spawning a
- * replacement. Helper roles run inline definitions that never autoload the `tdd`
- * skill; `verify` is additionally limited to read-only tools. Isolation is never
- * requested: worktrees are the caller's concern and the retro continuation
- * rejects isolated sessions.
+ * replacement. The integration helper runs an inline definition that never
+ * autoloads the `tdd` skill. Isolation is never requested: worktrees are the
+ * caller's concern and the retro continuation rejects isolated sessions.
  */
 import {
 	type AgentDefinition,
@@ -40,7 +39,7 @@ import { createRetroPorts } from "../implementation-node/retro-host";
 import type { RetroPorts } from "../implementation-node/tdd-execution";
 
 /** Roles the orchestrator dispatches to fresh subagent sessions. */
-export type HyperRole = "implement" | "integrate" | "fix" | "verify";
+export type HyperRole = "implement" | "integrate";
 
 /** One fresh-session dispatch request. */
 export interface HyperRun {
@@ -108,24 +107,14 @@ export interface HyperHost {
 	close(): Promise<void>;
 }
 
-const ROLES: readonly HyperRole[] = ["implement", "integrate", "fix", "verify"];
+const ROLES: readonly HyperRole[] = ["implement", "integrate"];
 const IMPLEMENT_AGENT = "tdd";
 type HelperRole = Exclude<HyperRole, "implement">;
-const HELPER_ROLES: readonly HelperRole[] = ["integrate", "fix", "verify"];
-/**
- * Explicit tool set for `verify`: file readers, LSP, and `bash` so
- * `git diff`/`log`, builds, and checks actually run, minus every
- * file-writing tool. The host has no read-only bash mode (its read-only agent
- * policy excludes `bash` entirely), so write prevention rides the role prompt
- * and the orchestrator's own post-run assertions.
- */
-const HELPER_TOOLS = ["read", "grep", "glob", "find", "ast_grep", "lsp", "web_search", "wait", "todo", "bash"];
+const HELPER_ROLES: readonly HelperRole[] = ["integrate"];
 
 interface HelperSpec {
 	description: string;
 	systemPrompt: string;
-	/** Tool allowlist; absent keeps the bundled task agent's full toolset. */
-	tools?: string[];
 }
 
 const HELPER_SPECS: Record<HelperRole, HelperSpec> = {
@@ -136,23 +125,6 @@ const HELPER_SPECS: Record<HelperRole, HelperSpec> = {
 			"The assignment is your whole scope, including which directory each step runs in: syncing a ticket's work and verifying the merged state can happen in different workspaces, so follow the paths the assignment names rather than assuming one.",
 			"Do not work outside the assignment and do not modify unrelated files. When finished, report through yield: the concrete result, the commands you ran with their observed outcomes, and any blocker with its exact error. Never fabricate an outcome you did not observe.",
 		].join("\n\n"),
-	},
-	fix: {
-		description: "Hyper-auto-coding helper: apply the assigned fixes, validate, and commit",
-		systemPrompt: [
-			"You are the fixer helper of the hyper-auto-coding pipeline, running as one fresh child session. You receive one complete assignment and no parent conversation exists.",
-			"Apply exactly the fixes the assignment describes, validate them with the project's own checks, and commit the result when the assignment calls for a commit. Every claim in your report must come from a command you actually ran in this session.",
-			"End with yield: what changed, the validation evidence (commands and observed outcomes), the commit identity when one was created, and any fix you could not complete with its exact blocker.",
-		].join("\n\n"),
-	},
-	verify: {
-		description: "Hyper-auto-coding helper: run the final verification pass and report what was observed",
-		systemPrompt: [
-			"You are the verification helper of the hyper-auto-coding pipeline, running as one fresh child session. You receive one complete assignment and no parent conversation exists.",
-			"Run the verification the assignment specifies against the current workspace state and report what you observed. Do not fix, edit, or commit anything unless the assignment explicitly says to.",
-			"End with yield: the exact commands, their observed outcomes, the verdict, and any check you could not run with its reason. Never claim a check passed without its output.",
-		].join("\n\n"),
-		tools: HELPER_TOOLS,
 	},
 };
 
@@ -169,7 +141,6 @@ function buildHelperAgents(): AgentDefinition[] {
 		name: `hyper-${role}`,
 		description: HELPER_SPECS[role].description,
 		systemPrompt: HELPER_SPECS[role].systemPrompt,
-		tools: HELPER_SPECS[role].tools,
 		filePath: undefined,
 	}));
 }

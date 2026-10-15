@@ -60,27 +60,27 @@ Never release the lock with an unresolved merge in the integration checkout. Tic
 
 ### One integration child closes the loop
 
-The first attempt always starts a fresh integration child, distinct from the original TDD session. In the original development worktree it resolves existing conflicts, runs the project's global test suite, fixes issues directly, and commits. Integration acceptance requires only global tests; complex scripts, cross-ticket overall checks, and real-device smoke belong to the final gate.
+The first attempt always starts a fresh integration child, distinct from the original TDD session. In the original development worktree it resolves existing conflicts, runs the project's global test suite, fixes issues directly, and commits. These global tests remain part of ticket integration. Additional acceptance work—such as complex scripts, cross-ticket checks, or real-device smoke—belongs in an explicitly scoped ticket when desired, not in an automatic final gate.
 
 Then the workflow attempts to merge the result back: success (including no new commits) ends integration. A conflict triggers the abort/reverse-sync critical section, followed by a continuation of the exact same integration child outside the lock. That child resolves and commits, and the workflow queues another attempt. Later success does not trigger another full validation pass; subsequent rounds do not mandate a full test rerun. The child reads code and judges conflict resolutions itself, without main-agent approval or a fixed retry limit.
 
 Integration HEAD advancing is not a rejection condition: clean merges proceed without chasing new HEADs or reacceptance. Background repair and conflict handling do not pause other tickets' dispatch or merges. Only after processing ends and all resulting changes are merged is a ticket **integrated**; its first merge only makes it **merged**.
 
-### Final independent verification and fixes
+### Optional acceptance tickets
 
-After all integration processing ends, `verify` starts a fresh independent verification child in the integration checkout. It runs overall verification against spec, contract, cross-ticket behavior, and project requirements, including necessary complex scripts or real-device smoke. It must not edit or commit. Normal completion passes automatically, without main-agent report acceptance.
+When final or cross-ticket acceptance is useful, `/to-tickets` can produce a ticket whose own text defines the scope, steps, and evidence. It is optional and is handled like every other ticket: ordinary dependency scheduling, a dedicated worktree, ticket execution, integration tests, and merge. The workflow never creates a separate verifier or fixer and does not judge ticket reports.
 
-If verification returns an execution failure, `fix` dispatches an independent fixer; after repair and commit, run `verify` again. There is no code-review, Standards/Spec review pair, or review-driven repair loop, and no code-review skill requirement. Final verification applies only to the commit it checked; a changed commit requires another verification before finish.
+Dependencies release after a blocking ticket's first successful merge, while its integration tests and repairs may still be running. An acceptance ticket can therefore run against an earlier tree; later clean merges do not trigger another acceptance pass. This is an accepted tradeoff for parallel development, not a hidden delivery gate.
 
 ## Retrospectives and report commits
 
-Only explicitly enrolled ticket implementations get retro, including first attempts, failures, and retries. Integration, conflict continuations, final verification, fixers, auxiliary agents, and retros themselves do not.
+Only explicitly enrolled ticket implementations get retro, including first attempts, failures, and retries. Integration, conflict continuations, auxiliary agents, and retrospectives themselves do not.
 
 Every implementation ending starts asynchronous retro in the original TDD session, without waiting for merge, once per execution. Integration takes the worktree in a different session; retro only assesses history and proposes advice, without editing code or operating Git. Retro outcomes remain independent of implementation outcomes.
 
 Reports are generated outside the Git checkout in a unique OS-temp directory (`%TEMP%` on Windows, otherwise the runtime OS-temp location). There is no per-merge report movement.
 
-After all integration and final verification, `finish`:
+After all ticket integration processing, `finish`:
 
 1. Waits for all retro success/failure terminal outcomes.
 2. Publishes reports and records into the integration checkout and commits only explicit output files.
@@ -115,7 +115,6 @@ One workflow runs through the extension at a time. It assumes a session complete
 - [Orchestration tool and main-agent instructions](../extensions/hyper-auto-coding/agent-tools.ts)
 - [Workflow scheduling and report publication](../extensions/hyper-auto-coding/workflow.ts)
 - [Ticket integration state, merge attempts, and conflict continuation](../extensions/integration-node/ticket-integration.ts)
-- [Independent final verification, repair, and report validity](../extensions/hyper-auto-coding/final-verification.ts)
 - [Local Git and worktrees](../extensions/hyper-auto-coding/git.ts)
 - [Fresh sessions and integration continuations](../extensions/hyper-auto-coding/subagent-host.ts)
 - [Original TDD-session retro](../extensions/implementation-node/retro-host.ts), [execution records and final draining](../extensions/implementation-node/tdd-execution.ts)
