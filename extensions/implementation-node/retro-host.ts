@@ -13,7 +13,7 @@ import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry
 import { discoverAgents } from "@oh-my-pi/pi-coding-agent/task";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { RetroWorkflow, type ExecutionIdentity, type RetroPorts } from "./tdd-execution";
+import { TddWorkFlow, type ExecutionIdentity, type RetroPorts } from "./tdd-execution";
 
 /**
  * Capture the original definition and source paths once, before any ticket
@@ -21,7 +21,7 @@ import { RetroWorkflow, type ExecutionIdentity, type RetroPorts } from "./tdd-ex
  * discovered `retro` / `writing-for-agents` skills the analysis turn loads.
  *
  * Shared by the spec-to-code workflow and the hyper-auto-coding host, which
- * builds its own `RetroWorkflow` over these same callbacks.
+ * builds its own `TddWorkFlow` over these same callbacks.
  */
 export async function createRetroPorts(pi: ExtensionAPI, ctx: ExtensionContext): Promise<RetroPorts> {
 	const workspace = path.resolve(ctx.cwd);
@@ -121,13 +121,13 @@ export async function createRetroWorkflow(
 	pi: ExtensionAPI,
 	ctx: ExtensionContext,
 	feature: string,
-): Promise<RetroWorkflow> {
+): Promise<TddWorkFlow> {
 	const workspace = path.resolve(ctx.cwd);
 	const files = await fs.readdir(path.join(workspace, ".scratch", feature, "implementation"), { withFileTypes: true });
 	const tickets = new Set(files.filter((file) => file.isFile() && file.name.endsWith(".md")).map((file) => file.name));
 	const ports = await createRetroPorts(pi, ctx);
 
-	return new RetroWorkflow(
+	return new TddWorkFlow(
 		feature,
 		workspace,
 		ctx.sessionManager.getSessionId(),

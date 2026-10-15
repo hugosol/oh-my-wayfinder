@@ -21,13 +21,14 @@ fork 改动的内容与位置由[上游对比蓝图](./upstream-differences.cn.m
 <extension root>/
   entry.ts              # 共享扩展入口，注册两个命令
   implementation-node/  # 共用 TDD 执行记录与 retro 生命周期
+  integration-node/     # 单票合并、集成测试与冲突续跑
   spec-to-code/          # 共用 Phase 1 与配置模块
   hyper-auto-coding/     # 并行命令配套模块，入口以相对路径导入
   agents/
     tdd.md               # blocking 的 `tdd` task agent，自动加载 `tdd` skill，自带模型声明
 ```
 
-`implementation-node/` 按职责归组共享的 TDD 执行记录与独立 retro 生命周期；TDD 派发仍由现有工作流负责。集成调度仍在 `hyper-auto-coding/workflow.ts` 中，`agent-tools.ts` 定义供主代理调用的工作流工具。此次布局调整只改变命名与归属，不改变执行顺序或完成规则。
+`implementation-node/tdd-execution.ts` 的主体是 `TddWorkFlow`：以 TDD 执行尝试为主，独立 retro 是后续附加动作；TDD 派发仍由现有工作流负责。`integration-node/ticket-integration.ts` 拥有每票合并尝试、集成报告及可续跑集成会话的状态。`hyper-auto-coding/final-verification.ts` 拥有独立的最终验收流程，不属于单票集成。`hyper-auto-coding/workflow.ts` 负责这些 module 的调度与报告发布，`agent-tools.ts` 定义供主代理调用的工作流工具。执行顺序与完成规则不变。
 
 更新已有安装时，替换原有布局，并将按文件配置的扩展入口改为 `entry.ts`；只加载一个入口，避免重复注册工具和命令。
 

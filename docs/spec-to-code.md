@@ -21,13 +21,14 @@ Copy the following artifacts, keeping their relative layout. The same entry also
 <extension root>/
   entry.ts              # shared extension entry; registers both commands
   implementation-node/  # shared TDD execution records and retrospective lifecycle
+  integration-node/     # per-ticket merge, integration testing, and conflict continuation
   spec-to-code/          # shared Phase 1 and configuration modules
   hyper-auto-coding/     # parallel command modules, imported relatively by the entry
   agents/
     tdd.md               # blocking `tdd` task agent; autoloads the `tdd` skill, pins its own model
 ```
 
-`implementation-node/` groups the shared TDD execution records and independent retrospective lifecycle; TDD dispatch remains in the existing workflows. Integration scheduling remains in `hyper-auto-coding/workflow.ts`, while `agent-tools.ts` defines the main agent’s workflow tool. This layout changes naming and ownership only, not execution order or completion rules.
+`implementation-node/tdd-execution.ts` exposes `TddWorkFlow`: TDD execution attempts are primary, with independent retrospectives as subsequent actions; TDD dispatch remains in the existing workflows. `integration-node/ticket-integration.ts` owns each ticket’s merge attempts, integration reports, and resumable integration session. `hyper-auto-coding/final-verification.ts` owns the separate final acceptance process, not ticket integration. `hyper-auto-coding/workflow.ts` schedules these modules and publishes their reports; `agent-tools.ts` defines the main agent’s workflow tool. Execution order and completion rules are unchanged.
 
 When updating an existing installation, replace the previous layout and update any file-based extension configuration to `entry.ts`; load only one entry to avoid duplicate tool and command registration.
 

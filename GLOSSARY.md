@@ -47,6 +47,12 @@ Every dispatched execution attempt and its retrospective has reached a known out
 The user-prepared development branch that receives the assembled delivery. It is distinct from the individual ticket branches and the repository's main branch.
 _Avoid_: main, ticket branch
 
+**Ticket integration**:
+The process of bringing an implementation ticket's worktree branch into the integration branch, including integration testing, repairs, conflict resolution, and any further merge attempts needed to land the resulting changes. It is distinct from final overall verification.
+
+**Final overall verification**:
+An independent acceptance process over the assembled delivery after all implementation tickets are integrated. It is not a ticket integration round.
+
 **Merged ticket**:
 An implementation ticket whose work has first reached the integration branch. This releases its dependent tickets without claiming integration testing or repairs are complete.
 

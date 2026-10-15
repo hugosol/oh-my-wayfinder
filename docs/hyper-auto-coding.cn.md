@@ -6,7 +6,7 @@
 
 ## 安装与准备
 
-按[扩展安装指南](./spec-to-code.cn.md#安装)安装同一个 `extensions/entry.ts` 入口，并同时复制 `implementation-node/`、`spec-to-code/`、`hyper-auto-coding/` 和 `agents/`。这个入口注册两个命令，不要重复加载。
+按[扩展安装指南](./spec-to-code.cn.md#安装)安装同一个 `extensions/entry.ts` 入口，并同时复制 `implementation-node/`、`integration-node/`、`spec-to-code/`、`hyper-auto-coding/` 和 `agents/`。这个入口注册两个命令，不要重复加载。
 
 所需 skills：本仓库的 `to-tickets`、`tdd`，以及 blocking 的 `tdd` agent；不再要求 `code-review`。`retro` 和 `writing-for-agents` 沿用已安装的上游版本，缺少时只报告对应复盘未交付。实现使用安装后的 TDD agent 模型，辅助工作使用宿主 task agent 的模型设置。
 
@@ -113,7 +113,9 @@ Markdown retro 只在交付成功时存在，失败记录仍然提交。实现�
 - [批准决策及取舍](./adr/0004-asynchronous-ticket-integration.md)
 - [共享命令入口与 Phase 1](../extensions/entry.ts)
 - [编排工具和主代理指导](../extensions/hyper-auto-coding/agent-tools.ts)
-- [工作流状态与调度](../extensions/hyper-auto-coding/workflow.ts)
+- [工作流调度与报告发布](../extensions/hyper-auto-coding/workflow.ts)
+- [单票集成状态、合并尝试与冲突续跑](../extensions/integration-node/ticket-integration.ts)
+- [独立最终验收、修复与报告有效性](../extensions/hyper-auto-coding/final-verification.ts)
 - [本地 Git 和 worktree](../extensions/hyper-auto-coding/git.ts)
 - [新会话与原集成会话续跑](../extensions/hyper-auto-coding/subagent-host.ts)
 - [原 TDD 会话 retro](../extensions/implementation-node/retro-host.ts)、[执行记录及终态等待](../extensions/implementation-node/tdd-execution.ts)

@@ -52,8 +52,10 @@ async function atomicWrite(file: string, content: string): Promise<void> {
 	}
 }
 
-/** One process-local workflow. Files are audit records, never a restart queue. */
-export class RetroWorkflow {
+/** Tracks TDD execution attempts and their independent, subsequent retrospectives.
+ * Files are audit records, never a restart queue.
+ */
+export class TddWorkFlow {
 	readonly #calls = new Map<string, ExecutionRecord>();
 	readonly #pending = new Set<Promise<void>>();
 	readonly #abort = new AbortController();

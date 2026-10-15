@@ -37,7 +37,7 @@ import { createJudgeDecider } from "./spec-to-code/jev-judge";
 import { lastAssistantStopReason, lastAssistantText, planTurn, type TurnPorts } from "./spec-to-code/turn-policy";
 import { createWorkflowSession, MAX_AUTO_ACTIONS } from "./spec-to-code/workflow-session";
 import { createRetroWorkflow, tddTicket, tddResult } from "./implementation-node/retro-host";
-import type { RetroWorkflow } from "./implementation-node/tdd-execution";
+import type { TddWorkFlow } from "./implementation-node/tdd-execution";
 import { HyperGit } from "./hyper-auto-coding/git";
 import { createHyperHost } from "./hyper-auto-coding/subagent-host";
 import { HyperWorkflow } from "./hyper-auto-coding/workflow";
@@ -166,7 +166,7 @@ export default function specToCode(pi: ExtensionAPI): void {
 
 	const z = pi.zod;
 	const session = createWorkflowSession();
-	let retroWorkflow: RetroWorkflow | undefined;
+	let retroWorkflow: TddWorkFlow | undefined;
 	let phase2Starting = false;
 	let hyperMode = false;
 	let hyperGit: HyperGit | undefined;

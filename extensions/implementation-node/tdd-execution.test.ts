@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { SingleResult } from "@oh-my-pi/pi-coding-agent";
-import { RetroWorkflow } from "./tdd-execution";
+import { TddWorkFlow } from "./tdd-execution";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -36,7 +36,7 @@ test("retry and next-ticket TDD proceed while every previous retro remains pendi
 		const started = new Promise<void>(resolve => { release = resolve; });
 		gates.set(id, { release, started });
 	}
-	const workflow = new RetroWorkflow("feature", workspace, "parent", "Main", "/parent.jsonl", new Set(["a.md", "b.md"]), {
+	const workflow = new TddWorkFlow("feature", workspace, "parent", "Main", "/parent.jsonl", new Set(["a.md", "b.md"]), {
 		identify,
 		async analyze(_record, execution) {
 			const completion = new Promise<void>(resolve => releases.set(execution.id, resolve));
@@ -83,7 +83,7 @@ test("retry and next-ticket TDD proceed while every previous retro remains pendi
 
 test("running TDD rejects concurrent dispatch; retro failures do not change implementation outcomes or stop next TDD", async () => {
 	const workspace = await root();
-	const workflow = new RetroWorkflow("feature", workspace, "parent", "Main", null, new Set(["a.md"]), {
+	const workflow = new TddWorkFlow("feature", workspace, "parent", "Main", null, new Set(["a.md"]), {
 		identify,
 		async analyze(_record, execution) { throw new Error(`retro failure ${execution.id}`); },
 		warn() {},
@@ -105,7 +105,7 @@ test("running TDD rejects concurrent dispatch; retro failures do not change impl
 
 test("truncated output, missing original identity and document write failure are reported as undelivered", async () => {
 	const workspace = await root();
-	const workflow = new RetroWorkflow("feature", workspace, "parent", "Main", null, new Set(["a.md"]), {
+	const workflow = new TddWorkFlow("feature", workspace, "parent", "Main", null, new Set(["a.md"]), {
 		async identify(execution) {
 			const identity = await identify(execution);
 			return { ...identity, session_id: execution.id === "missing" ? null : identity.session_id };
@@ -135,7 +135,7 @@ test("session cancellation settles background retro as failed without rerunning 
 	const workspace = await root();
 	let ready!: () => void;
 	const started = new Promise<void>(resolve => { ready = resolve; });
-	const workflow = new RetroWorkflow("feature", workspace, "parent", "Main", null, new Set(["a.md"]), {
+	const workflow = new TddWorkFlow("feature", workspace, "parent", "Main", null, new Set(["a.md"]), {
 		identify,
 		async analyze(_record, execution, signal) {
 			ready();
