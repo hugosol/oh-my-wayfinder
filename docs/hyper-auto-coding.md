@@ -102,7 +102,7 @@ Copy or commit failures preserve temporary artifacts and report errors, without 
 
 ## Orchestration surface and limits
 
-`hyper_auto_coding` exposes only `plan`, `dispatch`, `collect`, `verify`, `fix`, `finish`, and read-only `status`. `dispatch` returns after starting implementation; `collect` waits for task completion or a first-merge progress event, so the scheduler can dispatch released dependents while background tests are still running. Integration and conflict continuations are automatic; native task calls must not bypass the workflow to dispatch tickets.
+`hyper_auto_coding` exposes only `plan`, `dispatch`, `collect`, `finish`, and read-only `status`. `dispatch` returns after starting implementation. Implementation completion or failure, the first merge releasing dependencies, and integration completion or failure request a `collect` check; progress between calls is retained until the next call. `collect` returns the latest state immediately when progress is pending, otherwise waits for the next change. Notifications coalesce into one check; changes after a check starts are not cleared at its end and remain pending for the next check. Overlapping `collect` calls share one check, and waiting does not hold the orchestration guard or block `dispatch`. The main agent retains the existing result-handling and dispatch logic; no automatic dispatcher is added. Integration and conflict continuations are automatic; native task calls must not bypass the workflow to dispatch tickets.
 
 Status includes `temporaryDir`, `active`, `integrating`, the merge-released `ready` frontier, each ticket's first `mergedHead`, and report paths. `finish` returns a delivery summary, not a status snapshot.
 

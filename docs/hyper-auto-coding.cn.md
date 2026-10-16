@@ -102,7 +102,7 @@ Markdown retro 只在交付成功时存在，失败记录仍然提交。实现�
 
 ## 编排工具与边界
 
-`hyper_auto_coding` 的动作只有 `plan`、`dispatch`、`collect`、`verify`、`fix`、`finish` 与只读 `status`。`dispatch` 启动实现后返回；`collect` 等待任务结束或首次合入放行依赖的进展事件，避免主代理在后台测试期间错过可领取的下游。集成和冲突续跑由宿主自动调度，不通过 native task 绕过工具派发。
+`hyper_auto_coding` 的动作只有 `plan`、`dispatch`、`collect`、`finish` 与只读 `status`。`dispatch` 启动实现后返回。实现结束或失败、首次合入放行依赖、集成结束或失败都会请求一次 `collect` 检查；两次调用之间发生的进展会保留到下次调用。`collect` 有待检查进展时立即返回最新状态，否则等待下次变化。连续通知合并为一次检查，检查开始后的新变化不会被结束时清除，而是留给下一次检查。并发 `collect` 共用一次检查，等待期间不持有编排互斥，不阻止 `dispatch`。主代理仍按原有逻辑处理返回状态和派发下游，不新增自动派发器。集成和冲突续跑由宿主自动调度，不通过 native task 绕过工具派发。
 
 状态含 `temporaryDir`、`active`、`integrating`、依赖放行后的 `ready`、每票首次 `mergedHead` 及报告路径。`finish` 返回交付摘要而不是状态快照。
 

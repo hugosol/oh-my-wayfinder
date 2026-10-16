@@ -181,6 +181,106 @@ test("implementation slots are bounded; first merge releases dependencies while 
 	await drain(workflow);
 });
 
+async function collectBeforeNextTurn(collection: Promise<object>): Promise<StatusSnapshot> {
+	// Retained progress requires only an in-memory snapshot, not another I/O event.
+	return await Promise.race([
+		collection as Promise<StatusSnapshot>,
+		new Promise<never>((_, reject) => {
+			setImmediate(() => reject(new Error("collect missed pending progress")));
+		}),
+	]);
+}
+
+test("collect retains a first merge between calls and releases downstream without waiting for integration", async () => {
+	const entered = gate(), integrating = gate();
+	const { workflow } = await fixture({ integrationWork: async () => {
+		entered.release();
+		await integrating.promise;
+	} });
+	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
+	const first = await workflow.execute({ action: "collect" }) as StatusSnapshot;
+	expect(first.active).toEqual([]);
+	await entered.promise;
+	const collection = workflow.execute({ action: "collect" });
+	try {
+		const state = await collectBeforeNextTurn(collection);
+		expect(state.ready).toContain("c.md");
+		expect(state.integrating).toEqual(["a.md"]);
+		await workflow.execute({ action: "dispatch", tickets: ["c.md"] });
+		expect((await status(workflow)).active).toContain("c.md");
+	} finally {
+		integrating.release();
+		await collection;
+	}
+});
+
+async function waitForState(workflow: HyperWorkflow, matches: (state: StatusSnapshot) => boolean): Promise<StatusSnapshot> {
+	while (true) {
+		const state = await status(workflow);
+		if (matches(state)) return state;
+		await new Promise<void>((resolve) => setImmediate(resolve));
+	}
+}
+
+test("collect coalesces earlier changes but retains completion after a previous snapshot", async () => {
+	const integrating = gate();
+	const { workflow } = await fixture({ integrationWork: async () => { await integrating.promise; } });
+	await workflow.execute({ action: "dispatch", tickets: ["a.md", "b.md"] });
+	await waitForState(workflow, (state) => state.active.length === 0 &&
+		["a.md", "b.md"].every((name) => !!ticketSnapshot(state, name).mergedHead));
+	const snapshot = await collectBeforeNextTurn(workflow.execute({ action: "collect" }));
+	expect(snapshot.integrating).toEqual(["a.md", "b.md"]);
+	expect(snapshot.ready).toEqual(["c.md"]);
+
+	// All earlier notifications were consumed by one check; another collect must wait.
+	let returned = false;
+	const waiting = workflow.execute({ action: "collect" }).then((state) => { returned = true; return state; });
+	await new Promise<void>((resolve) => setImmediate(resolve));
+	expect(returned).toBe(false);
+	integrating.release();
+	const completion = await waiting as StatusSnapshot;
+	expect(completion.tickets.some((ticket) => ticket.status === "integrated")).toBe(true);
+	await drain(workflow);
+});
+
+test("collect retains terminal progress even when no background tasks remain", async () => {
+	const { workflow } = await fixture();
+	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
+	await waitForState(workflow, (state) => state.active.length === 0 && state.integrating.length === 0);
+	const state = await collectBeforeNextTurn(workflow.execute({ action: "collect" }));
+	expect(ticketSnapshot(state, "a.md").status).toBe("integrated");
+	expect(state.ready).toContain("c.md");
+	await expect(workflow.execute({ action: "collect" })).rejects.toThrow("没有运行中的实现或集成");
+});
+
+test("concurrent collect requests share progress without blocking dispatch", async () => {
+	const implementing = gate(), bImplementing = gate(), integrating = gate();
+	const { workflow } = await fixture({
+		implementationGate: implementing.promise,
+		implementationWork: async (request) => {
+			if (request.name.startsWith("b.md")) await bImplementing.promise;
+		},
+		integrationWork: async () => { await integrating.promise; },
+	});
+	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
+	const first = workflow.execute({ action: "collect" });
+	const second = workflow.execute({ action: "collect" });
+	try {
+		await workflow.execute({ action: "dispatch", tickets: ["b.md"] });
+		expect((await status(workflow)).active).toEqual(["a.md", "b.md"]);
+		implementing.release();
+		for (const state of await Promise.all([first, second]) as StatusSnapshot[]) {
+			expect(state.active).toEqual(["b.md"]);
+			expect(ticketSnapshot(state, "a.md").status).toBe("integrating");
+		}
+	} finally {
+		implementing.release();
+		bImplementing.release();
+		integrating.release();
+		await Promise.allSettled([first, second]);
+	}
+});
+
 test("failed implementation retries reuse the original branch and worktree without main-agent acceptance", async () => {
 	let fail = true;
 	const { workflow } = await fixture({ throwImplementation: () => fail });

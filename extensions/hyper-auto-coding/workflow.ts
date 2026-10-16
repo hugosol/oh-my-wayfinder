@@ -49,7 +49,9 @@ export class HyperWorkflow {
 	readonly tickets = new Map<string, TicketState>();
 	readonly #running = new Map<string, Promise<void>>();
 	readonly #integrating = new Map<string, Promise<void>>();
-	readonly #progressWaiters = new Set<() => void>();
+	#checkPending = false;
+	#collection?: Promise<object>;
+	#wakeCollection?: () => void;
 	readonly #reports: string[] = [];
 	readonly #attempts: ExecutionAttempt[] = [];
 	#busy = false;
@@ -124,13 +126,13 @@ export class HyperWorkflow {
 	async execute(input: HyperInput): Promise<object> {
 		if (input.action === "status") return this.status();
 		if (this.#finished) throw new Error("Hyper-Auto-Coding 已完成。");
+		if (input.action === "collect") return this.#collect();
 		if (this.#busy) throw new Error("另一个编排操作仍在执行。");
 		this.#busy = true;
 		try {
 			switch (input.action) {
 				case "plan": this.#plan(input.plan ?? []); break;
 				case "dispatch": await this.#dispatch(input.tickets ?? []); break;
-				case "collect": await this.#collect(); break;
 				case "finish": return await this.#finish();
 				default: throw new Error(`未知编排操作：${String(input.action)}`);
 			}
@@ -211,31 +213,40 @@ export class HyperWorkflow {
 				} finally {
 					await this.retro.settle(id, result, failure);
 					this.#running.delete(name);
+					this.#requestCheck();
 				}
 			})();
 			this.#running.set(name, job);
 		}
 	}
 
-	async #collect(): Promise<void> {
-		const pending = [...this.#running.values(), ...this.#integrating.values()];
-		if (!pending.length) throw new Error("没有运行中的实现或集成；请派发 ready 票据或进入最终验证。");
-		let wake!: () => void;
-		const progress = new Promise<void>((resolve) => {
-			wake = resolve;
-			this.#progressWaiters.add(wake);
+	#requestCheck(): void {
+		this.#checkPending = true;
+		this.#wakeCollection?.();
+	}
+
+	#collect(): Promise<object> {
+		if (this.#collection) return this.#collection;
+		if (!this.#checkPending && !this.#running.size && !this.#integrating.size)
+			throw new Error("没有运行中的实现或集成；请派发 ready 票据或结束工作流。");
+		const progress = this.#checkPending ? Promise.resolve() : new Promise<void>((resolve) => {
+			this.#wakeCollection = resolve;
 		});
-		try {
-			await Promise.race([...pending, progress]);
-		} finally {
-			this.#progressWaiters.delete(wake);
-		}
+		this.#collection = progress.then(() => {
+			// Consume before checking. Changes after this snapshot stay pending for the next collect.
+			this.#checkPending = false;
+			return this.status();
+		}).finally(() => {
+			this.#wakeCollection = undefined;
+			this.#collection = undefined;
+		});
+		return this.#collection;
 	}
 
 	#startIntegration(ticket: TicketState): void {
 		const integration = new TicketIntegration(this.git, this.host, this.#references(),
 			(role, result, head) => this.#save(role, result, head),
-			() => { for (const wake of this.#progressWaiters) wake(); });
+			() => this.#requestCheck());
 		ticket.integration = integration;
 		const job = integration.run(ticket.ticket, ticket.worktree!, ticket.report!.path).then(() => {
 			ticket.status = "integrated";
@@ -243,7 +254,10 @@ export class HyperWorkflow {
 			ticket.status = "failed";
 			ticket.error = error instanceof Error ? error.message : String(error);
 			await this.#saveError("integrate", randomUUID(), ticket.error);
-		}).finally(() => this.#integrating.delete(ticket.ticket));
+		}).finally(() => {
+			this.#integrating.delete(ticket.ticket);
+			this.#requestCheck();
+		});
 		this.#integrating.set(ticket.ticket, job);
 	}
 
