@@ -2,7 +2,7 @@
 
 [中文文档](./README.cn.md)
 
-Have you run into any of these situations?
+When you feel like you can build anything with grill-me and are eager to take on bigger challenges with Wayfinder, have you run into any of these situations?
 
 - **Every question has been discussed thoroughly with AI, but the pieces do not fit together.** A large requirement is split into tickets, each reasonable on its own. Yet earlier constraints get overlooked, decisions from separate discussions conflict, and the problems only surface during implementation.
 - **A discussion has gone on for a long time, but you already need to tackle another question.** Continuing may mean working through branches whose premises are still undecided. Switching sessions risks losing the conclusions you have reached—and the equally important reasons behind them.
