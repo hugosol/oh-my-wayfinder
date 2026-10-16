@@ -5,7 +5,7 @@
 When you feel like you can build anything with grill-me and are eager to take on bigger challenges with Wayfinder, have you run into any of these situations?
 
 - **Every question has been discussed thoroughly with AI, but the pieces do not fit together.** A large requirement is split into tickets, each reasonable on its own. Yet earlier constraints get overlooked, decisions from separate discussions conflict, and the problems only surface during implementation.
-- **A discussion has gone on for a long time, but you already need to tackle another question.** Continuing may mean working through branches whose premises are still undecided. Switching sessions risks losing the conclusions you have reached—and the equally important reasons behind them.
+- **The ticket is still unresolved, but the conversation has already entered the "dumb zone."** The scope is too large, the discussion has no end in sight, and there is no way to pause.
 - **AI is ready to write code, but you still cannot clearly describe what you will get.** The plan sounds reasonable, yet the code's external behavior, whether its architecture will be easy to test, and how you will accept the result remain unclear.
 
 Oh My Wayfinder is a set of improvements I developed to address these problems while using [Matt Pocock's Wayfinder](https://github.com/mattpocock/skills).
