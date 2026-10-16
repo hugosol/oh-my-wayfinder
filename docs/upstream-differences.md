@@ -130,10 +130,12 @@ Retro already exists upstream. The addition is **host-driven invocation and outc
 
 There are no mapping operations for the extension itself:
 
-- Extension entry: [spec-to-code.ts](../extensions/spec-to-code.ts).
-- Retro orchestration and original-session invocation: [retro-workflow.ts](../extensions/spec-to-code/retro-workflow.ts), [retro-host.ts](../extensions/spec-to-code/retro-host.ts). Code owns the internal mechanism.
+- Extension entry: [entry.ts](../extensions/entry.ts).
+- Retro orchestration and original-session invocation: [tdd-execution.ts](../extensions/implementation-node/tdd-execution.ts), [retro-host.ts](../extensions/implementation-node/retro-host.ts). Code owns the internal mechanism.
 - Router introduction: [omp-automation](../deltas/mappings/ask-matt.md#omp-automation).
 - Installation, configuration, output locations, and limits: [extension guide](./spec-to-code.md).
+
+The independent [`/hyper-auto-coding`](./hyper-auto-coding.md) command borrows the upstream `implement-spec` dependency frontier and per-ticket worktrees, but the user prepares the integration branch with committed spec/contract inputs. It reuses Phase 1 unchanged, commits tickets, implements concurrently, releases dependencies on first merge, and reuses development worktrees for asynchronous integration tests and repairs with same-session conflict continuations. Only short bidirectional merge attempts are serialized. There is no automatic final overall verification; when needed, acceptance scope is supplied by an optional ordinary ticket, whose evidence may refer to an earlier tree while integration proceeds. There is no code-review or main-agent acceptance gate. Only ticket implementation executions get retro; reports are generated in OS temp and committed together at final draining. Success cleans worktrees while retaining branches. No new Phase 1 gate, retry-count policy, or interruption recovery. Sources: [`hyper-auto-coding/`](../extensions/hyper-auto-coding/) for scheduling and ticket-scoped acceptance, [`integration-node/`](../extensions/integration-node/) for per-ticket integration; implementation concurrency defaults to 4 and shares the existing configuration file with Jev.
 
 Other agents can execute the portable workflow manually; copying skills does not provide OMP's host scheduling.
 

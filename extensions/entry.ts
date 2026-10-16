@@ -23,26 +23,25 @@
  * landed. Any failure in that chain falls back to the pre-Jev canned sequence.
  *
  * This module is the composition root: planning state lives in `workflow-session.ts`,
- * execution/retro state and persistence in `retro-workflow.ts`, host continuation in `retro-host.ts`,
+ * execution/retro state and persistence in `implementation-node/tdd-execution.ts`, host continuation in `retro-host.ts`,
  * the turn decision in `turn-policy.ts`, the judge port in `jev-judge.ts`, config
- * resolution in `config.ts`, and host access in `host-integration.ts`.
+ * resolution in `config.ts`, and skill activation and preflight in `skill-activation.ts`.
  */
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { type ExtensionAPI, type ExtensionCommandContext, type ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { loadSpecToCodeConfig } from "./spec-to-code/config";
-import { activateSkill, hasSkill, hasTddAgent } from "./spec-to-code/host-integration";
+import { activateSkill, hasSkill, hasTddAgent } from "./spec-to-code/skill-activation";
 import { createJudgeDecider } from "./spec-to-code/jev-judge";
-import {
-	lastAssistantStopReason,
-	lastAssistantText,
-	planTurn,
-	type TurnPorts,
-} from "./spec-to-code/turn-policy";
+import { lastAssistantStopReason, lastAssistantText, planTurn, type TurnPorts } from "./spec-to-code/turn-policy";
 import { createWorkflowSession, MAX_AUTO_ACTIONS } from "./spec-to-code/workflow-session";
-import { createRetroWorkflow, tddTicket, tddResult } from "./spec-to-code/retro-host";
-import type { RetroWorkflow } from "./spec-to-code/retro-workflow";
+import { createRetroWorkflow, tddTicket, tddResult } from "./implementation-node/retro-host";
+import type { TddWorkFlow } from "./implementation-node/tdd-execution";
+import { HyperGit } from "./hyper-auto-coding/git";
+import { createHyperHost } from "./hyper-auto-coding/subagent-host";
+import { HyperWorkflow } from "./hyper-auto-coding/workflow";
+import { registerHyperTools, startHyperPhase2 } from "./hyper-auto-coding/agent-tools";
 
 // ============================================================================
 // Constants
@@ -117,7 +116,7 @@ function buildAskAnswer(questions: readonly AskAnswerQuestion[]): {
 			details: {
 				question: first?.question,
 				options: (first?.options ?? [])
-					.map(option => option.label)
+					.map((option) => option.label)
 					.filter((label): label is string => typeof label === "string"),
 				multi: first?.multi === true,
 				selectedOptions: [],
@@ -126,11 +125,11 @@ function buildAskAnswer(questions: readonly AskAnswerQuestion[]): {
 		};
 	}
 
-	const results = questions.map(question => ({
+	const results = questions.map((question) => ({
 		id: question.id ?? "",
 		question: question.question ?? "",
 		options: (question.options ?? [])
-			.map(option => option.label)
+			.map((option) => option.label)
 			.filter((label): label is string => typeof label === "string"),
 		multi: question.multi === true,
 		selectedOptions: [] as string[],
@@ -140,7 +139,7 @@ function buildAskAnswer(questions: readonly AskAnswerQuestion[]): {
 		content: [
 			{
 				type: "text",
-				text: `User answers:\n${results.map(result => `${result.id}: "${ASK_REPLY}"`).join("\n")}`,
+				text: `User answers:\n${results.map((result) => `${result.id}: "${ASK_REPLY}"`).join("\n")}`,
 			},
 		],
 		details: { results },
@@ -167,8 +166,19 @@ export default function specToCode(pi: ExtensionAPI): void {
 
 	const z = pi.zod;
 	const session = createWorkflowSession();
-	let retroWorkflow: RetroWorkflow | undefined;
+	let retroWorkflow: TddWorkFlow | undefined;
 	let phase2Starting = false;
+	let hyperMode = false;
+	let hyperGit: HyperGit | undefined;
+	let hyperWorkflow: HyperWorkflow | undefined;
+	registerHyperTools(
+		pi,
+		() => hyperWorkflow,
+		() => {
+			hyperWorkflow = undefined;
+			hyperGit = undefined;
+		},
+	);
 
 	pi.on("tool_call", async (event, ctx) => {
 		const workflow = retroWorkflow;
@@ -184,23 +194,36 @@ export default function specToCode(pi: ExtensionAPI): void {
 	pi.on("tool_result", async (event, ctx) => {
 		const workflow = retroWorkflow;
 		if (!workflow?.owns(ctx.sessionManager.getSessionId(), ctx.agent.id) || event.toolName !== "task") return;
-		await workflow.settle(event.toolCallId, tddResult(event.details), event.isError
-			? event.content.filter(item => item.type === "text").map(item => item.text).join("\n")
-			: undefined);
+		await workflow.settle(
+			event.toolCallId,
+			tddResult(event.details),
+			event.isError
+				? event.content
+						.filter((item) => item.type === "text")
+						.map((item) => item.text)
+						.join("\n")
+				: undefined,
+		);
 	});
 
 	pi.registerTool({
 		name: "spec_to_code_finish",
 		label: "Finish Spec-to-Code",
-		description: "After all Spec-to-Code TDD attempts and retries have ended, wait for their background retrospectives and return independent implementation/retro outcomes. Retro failures are terminal, not reasons to retry or block completion. Call before the final workflow summary; never between tickets.",
+		description:
+			"After all Spec-to-Code TDD attempts and retries have ended, wait for their background retrospectives and return independent implementation/retro outcomes. Retro failures are terminal, not reasons to retry or block completion. Call before the final workflow summary; never between tickets.",
 		parameters: z.object({}),
 		approval: "read",
 		async execute(_toolCallId, _params, signal, _onUpdate, ctx) {
 			const workflow = retroWorkflow;
 			if (!workflow?.owns(ctx.sessionManager.getSessionId(), ctx.agent.id)) {
-				return { content: [{ type: "text" as const, text: "当前 session 没有待收尾的 Spec-to-Code Phase 2。" }], isError: true };
+				return {
+					content: [{ type: "text" as const, text: "当前 session 没有待收尾的 Spec-to-Code Phase 2。" }],
+					isError: true,
+				};
 			}
-			const cancel = () => { void workflow.cancel(); };
+			const cancel = () => {
+				void workflow.cancel();
+			};
 			signal?.addEventListener("abort", cancel, { once: true });
 			try {
 				if (signal?.aborted) await workflow.cancel();
@@ -208,7 +231,10 @@ export default function specToCode(pi: ExtensionAPI): void {
 				if (retroWorkflow === workflow) retroWorkflow = undefined;
 				return { content: [{ type: "text" as const, text: summary }], details: { executions: workflow.records } };
 			} catch (error) {
-				return { content: [{ type: "text" as const, text: error instanceof Error ? error.message : String(error) }], isError: true };
+				return {
+					content: [{ type: "text" as const, text: error instanceof Error ? error.message : String(error) }],
+					isError: true,
+				};
 			} finally {
 				signal?.removeEventListener("abort", cancel);
 			}
@@ -218,7 +244,11 @@ export default function specToCode(pi: ExtensionAPI): void {
 	// Event handlers have a short host timeout; long draining belongs in a tool execution.
 	pi.on("session_stop", (_event, ctx) => {
 		if (!retroWorkflow?.owns(ctx.sessionManager.getSessionId(), ctx.agent.id)) return;
-		return { decision: "block" as const, reason: "Spec-to-Code 尚未收尾。若仍有可执行票据或 TDD retry，请继续串行派发，勿等待后台 retro。所有 TDD 结束后，调用 spec_to_code_finish 等待复盘终态，再输出最终汇总。retro 失败也可正常收尾，不要重试 retro。" };
+		return {
+			decision: "block" as const,
+			reason:
+				"Spec-to-Code 尚未收尾。若仍有可执行票据或 TDD retry，请继续串行派发，勿等待后台 retro。所有 TDD 结束后，调用 spec_to_code_finish 等待复盘终态，再输出最终汇总。retro 失败也可正常收尾，不要重试 retro。",
+		};
 	});
 
 	const cancelWorkflow = async (_event: unknown, ctx: ExtensionContext) => {
@@ -341,10 +371,28 @@ export default function specToCode(pi: ExtensionAPI): void {
 			session.reset();
 			phase2Starting = true;
 			try {
-				retroWorkflow = await createRetroWorkflow(pi, ctx, plan.slug);
-				startPhase2(pi, plan.slug);
+				if (hyperMode) {
+					if (!hyperGit) throw new Error("集成分支尚未初始化。");
+					const host = await createHyperHost(pi, ctx);
+					hyperWorkflow = await HyperWorkflow.create(
+						plan.slug,
+						hyperGit,
+						host,
+						config.maxParallelTickets,
+						ctx.sessionManager.getSessionId(),
+						ctx.agent.id,
+						ctx.sessionManager.getSessionFile() ?? null,
+					);
+					startHyperPhase2(pi, hyperWorkflow);
+				} else {
+					retroWorkflow = await createRetroWorkflow(pi, ctx, plan.slug);
+					startPhase2(pi, plan.slug);
+				}
 			} catch (error) {
-				ctx.ui.notify(`Spec-to-Code 无法启动 Phase 2：${error instanceof Error ? error.message : String(error)}`, "error");
+				ctx.ui.notify(
+					`${hyperMode ? "Hyper-Auto-Coding" : "Spec-to-Code"} 无法启动 Phase 2：${error instanceof Error ? error.message : String(error)}`,
+					"error",
+				);
 			} finally {
 				phase2Starting = false;
 			}
@@ -362,57 +410,141 @@ export default function specToCode(pi: ExtensionAPI): void {
 		);
 	});
 
-	pi.registerCommand("spec-to-code", {
-		description: "Autonomous Spec → Tickets → Code workflow",
-		handler: async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
-			if (session.isActive || retroWorkflow || phase2Starting) {
-				ctx.ui.notify("已有 Spec-to-Code 工作流在运行，等待其结束或停止后再启动。", "error");
-				return;
-			}
-
-			const slug = args.trim();
-
-			if (!slug) {
-				ctx.ui.notify("用法: /spec-to-code <slug>", "error");
-				return;
-			}
-
-			const spec = `.scratch/${slug}/spec.md`;
-			const contract = `.scratch/${slug}/contract.md`;
-			try {
-				await Bun.file(spec).text();
-			} catch {
-				ctx.ui.notify(`spec 文件不存在: ${spec}`, "error");
-				return;
-			}
-
-			const hasToTickets = await hasSkill("to-tickets");
-			const hasTddSkill = await hasSkill("tdd");
-			const tddAgentExists = hasTddSkill && (await hasTddAgent(ctx.cwd));
-
-			if (!hasToTickets || !tddAgentExists) {
-				const missing = [
-					!hasToTickets && "to-tickets (skill)",
-					!hasTddSkill && "tdd (skill)",
-					hasTddSkill && !tddAgentExists && "tdd (agent)",
-				]
-					.filter(Boolean)
-					.join(", ");
-				ctx.ui.notify(`缺少: ${missing}。请检查安装。`, "error");
-				return;
-			}
-
-			session.begin(slug, ctx.sessionManager.getSessionId());
-			const success = await activateSkill(
-				pi,
-				"to-tickets",
-				`请分析以下spec，生成独立的 ticket 文件。\nspec 路径：${spec}\ncontract 路径：${contract}`,
-			);
-
-			if (!success) {
-				session.reset();
-				ctx.ui.notify("无法激活 to-tickets 技能", "error");
-			}
+	const commands = [
+		{
+			name: "spec-to-code",
+			description: "Autonomous serial Spec → Tickets → Code workflow",
+			hyperMode: false,
 		},
-	});
+		{
+			name: "hyper-auto-coding",
+			description: "Local integration-branch workflow with parallel ticket worktrees",
+			hyperMode: true,
+			async prepare(slug: string, ctx: ExtensionCommandContext): Promise<boolean> {
+				try {
+					hyperGit = await HyperGit.inspect(ctx.cwd, slug);
+					return true;
+				} catch (error) {
+					ctx.ui.notify(
+						`Hyper-Auto-Coding 无法启动：${error instanceof Error ? error.message : String(error)}`,
+						"error",
+					);
+					return false;
+				}
+			},
+		},
+	];
+	for (const command of commands) {
+		pi.registerCommand(command.name, {
+			description: command.description,
+			handler: async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
+				const control = args.trim();
+				if (command.hyperMode && (control === "pause" || control === "resume")) {
+					const sessionId = ctx.sessionManager.getSessionId();
+					if (control === "pause") {
+						const workflow = hyperWorkflow;
+						if (!workflow?.owns(sessionId, ctx.agent.id) || workflow.finished) {
+							ctx.ui.notify("当前会话没有可暂停的 Hyper-Auto-Coding Phase 2。", "error");
+							return;
+						}
+						// Close admission immediately; draining must not hold the command handler open.
+						const completion = workflow.pause();
+						ctx.ui.notify("已请求暂停：停止新实现派发，等待已有 TDD、retro 和集成链路收尾。", "info");
+						void completion.then(
+							() => ctx.ui.notify(`Hyper-Auto-Coding 已暂停。状态已保存：${HyperWorkflow.checkpointPath(sessionId)}`, "info"),
+							(error) => ctx.ui.notify(`Hyper-Auto-Coding 暂停失败：${error instanceof Error ? error.message : String(error)}`, "error"),
+						);
+						return;
+					}
+					if (session.isActive || retroWorkflow || phase2Starting || (hyperWorkflow && !hyperWorkflow.paused)) {
+						ctx.ui.notify("当前工作流尚未暂停，不能恢复。", "error");
+						return;
+					}
+					let restored: HyperWorkflow | undefined;
+					phase2Starting = true;
+					try {
+						let workflow = hyperWorkflow;
+						if (workflow && !workflow.owns(sessionId, ctx.agent.id)) throw new Error("该工作流不属于当前会话。");
+						if (!workflow) {
+							const host = await createHyperHost(pi, ctx);
+							try {
+								workflow = await HyperWorkflow.restore(
+									HyperWorkflow.checkpointPath(sessionId), host, sessionId, ctx.agent.id,
+									ctx.sessionManager.getSessionFile() ?? null,
+								);
+								restored = workflow;
+							} catch (error) {
+								await host.close();
+								throw error;
+							}
+						}
+						const snapshot = await workflow.resume();
+						hyperWorkflow = workflow;
+						hyperGit = workflow.git;
+						hyperMode = true;
+						pi.sendUserMessage(
+							`Hyper-Auto-Coding 已恢复。使用 hyper_auto_coding action=collect 获取恢复后的即时快照，继续原有调度；不要重建已登记的依赖图。若 planned=false，先读取票据并 action=plan；否则按 ready 派发剩余票据。全部票据 integrated 后 action=finish。只使用 hyper_auto_coding 编排票据，不直接调用 task 或操作集成工作区。\n当前状态：\n${JSON.stringify(snapshot, null, 2)}`,
+							{ deliverAs: "followUp" },
+						);
+					} catch (error) {
+						if (restored) await restored.host.close();
+						ctx.ui.notify(`Hyper-Auto-Coding 无法恢复：${error instanceof Error ? error.message : String(error)}`, "error");
+					} finally {
+						phase2Starting = false;
+					}
+					return;
+				}
+				if (session.isActive || retroWorkflow || hyperWorkflow || phase2Starting) {
+					ctx.ui.notify("已有 Spec-to-Code / Hyper-Auto-Coding 工作流在运行，等待其结束后再启动。", "error");
+					return;
+				}
+
+				const slug = args.trim();
+
+				if (!slug) {
+					ctx.ui.notify(`用法: /${command.name} <slug>`, "error");
+					return;
+				}
+
+				const spec = `.scratch/${slug}/spec.md`;
+				const contract = `.scratch/${slug}/contract.md`;
+				try {
+					await Bun.file(spec).text();
+				} catch {
+					ctx.ui.notify(`spec 文件不存在: ${spec}`, "error");
+					return;
+				}
+
+				const hasToTickets = await hasSkill("to-tickets");
+				const hasTddSkill = await hasSkill("tdd");
+				const tddAgentExists = hasTddSkill && (await hasTddAgent(ctx.cwd));
+
+				if (!hasToTickets || !tddAgentExists) {
+					const missing = [
+						!hasToTickets && "to-tickets (skill)",
+						!hasTddSkill && "tdd (skill)",
+						hasTddSkill && !tddAgentExists && "tdd (agent)",
+					]
+						.filter(Boolean)
+						.join(", ");
+					ctx.ui.notify(`缺少: ${missing}。请检查安装。`, "error");
+					return;
+				}
+
+				if (command.prepare && !(await command.prepare(slug, ctx))) return;
+				hyperMode = command.hyperMode;
+				session.begin(slug, ctx.sessionManager.getSessionId());
+				const success = await activateSkill(
+					pi,
+					"to-tickets",
+					`请分析以下spec，生成独立的 ticket 文件。\nspec 路径：${spec}\ncontract 路径：${contract}`,
+				);
+
+				if (!success) {
+					session.reset();
+					ctx.ui.notify("无法激活 to-tickets 技能", "error");
+				}
+			},
+		});
+	}
 }

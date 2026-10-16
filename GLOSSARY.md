@@ -1,6 +1,6 @@
-# Spec-to-Code
+# Automated Implementation
 
-The OMP-only `/spec-to-code` workflow: turn an approved spec into implementation tickets, then execute them with serial TDD subagents. It shares its vocabulary with the planning pipeline that feeds it (`wayfinder` → `to-spec` → `to-contract` → `to-tickets`).
+The OMP-only `/spec-to-code` and `/hyper-auto-coding` workflows turn approved specs into implementation tickets and execute them serially or around a local integration branch. They share vocabulary with the planning pipeline (`wayfinder` → `to-spec` → `to-contract` → `to-tickets`).
 
 ## Language
 
@@ -42,6 +42,35 @@ _Avoid_: review, acceptance verification
 
 **Workflow settled**:
 Every dispatched execution attempt and its retrospective has reached a known outcome, including failures or undelivered retrospectives. Settlement does not mean every ticket passed acceptance.
+
+**Workflow pausing**:
+New implementation attempts are no longer admitted, while already-started attempts, their retrospectives, and their ticket integrations are allowed to reach known outcomes.
+
+**Workflow paused**:
+No implementation attempt, retrospective, or ticket integration remains in flight, and new implementation attempts remain suspended until explicitly resumed. A paused workflow is not necessarily delivery complete or successful.
+
+**Integration branch**:
+The user-prepared development branch that receives the assembled delivery. It is distinct from the individual ticket branches and the repository's main branch.
+_Avoid_: main, ticket branch
+
+**Ticket integration**:
+The process of bringing an implementation ticket's worktree branch into the integration branch, including integration testing, repairs, conflict resolution, and any further merge attempts needed to land the resulting changes. Integration does not certify later combinations of changes.
+
+**Acceptance ticket**:
+An optional ticket explicitly scoped to confirm specified behavior of the assembled delivery, with its scope, steps, and evidence stated in the ticket.
+
+**Merged ticket**:
+An implementation ticket whose work has first reached the integration branch. This releases its dependent tickets without claiming integration testing or repairs are complete.
+
+**Integrated ticket**:
+A merged implementation ticket whose integration testing and any resulting repairs and conflict resolution are complete, with all resulting changes merged into the integration branch. This does not certify later combinations of changes.
+
+**Implementation frontier**:
+The implementation tickets available to start because all their blocking tickets have been merged; those blockers need not yet be integrated.
+
+**Delivery complete**:
+All planned implementation tickets are integrated and delivery reports are committed. Retrospective delivery remains an independent outcome.
+_Avoid_: workflow settled
 
 **Jev mode**:
 Turn-reply selection delegated to the judge chain instead of the built-in canned sequence. Off by default; the canned sequence is the deterministic alternative.

@@ -15,15 +15,22 @@ Both inputs live under `.scratch/<slug>/`:
 
 ### Install
 
-Copy three artifacts from this repository, keeping their relative layout:
+Copy the following artifacts, keeping their relative layout. The same entry also registers the independent [parallel `/hyper-auto-coding` command](./hyper-auto-coding.md):
 
 ```text
 <extension root>/
-  spec-to-code.ts        # extension entry
-  spec-to-code/          # companion modules, imported relatively by the entry
+  entry.ts              # shared extension entry; registers both commands
+  implementation-node/  # shared TDD execution records and retrospective lifecycle
+  integration-node/     # per-ticket merge, integration testing, and conflict continuation
+  spec-to-code/          # shared Phase 1 and configuration modules
+  hyper-auto-coding/     # parallel command modules, imported relatively by the entry
   agents/
     tdd.md               # blocking `tdd` task agent; autoloads the `tdd` skill, pins its own model
 ```
+
+`implementation-node/tdd-execution.ts` exposes `TddWorkFlow`: TDD execution attempts are primary, with independent retrospectives as subsequent actions; TDD dispatch remains in the existing workflows. `integration-node/ticket-integration.ts` owns each ticket’s merge attempts, integration reports, and resumable integration session. `hyper-auto-coding/workflow.ts` schedules ticket work, integration, and report publication; any optional acceptance scope is carried by an ordinary ticket rather than a separate final-verification process. `agent-tools.ts` defines the main agent’s workflow tool.
+
+When updating an existing installation, replace the previous layout and update any file-based extension configuration to `entry.ts`; load only one entry to avoid duplicate tool and command registration.
 
 The shipped `tdd.md` pins `deepseek/deepseek-flash:high` in its frontmatter; edit the installed copy if your model setup differs.
 
@@ -44,8 +51,10 @@ Keep `agents/tdd.md` where OMP discovers task agents: as the `agents/` sibling o
 `extensions/spec-to-code/config.json` is read once, at extension load — reload the extension after editing it:
 
 ```json
-{ "jev": { "enabled": false } }
+{ "jev": { "enabled": false }, "hyperAutoCoding": { "maxParallelTickets": 4 } }
 ```
+
+`hyperAutoCoding.maxParallelTickets` affects only the parallel command; this command remains serial.
 
 With `jev.enabled: true`, and when the host `judge` role resolves a native judge model (for example a TypeSafe Jev model such as `typesafe/jev-latest`), the judge chooses each automatic reply. Round 1 offers only "请你仔细思考后回答这些问题" / "请生成文件", so the first automatic reply is never a bare "请继续"; "请继续" joins from round 2. Without a judge, or on any judge failure, the run falls back to the canned sequence.
 
@@ -97,7 +106,7 @@ Automation advances the session and records execution outcomes; it does not inde
 - Automatic replies are not answers to the agent's questions: the canned replies tell the agent to think it through or to publish, and the judge picks from that same small set.
 - Ticket splits, acceptance, and retro findings stay yours to review; the run does not gate on them. A finished run reports what was attempted, what was not, and what was delivered; it does not mean the work is correct.
 - Retro output is advice: the retro is instructed to propose only — it does not apply suggestions, and it does not modify code, config, skills, or agent instructions, or write files itself.
-- The extension runs no code review; the workflow invokes only `to-tickets`, `tdd`, `retro`, and `writing-for-agents`.
+- `/spec-to-code` runs no code review; the serial workflow invokes only `to-tickets`, `tdd`, `retro`, and `writing-for-agents`.
 
 ## Practical limits
 
@@ -109,16 +118,16 @@ Automation advances the session and records execution outcomes; it does not inde
 - One run at a time: starting a second run while one is active is rejected.
 - Background retros are not concurrency-capped.
 
-See [`retro-workflow.ts`](../extensions/spec-to-code/retro-workflow.ts) and [`retro-host.ts`](../extensions/spec-to-code/retro-host.ts) for these behaviors.
+See [`tdd-execution.ts`](../extensions/implementation-node/tdd-execution.ts) and [`retro-host.ts`](../extensions/implementation-node/retro-host.ts) for these behaviors.
 
 ## Sources
 
-- Entry and install layout: [`extensions/spec-to-code.ts`](../extensions/spec-to-code.ts)
+- Entry and install layout: [`extensions/entry.ts`](../extensions/entry.ts)
 - Turn replies, budget, and stop conditions: [`turn-policy.ts`](../extensions/spec-to-code/turn-policy.ts), [`workflow-session.ts`](../extensions/spec-to-code/workflow-session.ts)
 - Judge chain: [`jev-judge.ts`](../extensions/spec-to-code/jev-judge.ts)
-- Host integration and preflight: [`host-integration.ts`](../extensions/spec-to-code/host-integration.ts)
+- Skill activation and dependency preflight: [`skill-activation.ts`](../extensions/spec-to-code/skill-activation.ts)
 - TDD agent: [`extensions/agents/tdd.md`](../extensions/agents/tdd.md)
-- Retro behavior, identity, and output files: [`retro-host.ts`](../extensions/spec-to-code/retro-host.ts), [`retro-workflow.ts`](../extensions/spec-to-code/retro-workflow.ts)
+- Retro behavior, identity, and output files: [`retro-host.ts`](../extensions/implementation-node/retro-host.ts), [`tdd-execution.ts`](../extensions/implementation-node/tdd-execution.ts)
 - Configuration: [`config.json`](../extensions/spec-to-code/config.json), [`config.ts`](../extensions/spec-to-code/config.ts)
 - Skills used: [to-tickets](../skills/to-tickets/SKILL.md), [tdd](../skills/tdd/SKILL.md); upstream `retro` and `writing-for-agents` are used unmodified.
 - Fork differences: [upstream comparison blueprint](./upstream-differences.md).

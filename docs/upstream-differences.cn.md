@@ -130,10 +130,12 @@ Backtracer 的范围是相关已发布主题，包含未完成票中的已发布
 
 这部分没有 mapping op：
 
-- 扩展入口：[spec-to-code.ts](../extensions/spec-to-code.ts)。
-- 复盘编排与原会话调用：[retro-workflow.ts](../extensions/spec-to-code/retro-workflow.ts)、[retro-host.ts](../extensions/spec-to-code/retro-host.ts)。代码是内部机制的权威来源。
+- 扩展入口：[entry.ts](../extensions/entry.ts)。
+- 复盘编排与原会话调用：[tdd-execution.ts](../extensions/implementation-node/tdd-execution.ts)、[retro-host.ts](../extensions/implementation-node/retro-host.ts)。代码是内部机制的权威来源。
 - 路由介绍：[omp-automation](../deltas/mappings/ask-matt.md#omp-automation)。
 - 安装、配置、输出目录与限制：[扩展使用指南](./spec-to-code.cn.md)。
+
+新增独立命令 [`/hyper-auto-coding`](./hyper-auto-coding.cn.md)，借鉴上游 `implement-spec` 的依赖 frontier 与每票 worktree，但集成分支由用户预先创建并提交 spec/contract。它原样复用现有 Phase 1，提交票据后并行实现，首次合入即放行下游，复用原开发 worktree 异步测试、修复并在同一集成会话处理冲突，仅短暂双向 merge 串行；不自动执行最终整体验收，需要时由可选普通 ticket 指定范围，验收结果可能早于并行集成中的后续修改。没有 code-review 或主代理验收门禁。只有票据实现执行触发 retro，报告先在系统临时目录生成，收尾统一提交；成功后清理 worktree、保留 branch。不增加 Phase 1 门禁、重试次数策略或中断恢复。调度与可选 ticket 验收见 [`hyper-auto-coding/`](../extensions/hyper-auto-coding/)，单票集成见 [`integration-node/`](../extensions/integration-node/)，配置与 Jev 共用现有文件，默认实现并发数 4。
 
 其他 agent 用户可手动完成通用流程，不会仅靠复制 skills 获得 OMP 的自动调度。
 

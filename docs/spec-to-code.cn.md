@@ -15,15 +15,22 @@ fork 改动的内容与位置由[上游对比蓝图](./upstream-differences.cn.m
 
 ### 安装
 
-从本仓库复制三个产物，保持相对布局：
+从本仓库复制以下产物，保持相对布局；同一入口还注册独立的[并行命令 `/hyper-auto-coding`](./hyper-auto-coding.cn.md)：
 
 ```text
 <extension root>/
-  spec-to-code.ts        # 扩展入口
-  spec-to-code/          # 配套模块目录，入口以相对路径导入
+  entry.ts              # 共享扩展入口，注册两个命令
+  implementation-node/  # 共用 TDD 执行记录与 retro 生命周期
+  integration-node/     # 单票合并、集成测试与冲突续跑
+  spec-to-code/          # 共用 Phase 1 与配置模块
+  hyper-auto-coding/     # 并行命令配套模块，入口以相对路径导入
   agents/
     tdd.md               # blocking 的 `tdd` task agent，自动加载 `tdd` skill，自带模型声明
 ```
+
+`implementation-node/tdd-execution.ts` 的主体是 `TddWorkFlow`：以 TDD 执行尝试为主，独立 retro 是后续附加动作；TDD 派发仍由现有工作流负责。`integration-node/ticket-integration.ts` 拥有每票合并尝试、集成报告及可续跑集成会话的状态。`hyper-auto-coding/workflow.ts` 负责 ticket 调度、集成与报告发布；可选的验收范围由普通 ticket 承载，不再有独立最终验证流程。`agent-tools.ts` 定义供主代理调用的工作流工具。
+
+更新已有安装时，替换原有布局，并将按文件配置的扩展入口改为 `entry.ts`；只加载一个入口，避免重复注册工具和命令。
 
 自带的 `tdd.md` 在 frontmatter 中固定了 `deepseek/deepseek-flash:high`；模型配置不同时，请修改安装后的副本。
 
@@ -44,8 +51,10 @@ fork 改动的内容与位置由[上游对比蓝图](./upstream-differences.cn.m
 `extensions/spec-to-code/config.json` 只在扩展加载时读取一次，修改后需重新加载扩展：
 
 ```json
-{ "jev": { "enabled": false } }
+{ "jev": { "enabled": false }, "hyperAutoCoding": { "maxParallelTickets": 4 } }
 ```
+
+`hyperAutoCoding.maxParallelTickets` 只用于并行命令，不改变本命令的串行行为。
 
 开启 `jev.enabled: true`，且宿主 `judge` 角色能解析出原生 judge 模型（例如 TypeSafe Jev 的 `typesafe/jev-latest`）时，由 judge 选择每条自动回复。第一轮只提供「请你仔细思考后回答这些问题」／「请生成文件」，因此第一条自动回复绝不可能是空泛的「请继续」；「请继续」从第二轮起加入。没有可用 judge 或 judge 调用失败时，回退到固定序列。
 
@@ -97,7 +106,7 @@ Phase 2——串行 TDD：
 - 自动回复不是对 agent 提问的回答：固定回复要求 agent 自行思考或生成文件，judge 也只是在同一小组回复中选择。
 - 切票是否合理、是否验收、复盘结论是否成立，都由你复核；运行本身不以它们为门禁。运行结束会报告已尝试、未执行与已交付的工作，不代表工作正确。
 - 复盘只提建议：复盘被要求不执行建议，不修改代码、配置、skill 或代理指令，也不自行写文件。
-- 扩展不会运行 code review；整个流程只调用 `to-tickets`、`tdd`、`retro` 与 `writing-for-agents`。
+- `/spec-to-code` 不会运行 code review；串行流程只调用 `to-tickets`、`tdd`、`retro` 与 `writing-for-agents`。
 
 ## 实际限制
 
@@ -109,16 +118,16 @@ Phase 2——串行 TDD：
 - 同一时间只允许一次运行：已有运行进行中时，新的 `/spec-to-code` 会被拒绝。
 - 后台复盘暂不限制并发。
 
-上述行为详见 [`retro-workflow.ts`](../extensions/spec-to-code/retro-workflow.ts) 与 [`retro-host.ts`](../extensions/spec-to-code/retro-host.ts)。
+上述行为详见 [`tdd-execution.ts`](../extensions/implementation-node/tdd-execution.ts) 与 [`retro-host.ts`](../extensions/implementation-node/retro-host.ts)。
 
 ## 源码索引
 
-- 入口与安装布局：[`extensions/spec-to-code.ts`](../extensions/spec-to-code.ts)
+- 入口与安装布局：[`extensions/entry.ts`](../extensions/entry.ts)
 - 回复、预算与停止条件：[`turn-policy.ts`](../extensions/spec-to-code/turn-policy.ts)、[`workflow-session.ts`](../extensions/spec-to-code/workflow-session.ts)
 - judge 链：[`jev-judge.ts`](../extensions/spec-to-code/jev-judge.ts)
-- 宿主集成与预检：[`host-integration.ts`](../extensions/spec-to-code/host-integration.ts)
+- skill 激活与依赖预检：[`skill-activation.ts`](../extensions/spec-to-code/skill-activation.ts)
 - TDD agent：[`extensions/agents/tdd.md`](../extensions/agents/tdd.md)
-- 复盘行为、身份与输出文件：[`retro-host.ts`](../extensions/spec-to-code/retro-host.ts)、[`retro-workflow.ts`](../extensions/spec-to-code/retro-workflow.ts)
+- 复盘行为、身份与输出文件：[`retro-host.ts`](../extensions/implementation-node/retro-host.ts)、[`tdd-execution.ts`](../extensions/implementation-node/tdd-execution.ts)
 - 配置：[`config.json`](../extensions/spec-to-code/config.json)、[`config.ts`](../extensions/spec-to-code/config.ts)
 - 使用的 skill：[to-tickets](../skills/to-tickets/SKILL.md)、[tdd](../skills/tdd/SKILL.md)；上游 `retro` 与 `writing-for-agents` 原样使用。
 - fork 差异：[上游对比蓝图](./upstream-differences.cn.md)。

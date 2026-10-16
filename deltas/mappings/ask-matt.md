@@ -45,7 +45,7 @@ anchor: |-
   <oh-my-wayfinder:insert>
 insert: |
 
-     **Oh My Pi only:** once `.scratch/<slug>/spec.md` and its approved `contract.md` exist, **`/spec-to-code <slug>`** automates `/to-tickets` and then works the tickets in dependency order with serial TDD subagents. It is the OMP-only counterpart to `/implement-spec`: the same route, but serial, with the contract gate and hands-off turn handling built in. Install it by placing this repo's `extensions/spec-to-code.ts` in your OMP extension setup, with `extensions/agents/tdd.md` in the adjacent `agents/` directory, and listing that directory under `extensions:` in `config.yml` (or passing it with `omp --extension`/`-e`). It is an automation tool, not a different flow: without OMP, call `/to-tickets` yourself, then work the tickets with `/implement` or `/implement-spec`.
+     **Oh My Pi only:** once `.scratch/<slug>/spec.md` and its approved `contract.md` exist, **`/spec-to-code <slug>`** automates `/to-tickets` and then works the tickets in dependency order with serial TDD subagents. It is the OMP-only counterpart to `/implement-spec`: the same route, but serial, with the contract gate and hands-off turn handling built in. Install it by placing this repo's `extensions/entry.ts` in your OMP extension setup, with `extensions/agents/tdd.md` in the adjacent `agents/` directory, and listing that directory under `extensions:` in `config.yml` (or passing it with `omp --extension`/`-e`). It is an automation tool, not a different flow: without OMP, call `/to-tickets` yourself, then work the tickets with `/implement` or `/implement-spec`.
 ```
 
 ### contract-context

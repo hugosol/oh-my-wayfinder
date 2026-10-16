@@ -1,6 +1,6 @@
 ---
 name: backtracer
-description: "Backtrace published Wayfinder results for upstream gaps and contradictions, or investigate a concrete conflict."
+description: "Invoke only when wayfinder explicitly instructs you to invoke backtracer."
 ---
 
 **Backtrace** the caller's published results and evidence through previously decided prerequisites to find gaps and contradictions, including published parts of unfinished tickets. Lighthouse carries approved policy between tickets; downstream tickets read it when they start or resume. Backtracer writes to a downstream ticket only to add a confirmed gap question it owns.

@@ -1,6 +1,6 @@
 /**
  * Planning skill activation and discovery through the OMP host.
- * Retained subagent continuation and retrospective identity live in retro-host.ts.
+ * Retained subagent continuation and retrospective identity live in implementation-node/retro-host.ts.
  *
  * Everything here is host-owned: which skills are discoverable, the skill-prompt
  * message the host renders for a skill activation, and whether the host's own
