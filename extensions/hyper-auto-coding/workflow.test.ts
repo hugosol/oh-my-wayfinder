@@ -16,11 +16,31 @@ interface TicketSnapshot {
 	error?: string;
 }
 interface StatusSnapshot {
+	mode: "running" | "pausing" | "paused";
+	planned: boolean;
+	paused: boolean;
+	pausing: boolean;
+	checkpoint: string;
 	temporaryDir: string;
 	active: string[];
 	integrating: string[];
 	ready: string[];
 	tickets: TicketSnapshot[];
+}
+interface CheckpointTicket {
+	ticket: string;
+	status: TicketSnapshot["status"];
+	worktree?: { branch: string; cwd: string };
+	integration?: { mergedHead?: string; integrationReport?: string; integrationAgentId?: string };
+}
+interface CheckpointSnapshot {
+	version: number;
+	planned: boolean;
+	temporaryDir: string;
+	reports: string[];
+	attempts: { ticket: string; id: string; report?: string; error?: string }[];
+	retro: { tickets: string[]; records: { ticket: string; tool_call_id: string; retro_status: string; retro_error?: string }[] };
+	tickets: CheckpointTicket[];
 }
 interface FinishSummary {
 	reports: string[];
@@ -54,6 +74,7 @@ afterEach(async () => {
 		}
 		await fs.rm(workflow.temporaryDir, { recursive: true, force: true });
 	}
+	await fs.rm(HyperWorkflow.checkpointPath("parent"), { recursive: true, force: true });
 	await cleanupFixtures();
 });
 
@@ -151,7 +172,7 @@ async function fixture(options: {
 	await workflow.execute({ action: "plan", plan: [
 		{ ticket: "a.md", blockedBy: [] }, { ticket: "b.md", blockedBy: [] }, { ticket: "c.md", blockedBy: ["a.md"] },
 	] });
-	return { root, workflow, retroIds, runs, retroWarnings, events };
+	return { root, workflow, host, retroIds, runs, retroWarnings, events };
 }
 async function complete(workflow: HyperWorkflow, ticket: string): Promise<void> {
 	await workflow.execute({ action: "dispatch", tickets: [ticket] });
@@ -412,3 +433,179 @@ test("integrated tickets can be published without independent final verification
 	expect(retroWarnings.some((warning) => warning.includes("b.md"))).toBe(true);
 	expect(await fs.stat(before.temporaryDir).catch(() => null)).toBeNull();
 }, 30000);
+
+async function waitFor(matches: () => boolean): Promise<void> {
+	while (!matches()) await new Promise<void>((resolve) => setImmediate(resolve));
+}
+
+test("pause drains in-flight implementation, integration and delayed retro, then refuses new attempts", async () => {
+	const implementing = gate(), retroDelay = gate(), integrating = gate();
+	const { workflow, retroIds, retroWarnings, runs } = await fixture({
+		implementationGate: implementing.promise,
+		retroGate: retroDelay.promise,
+		failRetro: (ticket) => ticket === "a.md",
+		integrationWork: async () => { await integrating.promise; },
+	});
+	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
+	const pausing = workflow.pause();
+	// The gate closes synchronously, before the first await, so this call cannot admit an attempt.
+	expect(workflow.pausing).toBe(true);
+	expect(workflow.paused).toBe(false);
+	await expect(workflow.execute({ action: "dispatch", tickets: ["b.md"] })).rejects.toThrow("正在暂停");
+	await expect(workflow.execute({ action: "plan", plan: [] })).rejects.toThrow("正在暂停");
+	await expect(workflow.execute({ action: "finish" })).rejects.toThrow("正在暂停");
+	const collecting = workflow.execute({ action: "collect" });
+	let paused = false;
+	void pausing.then(() => { paused = true; });
+	implementing.release();
+	await waitFor(() => retroIds.length === 1 && runs.some((run) => run.role === "integrate"));
+	await new Promise<void>((resolve) => setImmediate(resolve));
+	expect(paused).toBe(false);
+	retroDelay.release();
+	integrating.release();
+	const snapshot = await pausing as StatusSnapshot;
+	expect(snapshot.mode).toBe("paused");
+	expect(ticketSnapshot(snapshot, "a.md").status).toBe("integrated");
+	expect(ticketSnapshot(snapshot, "b.md").status).toBe("ready");
+	expect(ticketSnapshot(snapshot, "b.md").worktree).toBeUndefined();
+	expect(snapshot.active).toEqual([]);
+	expect(snapshot.integrating).toEqual([]);
+	expect(runs.filter((run) => run.role === "implement")).toHaveLength(1);
+	expect(["pausing", "paused"]).toContain((await collecting as StatusSnapshot).mode);
+	const saved = JSON.parse(await fs.readFile(snapshot.checkpoint, "utf8")) as CheckpointSnapshot;
+	expect(saved.version).toBe(1);
+	expect(saved.planned).toBe(true);
+	expect(saved.attempts.map((attempt) => attempt.ticket)).toEqual(["a.md"]);
+	expect(saved.retro.tickets.slice().sort()).toEqual(["a.md", "b.md", "c.md"]);
+	expect(saved.retro.records.map((record) => record.retro_status)).toEqual(["failed"]);
+	expect(saved.retro.records[0].retro_error).toBeTruthy();
+	expect(retroWarnings.some((warning) => warning.includes("a.md"))).toBe(true);
+	expect(saved.reports.length).toBeGreaterThan(0);
+	const delivered = saved.tickets.find((ticket) => ticket.ticket === "a.md")!;
+	expect(delivered.status).toBe("integrated");
+	expect(delivered.integration?.mergedHead).toBeTruthy();
+	expect(saved.tickets.find((ticket) => ticket.ticket === "b.md")?.status).toBe("ready");
+	await workflow.resume();
+	expect(workflow.paused).toBe(false);
+	expect(await fs.stat(snapshot.checkpoint).catch(() => null)).toBeNull();
+});
+
+test("pause with nothing in flight wakes a waiting collect and freezes pending tickets", async () => {
+	const { workflow, runs } = await fixture();
+	const pausing = workflow.pause();
+	const collected = await workflow.execute({ action: "collect" }) as StatusSnapshot;
+	expect(collected.mode).toBe("paused");
+	expect(await pausing).toMatchObject({ mode: "paused" });
+	const frozen = await collectBeforeNextTurn(workflow.execute({ action: "collect" })) as StatusSnapshot;
+	expect(frozen.mode).toBe("paused");
+	expect(frozen.paused).toBe(true);
+	expect(frozen.ready.slice().sort()).toEqual(["a.md", "b.md"]);
+	expect(runs).toEqual([]);
+	await expect(workflow.execute({ action: "dispatch", tickets: ["a.md"] })).rejects.toThrow("已暂停");
+	await expect(workflow.execute({ action: "finish" })).rejects.toThrow("已暂停");
+	await expect(workflow.execute({ action: "plan", plan: [] })).rejects.toThrow("已暂停");
+	await workflow.resume();
+	expect((await status(workflow)).mode).toBe("running");
+});
+
+test("pause during a dispatch loop stops admission without checkpointing an attempt away", async () => {
+	const { workflow, runs } = await fixture();
+	const dispatching = workflow.execute({ action: "dispatch", tickets: ["a.md", "b.md"] });
+	const pausing = workflow.pause();
+	expect(workflow.pausing).toBe(true);
+	expect((await dispatching as StatusSnapshot).mode).toBe("pausing");
+	const paused = await pausing as StatusSnapshot;
+	expect(paused.mode).toBe("paused");
+	expect(paused.active).toEqual([]);
+	expect(runs).toEqual([]);
+	const saved = JSON.parse(await fs.readFile(paused.checkpoint, "utf8")) as CheckpointSnapshot;
+	expect(saved.attempts).toEqual([]);
+	expect(saved.tickets.every((ticket) => ticket.status === "ready")).toBe(true);
+	// The worktree reserved by the interrupted loop is kept, so a resumed run reuses it.
+	const reserved = saved.tickets.find((ticket) => ticket.ticket === "a.md")!.worktree!;
+	expect(reserved.cwd).toBeTruthy();
+	await workflow.resume();
+	await complete(workflow, "a.md");
+	expect(ticketSnapshot(await status(workflow), "a.md").worktree).toEqual(reserved);
+});
+
+test("a restored pause keeps dependency evidence, the ledger and remaining scheduling", async () => {
+	const { workflow, host, root } = await fixture({ failRetro: (ticket) => ticket === "c.md" });
+	await complete(workflow, "a.md");
+	const before = await status(workflow);
+	expect(before.ready.slice().sort()).toEqual(["b.md", "c.md"]);
+	const paused = await workflow.pause() as StatusSnapshot;
+	expect(paused.mode).toBe("paused");
+	expect(HyperWorkflow.checkpointPath("parent")).toBe(paused.checkpoint);
+	const restored = await HyperWorkflow.restore(paused.checkpoint, host, "parent", "Main", null);
+	workflows.push(restored);
+	expect(restored.paused).toBe(true);
+	expect(restored.finished).toBe(false);
+	expect(restored.git.root).toBe(root);
+	expect(restored.git.branch).toBe(workflow.git.branch);
+	const reopened = await status(restored);
+	expect(reopened.mode).toBe("paused");
+	expect(reopened.planned).toBe(true);
+	expect(reopened.ready.slice().sort()).toEqual(["b.md", "c.md"]);
+	expect(ticketSnapshot(reopened, "a.md")).toMatchObject({
+		status: "integrated",
+		mergedHead: ticketSnapshot(before, "a.md").mergedHead,
+		worktree: ticketSnapshot(before, "a.md").worktree,
+	});
+	await expect(restored.execute({ action: "plan", plan: [] })).rejects.toThrow("已暂停");
+	await expect(restored.execute({ action: "dispatch", tickets: ["b.md"] })).rejects.toThrow("已暂停");
+	await expect(restored.execute({ action: "finish" })).rejects.toThrow("已暂停");
+	expect(await fs.stat(restored.temporaryDir).then((stat) => stat.isDirectory())).toBe(true);
+	await restored.resume();
+	expect(restored.paused).toBe(false);
+	expect(await fs.stat(paused.checkpoint).catch(() => null)).toBeNull();
+	// The next collect is served from the restored state without waiting for work.
+	const immediate = await collectBeforeNextTurn(restored.execute({ action: "collect" })) as StatusSnapshot;
+	expect(immediate.mode).toBe("running");
+	expect(immediate.ready.slice().sort()).toEqual(["b.md", "c.md"]);
+	// Only the restored dependency evidence releases the blocked ticket.
+	await complete(restored, "c.md");
+	await complete(restored, "b.md");
+	const summary = await restored.execute({ action: "finish" }) as unknown as FinishSummary;
+	expect(summary.warnings).toEqual([]);
+	const ledgerFile = summary.reports.find((file) => file.endsWith("workflow.json"))!;
+	const ledger = JSON.parse(await fs.readFile(ledgerFile, "utf8")) as Ledger;
+	expect(ledger.attempts.map((attempt) => attempt.ticket)).toEqual(["a.md", "c.md", "b.md"]);
+	expect(ledger.executions).toHaveLength(3);
+	for (const attempt of ledger.attempts) {
+		const record = ledger.executions.find((entry) => entry.tool_call_id === attempt.id)!;
+		const failedRetro = attempt.ticket === "c.md";
+		expect(record.tdd_status).toBe("completed");
+		expect(record.retro_status).toBe(failedRetro ? "failed" : "completed");
+		expect(Boolean(record.retro_error)).toBe(failedRetro);
+		expect(summary.reports).toContain(
+			path.join(root, ".scratch", "feature", "retro", attempt.ticket, `${record.run_id}.json`),
+		);
+	}
+	const first = ledger.executions.find((entry) => entry.ticket === "a.md")!;
+	const document = path.join(root, ".scratch", "feature", "retro", "a.md", `${first.run_id}.md`);
+	expect(summary.reports).toContain(document);
+	expect(await fs.readFile(document, "utf8")).toContain("Keep the successful behavioral verification");
+	expect(await fs.stat(paused.checkpoint).catch(() => null)).toBeNull();
+}, 30000);
+
+test("a failed checkpoint write never claims a pause and stays retryable", async () => {
+	const { workflow } = await fixture();
+	const file = HyperWorkflow.checkpointPath("parent");
+	await fs.mkdir(file);
+	try {
+		await expect(workflow.pause()).rejects.toThrow();
+		expect(workflow.paused).toBe(false);
+		expect(workflow.pausing).toBe(false);
+		const state = await status(workflow);
+		expect(state.mode).toBe("running");
+		expect(state.checkpoint).toBe(file);
+		await complete(workflow, "a.md");
+	} finally {
+		await fs.rm(file, { recursive: true, force: true });
+	}
+	const paused = await workflow.pause() as StatusSnapshot;
+	expect(paused.mode).toBe("paused");
+	const saved = JSON.parse(await fs.readFile(file, "utf8")) as CheckpointSnapshot;
+	expect(saved.attempts.map((attempt) => attempt.ticket)).toEqual(["a.md"]);
+});

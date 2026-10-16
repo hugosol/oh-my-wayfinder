@@ -40,6 +40,26 @@ export class TicketIntegration {
 	}
 
 	/**
+	 * Rebuild one ticket's recorded integration outcome for a workflow restored
+	 * from a pause. The object is inert: no child session is revived, and `run`
+	 * is never called again for a ticket that already reached this snapshot.
+	 */
+	static restore(
+		git: HyperGit,
+		host: HyperHost,
+		references: string,
+		save: (role: HyperRole, result: SingleResult, head: string) => Promise<Report>,
+		onMerged: () => void,
+		snapshot: TicketIntegrationSnapshot,
+	): TicketIntegration {
+		const integration = new TicketIntegration(git, host, references, save, onMerged);
+		integration.#mergedHead = snapshot.mergedHead;
+		integration.#integrationReport = snapshot.integrationReport;
+		integration.#integrationAgentId = snapshot.integrationAgentId;
+		return integration;
+	}
+
+	/**
 	 * Merge the ticket worktree, run the resumable integration child, and keep
 	 * attempting merges until the ticket branch is part of the integration
 	 * branch. Throws on execution faults, dirty worktrees, and Git failures.

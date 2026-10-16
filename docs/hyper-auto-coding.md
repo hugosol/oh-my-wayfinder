@@ -2,7 +2,7 @@
 
 [中文文档](./hyper-auto-coding.cn.md) · [Serial workflow](./spec-to-code.md) · [Repository README](../README.md)
 
-`/hyper-auto-coding <slug>` is an OMP-only command. It reuses `/spec-to-code` Phase 1 unchanged, implements tickets concurrently in per-ticket branches/worktrees, and tests and repairs integrations asynchronously. Only short Git operations in the shared integration checkout are serialized. The old command remains serial and does not orchestrate worktrees.
+`/hyper-auto-coding <slug>` is an OMP-only command that starts the workflow. `/hyper-auto-coding pause` and `/hyper-auto-coding resume` are the only controls that suspend and continue it; see [Pausing and resuming](#pausing-and-resuming). It reuses `/spec-to-code` Phase 1 unchanged, implements tickets concurrently in per-ticket branches/worktrees, and tests and repairs integrations asynchronously. Only short Git operations in the shared integration checkout are serialized. The old command remains serial and does not orchestrate worktrees.
 
 ## Install and prepare
 
@@ -104,9 +104,42 @@ Copy or commit failures preserve temporary artifacts and report errors, without 
 
 `hyper_auto_coding` exposes only `plan`, `dispatch`, `collect`, `finish`, and read-only `status`. `dispatch` returns after starting implementation. Implementation completion or failure, the first merge releasing dependencies, and integration completion or failure request a `collect` check; progress between calls is retained until the next call. `collect` returns the latest state immediately when progress is pending, otherwise waits for the next change. Notifications coalesce into one check; changes after a check starts are not cleared at its end and remain pending for the next check. Overlapping `collect` calls share one check, and waiting does not hold the orchestration guard or block `dispatch`. The main agent retains the existing result-handling and dispatch logic; no automatic dispatcher is added. Integration and conflict continuations are automatic; native task calls must not bypass the workflow to dispatch tickets.
 
-Status includes `temporaryDir`, `active`, `integrating`, the merge-released `ready` frontier, each ticket's first `mergedHead`, and report paths. `finish` returns a delivery summary, not a status snapshot.
+Status includes `temporaryDir`, `active`, `integrating`, the merge-released `ready` frontier, each ticket's first `mergedHead`, report paths, and the pause `mode` with its `checkpoint` path. `finish` returns a delivery summary, not a status snapshot.
 
-One workflow runs through the extension at a time. It assumes a session completes all tickets; interruption, cancellation, and automatic recovery are not implemented. Execution errors are recorded honestly; the normal-exit-is-success assumption adds no report-content acceptance logic.
+One workflow runs through the extension at a time. It assumes a session completes all tickets; interruption, cancellation, and recovery from an arbitrary interruption are not implemented — only the explicit `pause`/`resume` commands below suspend and continue a workflow. Execution errors are recorded honestly; the normal-exit-is-success assumption adds no report-content acceptance logic.
+
+## Pausing and resuming
+
+Workflow control is command-only: `/hyper-auto-coding pause` and `/hyper-auto-coding resume`. There is no natural-language or `hyper_auto_coding`-action equivalent, and the main agent cannot pause or resume itself.
+
+### `pause`: stop fresh work, drain, checkpoint
+
+`pause` applies to the Phase 2 workflow owned by the current session that has not finished; with no such workflow it reports an error. It acknowledges immediately and drains in the background, never holding the command open:
+
+1. It closes admission of new implementation attempts in the owning session immediately, including retries of failed tickets. No later `dispatch` starts an implementation.
+2. Work already in flight continues to a known outcome and is never aborted: running TDD implementations, their retrospectives, background integrations, and conflict continuations all finish, and an implementation already running may still start its own background integration child.
+3. Once nothing remains in flight, the workflow writes a checkpoint of state-machine-relevant data and becomes **paused**; the completion notice reports the checkpoint path. It does not finish: it publishes no reports, removes no worktrees, and makes no final commit, even when every ticket is already integrated and no retrospective is pending.
+
+`pause` resolves with the paused snapshot. Asking again while a drain is still running joins that same drain instead of starting a second one, and the command is rejected when the workflow is already paused or already finished.
+
+`hyper_auto_coding` `action=status` reports the pause `mode`: `running` while new attempts are still admitted, `pausing` once the gate is closed but work is still draining, and `paused` after the checkpoint exists; it also reports the `checkpoint` path, which exists on every status call even while running. While `mode` is `pausing` or `paused`, `plan`, `dispatch`, and `finish` are refused: only `status` and `collect` remain usable, the main agent keeps calling `collect` until the drain ends, then ends its turn and waits for the user to resume. Pausing aborts nothing, so `collect` still observes implementations, retrospectives, and integrations reaching their normal outcomes.
+
+### `resume`: unlock and continue
+
+`resume` returns a paused workflow to the idle state and makes it schedulable again, in two situations:
+
+- In the same session, immediately after the pause completed, it unlocks the live workflow.
+- After reopening the original session and running `/hyper-auto-coding resume` there, it loads the checkpoint and restores the paused workflow. It does not re-run Phase 1, recut tickets, or commit tickets again.
+
+`resume` takes no slug: the checkpoint is addressed by the current session. It only continues a workflow that is paused — a workflow that is still running or draining, or a session with no live pause and no loadable checkpoint, is rejected instead of starting anything. `resume` resolves with the running-mode snapshot and deletes the checkpoint file, so a pause that has already been resumed cannot be restored again. Resuming delivers the restored snapshot to the session right away, and the next `collect` returns immediately instead of waiting; from there the main agent continues as usual: if the dependency graph is not registered yet it plans first, otherwise it dispatches the remaining ready tickets, and calls `finish` once all ticket integration has completed. Restored state keeps the integrated dependency evidence, execution, retrospective, and report ledger, and recorded failures, so `finish` can still produce the same delivery summary it would have produced without the pause.
+
+### Assumptions and limits
+
+- The checkpoint lives outside the repository, under the OS temp directory, as a per-session `hyper-auto-coding-pause-*.json` file whose name is deterministic (`HyperWorkflow.checkpointPath(sessionId)`), so it never enters the integration branch or a commit.
+- It is a temporary aid, not durable storage: OS temp cleanup, or terminating the process before the drain finishes, leaves nothing to restore, and `resume` validates and repairs nothing beyond loading that file.
+- Pausing assumes the existing artifacts remain available: ticket worktrees and branches, the integration branch and its checkout, and the run's report temp directory. Resume neither copies nor repairs the environment, and performs no extra Git validation.
+- Pause/resume cover a deliberate suspension, not an arbitrary interruption: they do not recover a workflow whose host died mid-flight, do not recreate missing artifacts, and do not transfer a checkpoint to another session or slug.
+- Pausing does not stop an in-flight ticket, its retrospective, or its integration, and does not by itself change what `finish` later publishes.
 
 ## Sources
 

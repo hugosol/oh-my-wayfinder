@@ -19,7 +19,7 @@ export function registerHyperTools(
 		name: "hyper_auto_coding",
 		label: "Hyper-Auto-Coding",
 		description:
-			"Manage the local parallel ticket workflow. The main agent plans, dispatches, collects, and finishes; ticket contents define implementation or optional acceptance work, and the workflow does not create a separate overall-verification gate. A subagent that exits normally is a success. Integration starts automatically in the background as soon as an implementation finishes, never occupies an implementation slot, and the same integration subagent continues across conflict rounds. Dispatch returns immediately. Implementation completion or failure, first merge, and integration completion or failure request a collect check. Collect consumes retained progress immediately, otherwise waits for the next change; overlapping calls share one snapshot without blocking dispatch. Notifications coalesce, and changes after a snapshot remain pending for the next collect. Only this tool dispatches workflow agents, merges and publishes reports. Never use native task for these tickets. finish waits for retrospectives, commits all reports and removes clean merged worktrees while retaining branches.",
+			"Manage the local parallel ticket workflow. The main agent plans, dispatches, collects, and finishes; ticket contents define implementation or optional acceptance work, and the workflow does not create a separate overall-verification gate. A subagent that exits normally is a success. Integration starts automatically in the background as soon as an implementation finishes, never occupies an implementation slot, and the same integration subagent continues across conflict rounds. Dispatch returns immediately. Implementation completion or failure, first merge, and integration completion or failure request a collect check. Collect consumes retained progress immediately, otherwise waits for the next change; overlapping calls share one snapshot without blocking dispatch. Notifications coalesce, and changes after a snapshot remain pending for the next collect. Only this tool dispatches workflow agents, merges and publishes reports. Pause/resume are user commands only. When mode is pausing, do not dispatch, retry, plan or finish; collect until paused. When mode is paused, end the reply and wait for the user resume command. Never use native task for these tickets. finish waits for retrospectives, commits all reports and removes clean merged worktrees while retaining branches.",
 		parameters,
 		approval: "write",
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -49,7 +49,13 @@ export function registerHyperTools(
 	});
 	pi.on("session_stop", (_event, ctx) => {
 		const workflow = current();
-		if (!workflow?.owns(ctx.sessionManager.getSessionId(), ctx.agent.id) || workflow.finished) return;
+		if (!workflow?.owns(ctx.sessionManager.getSessionId(), ctx.agent.id) || workflow.finished || workflow.paused) return;
+		if (workflow.pausing) {
+			return {
+				decision: "block" as const,
+				reason: "Hyper-Auto-Coding 正在暂停。不要派发或重试实现，不调用 finish；使用 action=collect 等待已有实现、retro 和集成收尾。mode=paused 后结束本轮回复，等待用户通过命令恢复。",
+			};
+		}
 		return {
 			decision: "block" as const,
 			reason:

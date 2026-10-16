@@ -155,7 +155,8 @@ async function underTempWorktreeRoot(candidate: string): Promise<boolean> {
 /**
  * One run's Git surface: a captured integration checkout plus every ticket
  * worktree this run created. Never constructed directly; `inspect` validates
- * the repository and captures the branch first.
+ * the repository and captures the branch first, and `adopt` rebuilds the same
+ * surface from a paused checkpoint without validation.
  */
 export class HyperGit {
 	/** Resolved top-level working tree of the integration repository. */
@@ -212,6 +213,19 @@ export class HyperGit {
 		}
 
 		return new HyperGit(root, branch, slug);
+	}
+
+	/**
+	 * Rebuild the Git surface of a paused run from its checkpoint without
+	 * touching the repository. The integration checkout and every recorded
+	 * ticket worktree already exist on disk, so nothing is created, committed,
+	 * or re-validated; a fresh run token keeps retries of never-started tickets
+	 * on new branches while already-created worktrees keep their own.
+	 */
+	static adopt(root: string, branch: string, slug: string, worktrees: readonly (readonly [string, TicketWorktree])[]): HyperGit {
+		const adopted = new HyperGit(root, branch, slug);
+		for (const [ticket, tree] of worktrees) adopted.worktrees.set(ticket, { branch: tree.branch, cwd: tree.cwd });
+		return adopted;
 	}
 
 	/** Current integration HEAD commit SHA. */

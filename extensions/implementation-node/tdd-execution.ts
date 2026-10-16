@@ -201,6 +201,27 @@ export class TddWorkFlow {
 		}
 	}
 
+	/**
+	 * Await every background retro that is still in flight, including ones
+	 * started while draining, without closing the workflow to later attempts.
+	 * `finish()` is the closing counterpart; a pause must not call it.
+	 */
+	async drain(): Promise<void> {
+		while (this.#pending.size) await Promise.allSettled([...this.#pending]);
+	}
+
+	/**
+	 * Load records persisted by an earlier process so a workflow restored from a
+	 * pause can still publish them. Only valid for an idle, unsettled workflow:
+	 * a drained pause has no active execution and no pending retro.
+	 */
+	restore(records: readonly ExecutionRecord[]): void {
+		if (this.#closing || this.#activeCalls.size || this.#pending.size) {
+			throw new Error("TDD 正在收尾或仍有执行在运行，不能载入历史记录。");
+		}
+		for (const record of records) this.#calls.set(record.tool_call_id, structuredClone(record));
+	}
+
 	/** A failed retro is terminal too. No restart recovery and no automatic retro retries. */
 	finish(): Promise<string> {
 		if (this.#activeCalls.size) return Promise.reject(new Error("TDD 尚未结束，不能开始最终汇总。"));

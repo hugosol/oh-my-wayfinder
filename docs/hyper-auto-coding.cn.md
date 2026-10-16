@@ -2,7 +2,7 @@
 
 [English](./hyper-auto-coding.md) · [串行工作流](./spec-to-code.cn.md) · [仓库 README](../README.cn.md)
 
-`/hyper-auto-coding <slug>` 是 OMP 专用命令。它原样复用 `/spec-to-code` Phase 1；Phase 2 在每票 branch/worktree 中并行实现，随后异步测试与修复，仅共享集成工作区中的短暂 Git 操作串行。旧命令仍然串行，不编排 Git worktree。
+`/hyper-auto-coding <slug>` 是 OMP 专用启动命令；`/hyper-auto-coding pause` 与 `/hyper-auto-coding resume` 是唯一可以挂起和继续工作流的控制方式，见[暂停与恢复](#暂停与恢复)。它原样复用 `/spec-to-code` Phase 1；Phase 2 在每票 branch/worktree 中并行实现，随后异步测试与修复，仅共享集成工作区中的短暂 Git 操作串行。旧命令仍然串行，不编排 Git worktree。
 
 ## 安装与准备
 
@@ -104,9 +104,42 @@ Markdown retro 只在交付成功时存在，失败记录仍然提交。实现�
 
 `hyper_auto_coding` 的动作只有 `plan`、`dispatch`、`collect`、`finish` 与只读 `status`。`dispatch` 启动实现后返回。实现结束或失败、首次合入放行依赖、集成结束或失败都会请求一次 `collect` 检查；两次调用之间发生的进展会保留到下次调用。`collect` 有待检查进展时立即返回最新状态，否则等待下次变化。连续通知合并为一次检查，检查开始后的新变化不会被结束时清除，而是留给下一次检查。并发 `collect` 共用一次检查，等待期间不持有编排互斥，不阻止 `dispatch`。主代理仍按原有逻辑处理返回状态和派发下游，不新增自动派发器。集成和冲突续跑由宿主自动调度，不通过 native task 绕过工具派发。
 
-状态含 `temporaryDir`、`active`、`integrating`、依赖放行后的 `ready`、每票首次 `mergedHead` 及报告路径。`finish` 返回交付摘要而不是状态快照。
+状态含 `temporaryDir`、`active`、`integrating`、依赖放行后的 `ready`、每票首次 `mergedHead`、报告路径，以及暂停 `mode` 及其 `checkpoint` 路径。`finish` 返回交付摘要而不是状态快照。
 
-同一扩展一次只承载一条工作流。按一次会话完成全部票据设计，不提供中断、取消或自动恢复机制。异常执行仍如实记录；正常退出即成功的假设不增加报告内容验收逻辑。
+同一扩展一次只承载一条工作流。按一次会话完成全部票据设计，不提供中断、取消或任意中断后的自动恢复机制；只有下方的显式 `pause`/`resume` 命令可以挂起并继续工作流。异常执行仍如实记录；正常退出即成功的假设不增加报告内容验收逻辑。
+
+## 暂停与恢复
+
+工作流的挂起与继续只能通过命令完成：`/hyper-auto-coding pause` 与 `/hyper-auto-coding resume`。没有自然语言入口，`hyper_auto_coding` 工具也没有对应 action，主代理不能自行暂停或恢复。
+
+### `pause`：停止新实现、自然排水并写入检查点
+
+`pause` 作用于当前会话拥有的、尚未结束的 Phase 2 工作流；没有这样的工作流时直接报错。它立即给出受理提示，排水在后台进行，命令本身不会一直等待：
+
+1. 立即停止该会话中新的实现尝试，失败票据的重试也不再受理；此后的 `dispatch` 不会再启动实现。
+2. 已在途的工作不会被中止，而是跑到已知终态：正在执行的 TDD 实现及其 retro、后台集成与冲突续跑都会正常结束；已在运行的实现仍可启动属于它自己的后台集成子代理。
+3. 全部在途工作结束后，工作流把状态机相关信息写入检查点并进入 **paused**，完成通知给出检查点路径。此时不会收尾：不发布报告、不移除 worktree、不做最终提交，即使所有票据都已集成且没有待完成 retro 也一样。
+
+`pause` 以 paused 快照返回。排水尚未结束时再次执行会并入同一轮排水，而不是开启第二轮；工作流已处于 paused 或已结束时则直接拒绝。
+
+`hyper_auto_coding` 的 `action=status` 用 `mode` 报告暂停状态：仍受理新实现时为 `running`，准入已关闭但工作仍在排水时为 `pausing`，检查点写入后为 `paused`；每次 status 都给出 `checkpoint` 路径，即使仍在 `running`、文件尚未产生也一样。`mode` 为 `pausing` 或 `paused` 期间，`plan`、`dispatch`、`finish` 都会被拒绝，只有 `status` 与 `collect` 可用；主代理应持续 `collect` 等已有实现、retro 与集成收尾，进入 paused 后结束本轮回复，等待用户恢复。暂停不中止任何工作，因此 `collect` 仍能观察到实现、retro 与集成走到正常终态。
+
+### `resume`：解锁并继续
+
+`resume` 把已暂停的工作流恢复为空闲且可调度的状态，适用于两种情况：
+
+- 同一会话中 pause 刚刚完成时，直接解锁仍在内存中的工作流。
+- 重新打开原会话并在其中执行 `/hyper-auto-coding resume`：读取检查点并恢复已暂停的工作流，不重跑 Phase 1、不重新切票，也不再次提交票据。
+
+`resume` 不接受 slug：检查点按当前会话寻址。它只用于继续已暂停的工作流——工作流仍在运行或仍在排水，或当前会话既没有在内存中的暂停也没有可读取的检查点时，都会被拒绝，而不是启动任何新流程。`resume` 以 running 状态的快照返回，并删除检查点文件，因此已经恢复过的暂停无法再次恢复。恢复会立即把恢复后的快照交给会话，且下一次 `collect` 立即返回而不等待；此后照常继续：尚未登记依赖图时先 plan，否则派发剩余 ready 票据，并在全部票集成处理完成后调用 `finish`。恢复后的状态保留已集成依赖证据、执行/retro/报告账本与失败记录，`finish` 仍能产出与未暂停时一致的交付摘要。
+
+### 前提与限制
+
+- 检查点位于仓库之外的系统临时目录下，是按会话确定的 `hyper-auto-coding-pause-*.json` 文件（`HyperWorkflow.checkpointPath(sessionId)`），不会进入集成分支或任何提交。
+- 它只是临时辅助文件而非持久存储：系统清理临时目录，或在排水完成前进程终止，都会导致无从恢复；`resume` 除读取该文件外不校验、不修复任何内容。
+- 暂停以既有产物仍然可用为前提：票据 worktree 与分支、集成分支及其工作区、本次运行的报告临时目录。恢复既不复制也不修复环境，也不做额外 Git 校验。
+- pause/resume 只处理主动暂停，不做任意中断恢复：宿主中途死亡的工作流不会被恢复，缺失产物不会被重建，检查点也不会跨会话或跨 slug 使用。
+- 暂停不会中断正在执行的票据、其 retro 或集成，也不会自行改变 `finish` 后续发布的内容。
 
 ## 来源
 

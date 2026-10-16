@@ -438,6 +438,62 @@ export default function specToCode(pi: ExtensionAPI): void {
 		pi.registerCommand(command.name, {
 			description: command.description,
 			handler: async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
+				const control = args.trim();
+				if (command.hyperMode && (control === "pause" || control === "resume")) {
+					const sessionId = ctx.sessionManager.getSessionId();
+					if (control === "pause") {
+						const workflow = hyperWorkflow;
+						if (!workflow?.owns(sessionId, ctx.agent.id) || workflow.finished) {
+							ctx.ui.notify("当前会话没有可暂停的 Hyper-Auto-Coding Phase 2。", "error");
+							return;
+						}
+						// Close admission immediately; draining must not hold the command handler open.
+						const completion = workflow.pause();
+						ctx.ui.notify("已请求暂停：停止新实现派发，等待已有 TDD、retro 和集成链路收尾。", "info");
+						void completion.then(
+							() => ctx.ui.notify(`Hyper-Auto-Coding 已暂停。状态已保存：${HyperWorkflow.checkpointPath(sessionId)}`, "info"),
+							(error) => ctx.ui.notify(`Hyper-Auto-Coding 暂停失败：${error instanceof Error ? error.message : String(error)}`, "error"),
+						);
+						return;
+					}
+					if (session.isActive || retroWorkflow || phase2Starting || (hyperWorkflow && !hyperWorkflow.paused)) {
+						ctx.ui.notify("当前工作流尚未暂停，不能恢复。", "error");
+						return;
+					}
+					let restored: HyperWorkflow | undefined;
+					phase2Starting = true;
+					try {
+						let workflow = hyperWorkflow;
+						if (workflow && !workflow.owns(sessionId, ctx.agent.id)) throw new Error("该工作流不属于当前会话。");
+						if (!workflow) {
+							const host = await createHyperHost(pi, ctx);
+							try {
+								workflow = await HyperWorkflow.restore(
+									HyperWorkflow.checkpointPath(sessionId), host, sessionId, ctx.agent.id,
+									ctx.sessionManager.getSessionFile() ?? null,
+								);
+								restored = workflow;
+							} catch (error) {
+								await host.close();
+								throw error;
+							}
+						}
+						const snapshot = await workflow.resume();
+						hyperWorkflow = workflow;
+						hyperGit = workflow.git;
+						hyperMode = true;
+						pi.sendUserMessage(
+							`Hyper-Auto-Coding 已恢复。使用 hyper_auto_coding action=collect 获取恢复后的即时快照，继续原有调度；不要重建已登记的依赖图。若 planned=false，先读取票据并 action=plan；否则按 ready 派发剩余票据。全部票据 integrated 后 action=finish。只使用 hyper_auto_coding 编排票据，不直接调用 task 或操作集成工作区。\n当前状态：\n${JSON.stringify(snapshot, null, 2)}`,
+							{ deliverAs: "followUp" },
+						);
+					} catch (error) {
+						if (restored) await restored.host.close();
+						ctx.ui.notify(`Hyper-Auto-Coding 无法恢复：${error instanceof Error ? error.message : String(error)}`, "error");
+					} finally {
+						phase2Starting = false;
+					}
+					return;
+				}
 				if (session.isActive || retroWorkflow || hyperWorkflow || phase2Starting) {
 					ctx.ui.notify("已有 Spec-to-Code / Hyper-Auto-Coding 工作流在运行，等待其结束后再启动。", "error");
 					return;
