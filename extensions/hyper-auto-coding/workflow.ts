@@ -411,13 +411,14 @@ export class HyperWorkflow {
 			if (this.#pausing || this.#paused) break;
 			const id = randomUUID();
 			const previous = ticket.report?.path;
+			const previousError = ticket.error;
 			ticket.report = undefined;
 			ticket.error = undefined;
 			ticket.status = "running";
 			const attempt: ExecutionAttempt = { ticket: name, id };
 			this.#attempts.push(attempt);
 			await this.retro.begin(id, name);
-			const task = `在当前 worktree 实现唯一票据：${path.join(worktree.cwd, ".scratch", this.slug, "implementation", name)}。\n${this.#references()}\n${previous ? `接手此前实现进度，不丢弃已有修改。上次报告：${previous}` : "这是本票首次执行。"}\n遵守 tdd skill，自行负责本票验收并报告实际验证与未完成事项。完成后尽快提交本票实现，交出 worktree，由独立集成子代理接管。不要修改其他票据或工作流报告，不操作集成分支工作区，不自行合入集成分支，不调用 retro、不派发其他票据。不得 reset 丢弃既有工作。`;
+			const task = `${previousError ? `上次执行未被工作流接收，原因如下：\n${previousError}\n请先处理上述原因，再完成本票交付；保留已有工作，不要重复已完成且无需重跑的工作。\n\n` : ""}在当前 worktree 实现唯一票据：${path.join(worktree.cwd, ".scratch", this.slug, "implementation", name)}。\n${this.#references()}\n${previous ? `接手此前实现进度，不丢弃已有修改。上次报告：${previous}` : "这是本票首次执行。"}\n遵守 tdd skill，自行负责本票验收并报告实际验证与未完成事项。完成后尽快提交本票实现，交出 worktree，由独立集成子代理接管。不要修改其他票据或工作流报告，不操作集成分支工作区，不自行合入集成分支，不调用 retro、不派发其他票据。不得 reset 丢弃既有工作。`;
 			const job = (async () => {
 				let result: SingleResult | undefined, failure: string | undefined;
 				try {

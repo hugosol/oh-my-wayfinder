@@ -45,7 +45,7 @@ The main agent reads published tickets and registers the execution dependency gr
 - A fresh TDD child implements, validates, and promptly commits its ticket, without an extra integration-tip synchronization stage. Ending implementation automatically starts background integration, outside implementation slot limits.
 - TDD and integration are different sessions taking sequential ownership of the same worktree and branch. They do not write code concurrently. No extra integration worktree is created.
 - The first successful merge releases downstream tickets immediately, before integration tests or repairs finish. Status lists implementation in `active` and background integration separately in `integrating`.
-- Failed implementations can retry with a fresh implementer in the original branch/worktree, retaining progress. An original TDD session already running retro is not continued for implementation.
+- Failed implementations can retry with a fresh implementer in the original branch/worktree, retaining progress. The retry task begins with the previous rejection reason verbatim and asks the implementer to address it first, preserve existing work, and avoid repeating completed work that needs no rerun; the previous implementation report remains available as handoff context. An original TDD session already running retro is not continued for implementation.
 
 ### The short bidirectional merge critical section
 
