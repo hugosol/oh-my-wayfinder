@@ -2,27 +2,58 @@
 
 [中文文档](./README.cn.md)
 
-**Keep decisions intact across sessions. Make requirements testable before implementation. Learn from each execution.**
+Have you run into any of these situations?
 
-Oh My Wayfinder is a non-invasive fork of [mattpocock/skills](https://github.com/mattpocock/skills) for AI-assisted engineering. It extends the upstream workflow for large efforts that need more than one conversation, and offers optional automation for [Oh My Pi](https://github.com/can1357/oh-my-pi) (OMP).
+- **Every question has been discussed thoroughly with AI, but the pieces do not fit together.** A large requirement is split into tickets, each reasonable on its own. Yet earlier constraints get overlooked, decisions from separate discussions conflict, and the problems only surface during implementation.
+- **A discussion has gone on for a long time, but you already need to tackle another question.** Continuing may mean working through branches whose premises are still undecided. Switching sessions risks losing the conclusions you have reached—and the equally important reasons behind them.
+- **AI is ready to write code, but you still cannot clearly describe what you will get.** The plan sounds reasonable, yet the code's external behavior, whether its architecture will be easy to test, and how you will accept the result remain unclear.
+
+Oh My Wayfinder is a set of improvements I developed to address these problems while using [Matt Pocock's Wayfinder](https://github.com/mattpocock/skills).
+
+Wayfinder is already an excellent skill for exploring complex problems and breaking the unknown into decisions that can be resolved step by step. This fork builds on that foundation, bringing some of my development practices and ways of thinking into the workflow through three main improvements.
 
 ## Why this fork?
 
-### A conversation can stop before a decision is finished
+### Lighthouse: reconnect decisions across tickets
 
-Large efforts involve research, prototypes, and decisions that depend on one another. An unfinished question should not prevent a confirmed result from being useful, and a new session should not have to reconstruct the entire discussion.
+Matt Pocock calls the unknown that Wayfinder explores the Fog of War. Extending that metaphor, I named the skill that preserves confirmed decisions and provides a reference for further exploration Lighthouse.
 
-This fork adds pause and recovery to Wayfinder, publishes confirmed decisions as shared authorities, and checks their prerequisites for gaps and conflicts. A final audit checks the whole design before it becomes a specification. The goal is continuity without turning every ticket into a copy of every other ticket's policy.
+While using Wayfinder for large efforts, I found that splitting a complex problem into tickets made each question easier to handle, but also weakened the connections between decisions. In some cases, implementations based on discussions spread across tickets were lower in quality than those produced from a single, continuous grilling session.
 
-### Passing tests are not enough if they lost the requirement
+The issue is not necessarily a lack of depth in any individual ticket. Decisions that make sense locally do not always form a consistent whole.
 
-Requirements can disappear while work is split into tickets. Tests can also end up confirming the implementation rather than testing the behavior that was promised.
+To address this, I added Lighthouse and Backtracer:
 
-This fork separates the specification from an approved contract of promises and test seams, assigns delivery and coverage responsibilities to implementation tickets, and strengthens TDD around those responsibilities. The aim is a traceable path from an approved requirement to evidence that can detect its violation—not just a green test suite.
+- Lighthouse preserves confirmed conclusions, their rationale, and the conditions under which they apply. It gives different tickets a shared basis for decisions, rather than letting each maintain an understanding that gradually diverges from the others.
+- Backtracer uses new conclusions to revisit earlier decisions, check their premises, and identify omissions and contradictions. The user then decides whether to supplement or revise those decisions.
 
-### Finishing implementation should not discard what it taught you
+This mechanism follows a habit from my own reasoning: after resolving a question, revisit earlier judgments to check whether they still hold. At decision-publication boundaries, such as ticket completion or a pause, this backward review brings new conclusions into earlier discussions, checks their consistency, and helps separate decisions converge into a coherent whole.
 
-Upstream already provides Retro. The OMP extension makes it part of automated execution: each TDD execution gets a separate retrospective, with implementation and retrospective outcomes reported independently. Suggestions are recorded, not automatically applied; a completed run is not itself proof of acceptance.
+### Pause grilling: preserve progress and take a different path
+
+Some topics are too large to resolve every decision in a single conversation. Staying with the same topic can prolong the discussion without bringing it closer to a conclusion.
+
+This fork allows grilling to pause before a ticket is complete, compressing the discussion into a record sufficient to continue. That record includes not only confirmed decisions, but also their rationale, important context, and open questions. Temporary assumptions, unproductive exploration, and lengthy research do not need to be carried into the next session in full; reasons for rejecting alternatives and key evidence are retained when they still matter to future decisions.
+
+Pausing supports more than resuming later: it also lets you change the order in which decisions are made.
+
+If several options for the current question depend on another unresolved decision, you can save your progress, resolve that prerequisite first, and then return to the original discussion. Settling the prerequisite often narrows the options and makes the remaining decisions easier.
+
+At a pause, confirmed results can be published through Lighthouse, with Backtracer reviewing the relevant premises. Useful conclusions can therefore support other discussions even before their source ticket is complete. When you resume, relevant new conclusions help determine the next step without starting over.
+
+### To-contract: understand what you will get before AI writes the code
+
+Finishing the design discussion does not necessarily mean you have a clear picture of the code that will be generated. What does it promise externally? How should it be structured for testability? How will you decide whether to accept it?
+
+Inspired by [double-loop TDD](https://growing-object-oriented-software.com/), I split `/to-contract` out of `/to-spec` to align on three questions through three short rounds of discussion before implementation:
+
+1. **What does it provide externally?** Clarify its behavior, interfaces, and boundaries to define the external contract for this delivery.
+2. **How should it be structured to make testing straightforward?** Start by selecting test seams: architectural boundaries that make key behavior observable and relevant dependencies controllable, rather than restructuring finished code just to make it testable.
+3. **How will I accept the result?** Define acceptance scenarios, pass criteria, and the evidence needed to demonstrate that the promises have been fulfilled.
+
+Together, these questions establish the boundaries and required precision of the implementation, while helping uncover details missed in earlier decisions.
+
+The purpose of `/to-contract` is not to rewrite the specification in another format. It is to help you build a coherent picture of the code before implementation begins: what it will provide, which key structural choices make it easy to test, and what standard it must meet to satisfy expectations.
 
 ## At a glance
 
