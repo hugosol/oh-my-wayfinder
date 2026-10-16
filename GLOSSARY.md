@@ -43,6 +43,12 @@ _Avoid_: review, acceptance verification
 **Workflow settled**:
 Every dispatched execution attempt and its retrospective has reached a known outcome, including failures or undelivered retrospectives. Settlement does not mean every ticket passed acceptance.
 
+**Workflow pausing**:
+New implementation attempts are no longer admitted, while already-started attempts, their retrospectives, and their ticket integrations are allowed to reach known outcomes.
+
+**Workflow paused**:
+No implementation attempt, retrospective, or ticket integration remains in flight, and new implementation attempts remain suspended until explicitly resumed. A paused workflow is not necessarily delivery complete or successful.
+
 **Integration branch**:
 The user-prepared development branch that receives the assembled delivery. It is distinct from the individual ticket branches and the repository's main branch.
 _Avoid_: main, ticket branch

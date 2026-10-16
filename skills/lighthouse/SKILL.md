@@ -1,6 +1,6 @@
 ---
 name: lighthouse
-description: "Load when the user requests /lighthouse, or when Wayfinder is ready to publish at a pause, save, switch, ticket-completion, or confirmed scope-disposition boundary. Publishes confirmed decisions."
+description: "Publish confirmed Wayfinder decisions. Invoke only on an explicit user request for lighthouse or an explicit instruction from another skill to invoke lighthouse."
 ---
 
 Publish accumulated confirmed results at a Wayfinder [publication boundary](../wayfinder/SKILL.md#publication). A Lighthouse is the single authority for what was decided, why and what it constrains; its source ticket may remain unfinished. Other tickets read that authority when starting or resuming. Backtracer checks its relevant upstream decisions for gaps and conflicts.
