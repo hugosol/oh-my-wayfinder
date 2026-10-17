@@ -3,7 +3,7 @@ name: tdd
 description: Execute one implementation ticket using the tdd skill.
 autoloadSkills: ["tdd"]
 blocking: true
-model: deepseek/deepseek-flash:high
+model: deepseek/deepseek-flash:max
 ---
 Execute the single ticket supplied in this task.
 
