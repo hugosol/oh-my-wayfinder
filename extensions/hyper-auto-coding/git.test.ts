@@ -67,7 +67,7 @@ test("inspect rejects main/master, detached HEAD, dirty state, missing spec/cont
 	await expect(HyperGit.inspect(plain, "feature")).rejects.toThrow(/git rev-parse/);
 });
 
-test("commitTickets stages only the implementation markdown files", async () => {
+test("commitTickets publishes the implementation markdown files and the contract mapping", async () => {
 	const repo1 = await initRepo();
 	const backend = await HyperGit.inspect(repo1.root, repo1.slug);
 	const before = await backend.head();
@@ -75,6 +75,7 @@ test("commitTickets stages only the implementation markdown files", async () => 
 	await ticketFile(repo1, "02-client.md");
 	await ticketFile(repo1, "03 [edge].md");
 	await write(path.join(repo1.root, ".scratch", repo1.slug, "implementation", "notes.txt"), "not a ticket\n");
+	await write(path.join(repo1.root, ".scratch", repo1.slug, "contract.md"), "# Contract\n|P1|... delivers 01|\n");
 	await write(path.join(repo1.root, ".scratch", repo1.slug, "spec.md"), "# Spec\nedited but not staged\n");
 	await write(path.join(repo1.root, "loose.txt"), "untracked\n");
 
@@ -83,12 +84,14 @@ test("commitTickets stages only the implementation markdown files", async () => 
 	expect(published).toBe(await backend.head());
 	const committed = (await git(repo1.root, "show", "--name-only", "--format=", "HEAD")).trim().split("\n").sort();
 	expect(committed).toEqual([
+		`.scratch/${repo1.slug}/contract.md`,
 		`.scratch/${repo1.slug}/implementation/01-server.md`,
 		`.scratch/${repo1.slug}/implementation/02-client.md`,
 		`.scratch/${repo1.slug}/implementation/03 [edge].md`,
 	]);
 	expect((await git(repo1.root, "diff", "--cached", "--name-only")).trim()).toBe("");
 	const status = await git(repo1.root, "status", "--porcelain");
+	expect(status).not.toContain(`.scratch/${repo1.slug}/contract.md`);
 	expect(status).toContain(`.scratch/${repo1.slug}/spec.md`);
 	expect(status).toContain("?? loose.txt");
 	expect(status).toContain(`?? .scratch/${repo1.slug}/implementation/notes.txt`);

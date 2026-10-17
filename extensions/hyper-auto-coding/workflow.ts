@@ -142,6 +142,11 @@ export class HyperWorkflow {
 		sessionFile: string | null,
 	): Promise<HyperWorkflow> {
 		const baseline = await git.commitTickets();
+		// Phase 1 owns the checkout until now. Publication commits the ticket files
+		// and the contract mapping it filled; anything else left tracked or untracked
+		// would make every later integration merge fail assertClean, so refuse to
+		// start instead of dispatching tickets into that dead lock.
+		await git.assertClean();
 		const temporaryDir = await fs.mkdtemp(path.join(os.tmpdir(), "hyper-auto-coding-"));
 		const entries = await fs.readdir(path.join(git.root, ".scratch", slug, "implementation"), { withFileTypes: true });
 		const names = entries.filter((entry) => entry.isFile() && entry.name.endsWith(".md")).map((entry) => entry.name);

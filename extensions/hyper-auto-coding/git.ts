@@ -234,18 +234,22 @@ export class HyperGit {
 	}
 
 	/**
-	 * Stage and commit exactly the implementation `.md` files phase 1 published
-	 * under `.scratch/<slug>/implementation/`. Refuses when anything else is
-	 * staged; when the ticket files already match HEAD the current HEAD is
-	 * returned without creating an empty commit.
+	 * Stage and commit the implementation `.md` files phase 1 published under
+	 * `.scratch/<slug>/implementation/` together with the slug's `contract.md`,
+	 * whose "Delivering work" mapping phase 1 fills in. Committing the contract
+	 * here is what keeps the integration checkout clean: every later merge runs
+	 * `assertClean`, which rejects any tracked or untracked modification. Refuses
+	 * when anything else is staged; when the paths already match HEAD the current
+	 * HEAD is returned without creating an empty commit.
 	 */
 	async commitTickets(): Promise<string> {
 		const files = await this.#implementationFiles();
 		if (files.length === 0) {
 			throw new Error(`实现票据目录中没有 *.md 票据文件：.scratch/${this.#slug}/implementation`);
 		}
-		await this.#rejectForeignStaged(files);
-		return this.#commitStagedPaths(files, `Publish implementation tickets for ${this.#slug}`);
+		const paths = [...files, `.scratch/${this.#slug}/contract.md`];
+		await this.#rejectForeignStaged(paths);
+		return this.#commitStagedPaths(paths, `Publish implementation tickets for ${this.#slug}`);
 	}
 
 	/**
