@@ -180,6 +180,41 @@ async function complete(workflow: HyperWorkflow, ticket: string): Promise<void> 
 	expect(ticketSnapshot(await status(workflow), ticket).status).toBe("integrated");
 }
 
+/** Minimal host for create-time tests that never dispatch, integrate, or run retro. */
+function stubHost(): HyperHost {
+	return {
+		retro: {
+			identify: async () => ({ agent: "retro", agent_id: "retro", session_id: null, session_file: null, execution_cwd: null }),
+			analyze: async (_record: unknown, result: SingleResult) => result,
+			warn: () => {},
+		},
+	} as unknown as HyperHost;
+}
+
+test("phase 2 publishes the contract mapping phase 1 filled and starts on a clean checkout", async () => {
+	const repo = await initRepo({ slug: "feature", branch: "feature/delivery", prefix: "hyper-workflow-test-",
+		spec: "S", contract: "C" });
+	const backend = await HyperGit.inspect(repo.root, repo.slug);
+	await ticketFile(repo, "a.md");
+	// Phase 1 fills the contract's "Delivering work" mapping; leaving it uncommitted
+	// used to fail every first integration merge with a dirty-worktree rejection.
+	await write(path.join(repo.root, ".scratch", repo.slug, "contract.md"), "C\n|P1|[01](implementation/a.md)|\n");
+	const workflow = await HyperWorkflow.create("feature", backend, stubHost(), 1, "parent", "Main", null);
+	workflows.push(workflow);
+	expect((await git(repo.root, "status", "--porcelain")).trim()).toBe("");
+});
+
+test("phase 2 refuses to start when phase 1 left the checkout dirty", async () => {
+	const repo = await initRepo({ slug: "feature", branch: "feature/delivery", prefix: "hyper-workflow-test-",
+		spec: "S", contract: "C" });
+	const backend = await HyperGit.inspect(repo.root, repo.slug);
+	await ticketFile(repo, "a.md");
+	// A tracked or untracked edit outside the published tickets and contract mapping
+	// would make every integration merge fail assertClean, so create must stop now.
+	await write(path.join(repo.root, "phase1-leftover.txt"), "uncommitted\n");
+	await expect(HyperWorkflow.create("feature", backend, stubHost(), 1, "parent", "Main", null)).rejects.toThrow(/不干净/);
+});
+
 test("implementation slots are bounded; first merge releases dependencies while integration remains asynchronous", async () => {
 	const implementing = gate(), integrating = gate();
 	const { workflow, root } = await fixture({ cap: 2, implementationGate: implementing.promise,

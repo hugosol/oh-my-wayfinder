@@ -35,7 +35,7 @@
 
 ### Phase 1：复用切票
 
-原样沿用 `/to-tickets` 激活、自动回答、Jev、15 次自动干预预算和票据落盘触发机制。不新增整套票据完整性门禁；已有非空票据按原规则结束 Phase 1。随后只提交 `implementation/` 中的票据，再开始 Phase 2。
+原样沿用 `/to-tickets` 激活、自动回答、Jev、15 次自动干预预算和票据落盘触发机制。不新增整套票据完整性门禁；已有非空票据按原规则结束 Phase 1。随后把 `implementation/` 中的票据与 `<slug>/contract.md`（Phase 1 填入的“Delivering work”映射）一起提交；若仍留有其他已跟踪或未跟踪改动，则拒绝进入 Phase 2，因为之后的每次合入都要求集成分支完全干净。
 
 ### Phase 2：实现与后台集成
 

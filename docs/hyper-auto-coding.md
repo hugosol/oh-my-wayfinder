@@ -35,7 +35,7 @@ The concurrency limit shares `extensions/spec-to-code/config.json` with Jev and 
 
 ### Phase 1: reuse ticket cutting
 
-The existing `/to-tickets` activation, automatic answers, Jev decisions, 15-intervention budget, and ticket-file transition are unchanged. No new whole-ticket-set publication gate is added: existing nonempty tickets end Phase 1 under the original rules. The command then commits only implementation ticket files before Phase 2.
+The existing `/to-tickets` activation, automatic answers, Jev decisions, 15-intervention budget, and ticket-file transition are unchanged. No new whole-ticket-set publication gate is added: existing nonempty tickets end Phase 1 under the original rules. The command then commits the implementation ticket files together with the slug's `contract.md` (whose "Delivering work" mapping Phase 1 fills in), and refuses to start Phase 2 while anything else is still tracked or untracked, because every later integration merge requires a fully clean integration checkout.
 
 ### Phase 2: implementation and background integration
 
