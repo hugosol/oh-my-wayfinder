@@ -42,6 +42,7 @@ import { HyperGit } from "./hyper-auto-coding/git";
 import { createHyperHost } from "./hyper-auto-coding/subagent-host";
 import { HyperWorkflow } from "./hyper-auto-coding/workflow";
 import { registerHyperTools, startHyperPhase2 } from "./hyper-auto-coding/agent-tools";
+import { createWorkflowProgress, type WorkflowProgressHandle } from "./spec-to-code/workflow-progress";
 
 // ============================================================================
 // Constants
@@ -171,10 +172,15 @@ export default function specToCode(pi: ExtensionAPI): void {
 	let hyperMode = false;
 	let hyperGit: HyperGit | undefined;
 	let hyperWorkflow: HyperWorkflow | undefined;
+	const progress = createWorkflowProgress(pi);
+	let progressHandle: WorkflowProgressHandle | undefined;
+	let sessionGeneration = 0;
 	registerHyperTools(
 		pi,
 		() => hyperWorkflow,
 		() => {
+			if (!hyperWorkflow?.finished) return;
+			progressHandle?.capture();
 			hyperWorkflow = undefined;
 			hyperGit = undefined;
 		},
@@ -228,7 +234,10 @@ export default function specToCode(pi: ExtensionAPI): void {
 			try {
 				if (signal?.aborted) await workflow.cancel();
 				const summary = await workflow.finish();
-				if (retroWorkflow === workflow) retroWorkflow = undefined;
+				if (retroWorkflow === workflow) {
+					progressHandle?.capture();
+					retroWorkflow = undefined;
+				}
 				return { content: [{ type: "text" as const, text: summary }], details: { executions: workflow.records } };
 			} catch (error) {
 				return {
@@ -257,8 +266,20 @@ export default function specToCode(pi: ExtensionAPI): void {
 		await workflow.cancel();
 		if (retroWorkflow === workflow) retroWorkflow = undefined;
 	};
+	pi.on("session_before_switch", () => {
+		sessionGeneration++;
+		progress.clear();
+	});
+	pi.on("session_shutdown", () => {
+		sessionGeneration++;
+		progress.clear();
+	});
 	pi.on("session_before_switch", cancelWorkflow);
 	pi.on("session_shutdown", cancelWorkflow);
+	pi.on("session_start", (_event, ctx) => {
+		sessionGeneration++;
+		progress.restore(ctx);
+	});
 
 	// Config lives in `config.json` beside the config module (extensions/spec-to-code/).
 	// Read once at extension load: editing it requires an extension reload / omp restart.
@@ -343,6 +364,7 @@ export default function specToCode(pi: ExtensionAPI): void {
 		// OMP already scheduled a continuation (auto-retry, empty-stop recovery, ...); don't stack another.
 		if (event.willContinue) return;
 
+		const display = progressHandle;
 		const round = session.advanceRound();
 		const ports: TurnPorts = {
 			decide: createJudgeDecider(pi, ctx, config),
@@ -360,6 +382,7 @@ export default function specToCode(pi: ExtensionAPI): void {
 			ports,
 		);
 
+		if (!display?.isCurrent()) return;
 		if (plan.type === "reply") {
 			if (session.spendIntervention()) {
 				if (plan.fallback) session.markReplied();
@@ -383,12 +406,15 @@ export default function specToCode(pi: ExtensionAPI): void {
 						ctx.agent.id,
 						ctx.sessionManager.getSessionFile() ?? null,
 					);
+					display.attach(hyperWorkflow);
 					startHyperPhase2(pi, hyperWorkflow);
 				} else {
 					retroWorkflow = await createRetroWorkflow(pi, ctx, plan.slug);
+					display.attach(retroWorkflow);
 					startPhase2(pi, plan.slug);
 				}
 			} catch (error) {
+				display.stop(true);
 				ctx.ui.notify(
 					`${hyperMode ? "Hyper-Auto-Coding" : "Spec-to-Code"} 无法启动 Phase 2：${error instanceof Error ? error.message : String(error)}`,
 					"error",
@@ -400,6 +426,7 @@ export default function specToCode(pi: ExtensionAPI): void {
 		}
 
 		session.reset();
+		display.stop(plan.type === "stop" && plan.reason === "error");
 		if (plan.type === "stop" && (plan.reason === "aborted" || plan.reason === "error")) {
 			ctx.ui.notify(`Spec-to-Code 自动模式已停止：agent 以 ${plan.reason} 结束（${slug}）。`, "warning");
 			return;
@@ -438,6 +465,7 @@ export default function specToCode(pi: ExtensionAPI): void {
 		pi.registerCommand(command.name, {
 			description: command.description,
 			handler: async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
+				const commandGeneration = sessionGeneration;
 				const control = args.trim();
 				if (command.hyperMode && (control === "pause" || control === "resume")) {
 					const sessionId = ctx.sessionManager.getSessionId();
@@ -461,6 +489,8 @@ export default function specToCode(pi: ExtensionAPI): void {
 						return;
 					}
 					let restored: HyperWorkflow | undefined;
+					let resumedDisplay: WorkflowProgressHandle | undefined;
+					const resumeSessionId = ctx.sessionManager.getSessionId();
 					phase2Starting = true;
 					try {
 						let workflow = hyperWorkflow;
@@ -478,6 +508,13 @@ export default function specToCode(pi: ExtensionAPI): void {
 								throw error;
 							}
 						}
+						if (commandGeneration !== sessionGeneration || ctx.sessionManager.getSessionId() !== resumeSessionId) {
+							if (restored) await restored.host.close();
+							return;
+						}
+						resumedDisplay = progress.begin(ctx, "hyper-auto-coding", workflow.slug);
+						progressHandle = resumedDisplay;
+						resumedDisplay.attach(workflow);
 						const snapshot = await workflow.resume();
 						hyperWorkflow = workflow;
 						hyperGit = workflow.git;
@@ -487,6 +524,7 @@ export default function specToCode(pi: ExtensionAPI): void {
 							{ deliverAs: "followUp" },
 						);
 					} catch (error) {
+						resumedDisplay?.stop(true);
 						if (restored) await restored.host.close();
 						ctx.ui.notify(`Hyper-Auto-Coding 无法恢复：${error instanceof Error ? error.message : String(error)}`, "error");
 					} finally {
@@ -532,17 +570,29 @@ export default function specToCode(pi: ExtensionAPI): void {
 				}
 
 				if (command.prepare && !(await command.prepare(slug, ctx))) return;
+				if (commandGeneration !== sessionGeneration) return;
 				hyperMode = command.hyperMode;
+				const display = progress.begin(ctx, command.hyperMode ? "hyper-auto-coding" : "spec-to-code", slug);
+				progressHandle = display;
 				session.begin(slug, ctx.sessionManager.getSessionId());
-				const success = await activateSkill(
-					pi,
-					"to-tickets",
-					`请分析以下spec，生成独立的 ticket 文件。\nspec 路径：${spec}\ncontract 路径：${contract}`,
-				);
-
-				if (!success) {
+				try {
+					const success = await activateSkill(
+						pi,
+						"to-tickets",
+						`请分析以下spec，生成独立的 ticket 文件。\nspec 路径：${spec}\ncontract 路径：${contract}`,
+					);
+					if (!success && display.isCurrent()) {
+						session.reset();
+						hyperGit = undefined;
+						display.stop(true);
+						ctx.ui.notify("无法激活 to-tickets 技能", "error");
+					}
+				} catch (error) {
+					if (!display.isCurrent()) return;
 					session.reset();
-					ctx.ui.notify("无法激活 to-tickets 技能", "error");
+					hyperGit = undefined;
+					display.stop(true);
+					ctx.ui.notify(`无法激活 to-tickets 技能：${error instanceof Error ? error.message : String(error)}`, "error");
 				}
 			},
 		});

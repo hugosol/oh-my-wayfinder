@@ -18,6 +18,15 @@ Classification and readiness assessment for implementation tickets, separate fro
 A tracer-bullet vertical slice cut from an approved contract; the unit phase 2 implements. Failed attempts may be followed by independent retries.
 _Avoid_: issue, task (reserve those for a real tracker)
 
+**Implementation progress total**:
+The number of distinct published implementation tickets in a Phase 2 workflow. Retrying a ticket does not increase this total.
+
+**Execution progress**:
+The number of distinct implementation tickets whose latest TDD execution attempt has ended, successfully or unsuccessfully. Retrospective outcomes do not affect this count; a new attempt makes that ticket pending again until the attempt ends.
+
+**Integration progress**:
+The number of distinct implementation tickets that are integrated. An ended implementation attempt or a first merge alone does not count as completed integration.
+
 **Publish**:
 Write the approved implementation tickets to the configured tracker; for a local tracker, one file per ticket under the feature's implementation directory.
 _Avoid_: generate, save

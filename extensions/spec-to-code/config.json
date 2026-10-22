@@ -1,6 +1,6 @@
 {
   "jev": {
-    "enabled": false
+    "enabled": true
   },
   "hyperAutoCoding": {
     "maxParallelTickets": 4

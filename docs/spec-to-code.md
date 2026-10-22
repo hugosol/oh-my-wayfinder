@@ -30,6 +30,8 @@ Copy the following artifacts, keeping their relative layout. The same entry also
 
 `implementation-node/tdd-execution.ts` exposes `TddWorkFlow`: TDD execution attempts are primary, with independent retrospectives as subsequent actions; TDD dispatch remains in the existing workflows. `integration-node/ticket-integration.ts` owns each ticket’s merge attempts, integration reports, and resumable integration session. `hyper-auto-coding/workflow.ts` schedules ticket work, integration, and report publication; any optional acceptance scope is carried by an ordinary ticket rather than a separate final-verification process. `agent-tools.ts` defines the main agent’s workflow tool.
 
+The progress helper and its tests live under `spec-to-code/` (`workflow-progress.ts` and `workflow-progress.test.ts`), not at the extension root. OMP directory discovery treats root-level TypeScript files as extension entries; internal modules and tests must remain in their subdirectories.
+
 When updating an existing installation, replace the previous layout and update any file-based extension configuration to `entry.ts`; load only one entry to avoid duplicate tool and command registration.
 
 The shipped `tdd.md` pins `deepseek/deepseek-flash:high` in its frontmatter; edit the installed copy if your model setup differs.
@@ -80,6 +82,12 @@ Phase 2 — serial TDD:
 - If the workflow retries a failed ticket, the retry is a fresh, independent TDD execution with its own retrospective. This feature does not add an automatic retry policy.
 - After every attempt (failures included), the host starts a background retro in the original TDD session. Later TDD does not wait for it, and neither should you.
 - When all attempts and retries have ended, the run calls `spec_to_code_finish`, which waits for every retro to reach a success or failure terminal outcome and returns the summary; the workflow will not wrap up before that.
+
+## Above-input progress
+
+The widget is hidden in ordinary conversations and appears only after a command passes startup checks and starts a workflow. Phase 1 shows ticket preparation; Phase 2 shows `TDD ended ended/total`. The denominator is this run's distinct published implementation tickets. Each ticket counts only when its latest TDD attempt ends, successfully or unsuccessfully; retrospectives do not affect progress. Starting a retry retracts that ticket's count until the attempt ends, without increasing the total.
+
+A full bar means the latest TDD attempts have ended, not that acceptance succeeded or retrospectives finished; the existing `spec_to_code_finish` requirements remain unchanged. Final progress stays until another workflow starts or the session switches. Display snapshots are saved in the current session and restored when that original session reopens; this does not resume interrupted serial execution or permit takeover from a new session. Interactive terminals render above the input; RPC clients control widget presentation, and noninteractive visibility is not guaranteed.
 
 ## Retrospectives: what gets written
 

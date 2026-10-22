@@ -3,7 +3,7 @@ name: tdd
 description: Execute one implementation ticket using the tdd skill.
 autoloadSkills: ["tdd"]
 blocking: true
-model: deepseek/deepseek-flash:max
+model: openai-codex/gpt-6.1-sol:high
 ---
 Execute the single ticket supplied in this task.
 

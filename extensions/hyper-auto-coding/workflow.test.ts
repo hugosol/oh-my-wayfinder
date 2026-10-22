@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { SingleResult } from "@oh-my-pi/pi-coding-agent";
+import type { TicketProgress } from "../implementation-node/tdd-execution";
 import { HyperGit } from "./git";
 import type { HyperHost, HyperRole, HyperRun } from "./subagent-host";
 import { cleanupFixtures, git, initRepo, ticketFile, write } from "./test-support";
@@ -228,6 +229,7 @@ test("implementation slots are bounded; first merge releases dependencies while 
 	while ((await status(workflow)).active.length) await workflow.execute({ action: "collect" });
 	const state = await status(workflow);
 	expect(ticketSnapshot(state, "a.md").status).toBe("integrating");
+	expect(workflow.progress).toEqual({ total: 3, executed: 2, integrated: 0, mode: "running" });
 	expect(state.ready).toContain("c.md");
 	expect(await fs.readFile(path.join(root, "a.txt"), "utf8")).toBe("delivered a\n");
 	await workflow.execute({ action: "dispatch", tickets: ["c.md"] });
@@ -235,6 +237,7 @@ test("implementation slots are bounded; first merge releases dependencies while 
 	expect(await git(c.cwd, "show", "HEAD:a.txt")).toBe("delivered a");
 	integrating.release();
 	await drain(workflow);
+	expect(workflow.progress).toEqual({ total: 3, executed: 3, integrated: 3, mode: "running" });
 });
 
 async function collectBeforeNextTurn(collection: Promise<object>): Promise<StatusSnapshot> {
@@ -339,14 +342,32 @@ test("concurrent collect requests share progress without blocking dispatch", asy
 
 test("failed implementation retries reuse the original branch and worktree without main-agent acceptance", async () => {
 	let fail = true;
-	const { workflow } = await fixture({ throwImplementation: () => fail });
+	const retry = gate();
+	const { workflow } = await fixture({ throwImplementation: () => fail,
+		implementationWork: async () => { await retry.promise; } });
+	const snapshots: TicketProgress[] = [];
+	const unsubscribe = workflow.subscribeProgress(() => snapshots.push(workflow.progress));
+	const unsubscribeBroken = workflow.subscribeProgress(() => { throw new Error("broken renderer"); });
+	expect(snapshots).toEqual([]);
 	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
 	await drain(workflow);
 	const first = ticketSnapshot(await status(workflow), "a.md");
 	expect(first.status).toBe("ready");
 	expect(first.mergedHead).toBeUndefined();
+	expect(workflow.progress).toEqual({ total: 3, executed: 1, integrated: 0, mode: "running" });
 	fail = false;
-	await complete(workflow, "a.md");
+	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
+	expect(workflow.progress.executed).toBe(0);
+	retry.release();
+	await drain(workflow);
+	expect(workflow.progress).toEqual({ total: 3, executed: 1, integrated: 1, mode: "running" });
+	expect(snapshots.map((progress) => progress.executed)).toEqual([0, 1, 0, 1, 1]);
+	expect(snapshots.at(-1)?.integrated).toBe(1);
+	unsubscribe();
+	unsubscribeBroken();
+	const notificationCount = snapshots.length;
+	await workflow.retro.drain();
+	expect(snapshots).toHaveLength(notificationCount);
 	expect(ticketSnapshot(await status(workflow), "a.md").worktree).toEqual(first.worktree);
 	expect(await fs.readFile(path.join(first.worktree!.cwd, "a.txt"), "utf8")).toBe("delivered a\n");
 });
@@ -569,13 +590,22 @@ test("a restored pause keeps dependency evidence, the ledger and remaining sched
 	await complete(workflow, "a.md");
 	const before = await status(workflow);
 	expect(before.ready.slice().sort()).toEqual(["b.md", "c.md"]);
+	const pauseModes: TicketProgress["mode"][] = [];
+	const unsubscribePause = workflow.subscribeProgress(() => pauseModes.push(workflow.progress.mode));
 	const paused = await workflow.pause() as StatusSnapshot;
+	expect(pauseModes).toEqual(["pausing", "paused"]);
+	unsubscribePause();
+	expect(workflow.progress).toEqual({ total: 3, executed: 1, integrated: 1, mode: "paused" });
 	expect(paused.mode).toBe("paused");
 	expect(HyperWorkflow.checkpointPath("parent")).toBe(paused.checkpoint);
 	const restored = await HyperWorkflow.restore(paused.checkpoint, host, "parent", "Main", null);
 	workflows.push(restored);
 	expect(restored.paused).toBe(true);
 	expect(restored.finished).toBe(false);
+	expect(restored.progress).toEqual({ total: 3, executed: 1, integrated: 1, mode: "paused" });
+	const restoredProgress: TicketProgress[] = [];
+	const unsubscribeRestored = restored.subscribeProgress(() => restoredProgress.push(restored.progress));
+	expect(restoredProgress).toEqual([]);
 	expect(restored.git.root).toBe(root);
 	expect(restored.git.branch).toBe(workflow.git.branch);
 	const reopened = await status(restored);
@@ -593,6 +623,7 @@ test("a restored pause keeps dependency evidence, the ledger and remaining sched
 	expect(await fs.stat(restored.temporaryDir).then((stat) => stat.isDirectory())).toBe(true);
 	await restored.resume();
 	expect(restored.paused).toBe(false);
+	expect(restoredProgress).toEqual([{ total: 3, executed: 1, integrated: 1, mode: "running" }]);
 	expect(await fs.stat(paused.checkpoint).catch(() => null)).toBeNull();
 	// The next collect is served from the restored state without waiting for work.
 	const immediate = await collectBeforeNextTurn(restored.execute({ action: "collect" })) as StatusSnapshot;
@@ -602,6 +633,9 @@ test("a restored pause keeps dependency evidence, the ledger and remaining sched
 	await complete(restored, "c.md");
 	await complete(restored, "b.md");
 	const summary = await restored.execute({ action: "finish" }) as unknown as FinishSummary;
+	expect(restored.progress).toEqual({ total: 3, executed: 3, integrated: 3, mode: "finished" });
+	expect(restoredProgress.at(-1)).toEqual(restored.progress);
+	unsubscribeRestored();
 	expect(summary.warnings).toEqual([]);
 	const ledgerFile = summary.reports.find((file) => file.endsWith("workflow.json"))!;
 	const ledger = JSON.parse(await fs.readFile(ledgerFile, "utf8")) as Ledger;
