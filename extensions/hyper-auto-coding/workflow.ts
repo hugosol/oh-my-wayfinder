@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { SingleResult } from "@oh-my-pi/pi-coding-agent";
-import { TddWorkFlow, type ExecutionRecord } from "../implementation-node/tdd-execution";
+import { TddWorkFlow, type ExecutionRecord, type TicketProgress } from "../implementation-node/tdd-execution";
 import { TicketIntegration, type TicketIntegrationSnapshot } from "../integration-node/ticket-integration";
 import { HyperGit, type TicketWorktree } from "./git";
 import type { HyperHost, HyperRole } from "./subagent-host";
@@ -119,6 +119,8 @@ export class HyperWorkflow {
 	#pause?: Promise<object>;
 	#pauseId?: string;
 	#checkpoint?: string;
+	readonly #progressListeners = new Set<() => void>();
+	#unsubscribeRetroProgress?: () => void;
 
 	private constructor(
 		readonly slug: string,
@@ -224,6 +226,37 @@ export class HyperWorkflow {
 		return this.#pausing;
 	}
 
+	get progress(): TicketProgress {
+		let integrated = 0;
+		for (const ticket of this.tickets.values()) if (ticket.status === "integrated") integrated++;
+		return {
+			total: this.tickets.size,
+			executed: this.retro.progress.executed,
+			integrated,
+			mode: this.#finished ? "finished" : this.#pausing ? "pausing" : this.#paused ? "paused" : "running",
+		};
+	}
+
+	subscribeProgress(listener: () => void): () => void {
+		this.#progressListeners.add(listener);
+		if (!this.#unsubscribeRetroProgress && !this.#finished) {
+			this.#unsubscribeRetroProgress = this.retro.subscribeProgress(() => this.#notifyProgress());
+		}
+		return () => {
+			this.#progressListeners.delete(listener);
+			if (!this.#progressListeners.size) {
+				this.#unsubscribeRetroProgress?.();
+				this.#unsubscribeRetroProgress = undefined;
+			}
+		};
+	}
+
+	#notifyProgress(): void {
+		for (const listener of this.#progressListeners) {
+			try { listener(); } catch { /* Presentation must never change orchestration outcomes. */ }
+		}
+	}
+
 	/**
 	 * Where this session's pause is persisted: a deterministic file outside the
 	 * repository, so a restarted session finds it without any repository state.
@@ -299,6 +332,7 @@ export class HyperWorkflow {
 		if (this.#pause) return this.#pause;
 		// The gate closes before the first await: nothing may be admitted after this line.
 		this.#pausing = true;
+		this.#notifyProgress();
 		const pauseId = randomUUID();
 		const job = (async (): Promise<object> => {
 			try {
@@ -332,11 +366,13 @@ export class HyperWorkflow {
 				this.#pauseId = pauseId;
 				this.#paused = true;
 				this.#pausing = false;
+				this.#notifyProgress();
 				this.#requestCheck();
 				return this.status();
 			} catch (error) {
 				this.#pause = undefined;
 				this.#pausing = false;
+				this.#notifyProgress();
 				this.#requestCheck();
 				throw error;
 			}
@@ -364,6 +400,7 @@ export class HyperWorkflow {
 		this.#pause = undefined;
 		this.#pauseId = undefined;
 		this.#checkpoint = undefined;
+		this.#notifyProgress();
 		this.#requestCheck();
 		return this.status();
 	}
@@ -499,6 +536,7 @@ export class HyperWorkflow {
 		ticket.integration = integration;
 		const job = integration.run(ticket.ticket, ticket.worktree!, ticket.report!.path).then(() => {
 			ticket.status = "integrated";
+			this.#notifyProgress();
 		}).catch(async (error) => {
 			ticket.status = "failed";
 			ticket.error = error instanceof Error ? error.message : String(error);
@@ -563,6 +601,9 @@ export class HyperWorkflow {
 		this.#pause = undefined;
 		this.#paused = false;
 		this.#pausing = false;
+		this.#notifyProgress();
+		this.#unsubscribeRetroProgress?.();
+		this.#unsubscribeRetroProgress = undefined;
 		try { await fs.rm(checkpoint, { force: true }); }
 		catch (error) { warnings.push(`暂停检查点未能删除，可能被再次恢复：${checkpoint}；${error instanceof Error ? error.message : String(error)}`); }
 		try { await fs.rm(this.temporaryDir, { recursive: true }); }

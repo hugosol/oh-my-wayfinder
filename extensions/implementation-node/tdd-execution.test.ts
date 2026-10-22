@@ -81,6 +81,52 @@ test("retry and next-ticket TDD proceed while every previous retro remains pendi
 	await expect(workflow.begin("late", "a.md")).rejects.toThrow("收尾");
 });
 
+test("progress follows admission order, counts failures, and ignores old retros during a retry", async () => {
+	const workspace = await root();
+	const { promise: gate, resolve: release } = Promise.withResolvers<void>();
+	const ports = {
+		identify,
+		async analyze(_record: unknown, execution: SingleResult) { await gate; return result(execution.id); },
+		warn() {},
+	};
+	const workflow = new TddWorkFlow("feature", workspace, "parent", "Main", null, new Set(["a.md", "b.md"]), ports);
+	const snapshots: number[] = [];
+	const unsubscribe = workflow.subscribeProgress(() => snapshots.push(workflow.progress.executed));
+	workflow.subscribeProgress(() => { throw new Error("broken renderer"); });
+	expect(snapshots).toEqual([]);
+	expect(workflow.progress).toEqual({ total: 2, executed: 0, mode: "running" });
+	await workflow.begin("first", "a.md");
+	await workflow.settle("first", result("first", { exitCode: 1 }));
+	expect(workflow.progress.executed).toBe(1);
+	await workflow.begin("retry", "a.md");
+	expect(workflow.progress.executed).toBe(0);
+	const beforeRetro = [...snapshots];
+	release();
+	await workflow.drain();
+	expect(workflow.records[0].retro_status).toBe("completed");
+	expect(workflow.progress.executed).toBe(0);
+	expect(snapshots).toEqual(beforeRetro);
+
+	// Even misleading timestamps cannot supersede the last admitted attempt on restore.
+	const records = [...workflow.records];
+	records[0].started_at = "2099-01-01T00:00:00.000Z";
+	records[1].started_at = "2000-01-01T00:00:00.000Z";
+	const restored = new TddWorkFlow("feature", workspace, "parent", "Main", null, workflow.tickets, ports);
+	let restoredNotifications = 0;
+	restored.subscribeProgress(() => { restoredNotifications++; });
+	restored.restore(records);
+	expect(restoredNotifications).toBe(1);
+	expect(restored.progress).toEqual({ total: 2, executed: 0, mode: "running" });
+
+	await workflow.settle("retry", undefined, "retry failed");
+	expect(workflow.progress.executed).toBe(1);
+	expect(snapshots).toEqual([0, 1, 0, 1]);
+	unsubscribe();
+	await workflow.finish();
+	expect(workflow.progress).toEqual({ total: 2, executed: 1, mode: "finished" });
+	expect(snapshots).toEqual([0, 1, 0, 1]);
+});
+
 test("running TDD rejects concurrent dispatch; retro failures do not change implementation outcomes or stop next TDD", async () => {
 	const workspace = await root();
 	const workflow = new TddWorkFlow("feature", workspace, "parent", "Main", null, new Set(["a.md"]), {

@@ -72,6 +72,14 @@ When final or cross-ticket acceptance is useful, `/to-tickets` can produce a tic
 
 Dependencies release after a blocking ticket's first successful merge, while its integration tests and repairs may still be running. An acceptance ticket can therefore run against an earlier tree; later clean merges do not trigger another acceptance pass. This is an accepted tradeoff for parallel development, not a hidden delivery gate.
 
+## Above-input dual-layer progress
+
+The widget appears only after a command passes startup checks and starts a workflow; ordinary conversations have no widget. Phase 1 shows ticket preparation. Phase 2 uses one layered bar: solid `█` cells represent successful integration, with dashed `┄` cells beyond the solid portion representing ended TDD work not yet integrated. Separate `TDD ended ended/total` and `integrated integrated/total` counts share the same denominator.
+
+The total counts distinct published implementation tickets, including optional acceptance tickets published as ordinary implementation tickets. Execution counts use each ticket's latest TDD attempt, including successful and failed endings, without waiting for retro. A retry retracts that ticket's execution count until it ends and never increases the total. Solid progress requires `integrated`; the first merge is insufficient. Background changes refresh the widget without waiting for another main-agent tool call.
+
+Pausing retains the bar and labels its state. Reopening the original session restores its display; `resume` recomputes live progress from the existing pause checkpoint. New-session takeover and arbitrary crash recovery are not supported; a display snapshot is not an execution checkpoint. Final progress remains until another workflow starts or the session switches. Full progress does not skip retrospectives or other existing finish requirements. Interactive terminals render above the input; RPC presentation is client-dependent.
+
 ## Retrospectives and report commits
 
 Only explicitly enrolled ticket implementations get retro, including first attempts, failures, and retries. Integration, conflict continuations, auxiliary agents, and retrospectives themselves do not.

@@ -3,6 +3,13 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { SingleResult } from "@oh-my-pi/pi-coding-agent";
 
+export interface TicketProgress {
+	total: number;
+	executed: number;
+	integrated?: number;
+	mode: "running" | "pausing" | "paused" | "finished";
+}
+
 export interface ExecutionIdentity {
 	agent: string;
 	agent_id: string;
@@ -57,6 +64,10 @@ async function atomicWrite(file: string, content: string): Promise<void> {
  */
 export class TddWorkFlow {
 	readonly #calls = new Map<string, ExecutionRecord>();
+	// Admission order, independent of timestamps and retrospective completion order.
+	readonly #latest = new Map<string, ExecutionRecord>();
+	readonly #progressListeners = new Set<() => void>();
+	#finished = false;
 	readonly #pending = new Set<Promise<void>>();
 	readonly #abort = new AbortController();
 	readonly #activeCalls = new Set<string>();
@@ -80,6 +91,23 @@ export class TddWorkFlow {
 
 	get records(): readonly ExecutionRecord[] {
 		return [...this.#calls.values()].map((record) => structuredClone(record));
+	}
+
+	get progress(): TicketProgress {
+		let executed = 0;
+		for (const record of this.#latest.values()) if (record.tdd_status !== "running") executed++;
+		return { total: this.tickets.size, executed, mode: this.#finished ? "finished" : "running" };
+	}
+
+	subscribeProgress(listener: () => void): () => void {
+		this.#progressListeners.add(listener);
+		return () => { this.#progressListeners.delete(listener); };
+	}
+
+	#notifyProgress(): void {
+		for (const listener of this.#progressListeners) {
+			try { listener(); } catch { /* Presentation must never change the execution outcome. */ }
+		}
 	}
 
 	/** Reserve synchronously before disk I/O so concurrent tool calls cannot both start TDD. */
@@ -108,6 +136,8 @@ export class TddWorkFlow {
 			retro_status: "pending",
 		};
 		this.#calls.set(toolCallId, record);
+		this.#latest.set(ticket, record);
+		this.#notifyProgress();
 		await this.#persist(record);
 	}
 
@@ -127,6 +157,7 @@ export class TddWorkFlow {
 		}
 		record.tdd_error = error ?? result?.error;
 		this.#activeCalls.delete(toolCallId);
+		this.#notifyProgress();
 		await this.#persist(record);
 
 		// Track the whole background operation (including identity lookup) before yielding control.
@@ -220,6 +251,10 @@ export class TddWorkFlow {
 			throw new Error("TDD 正在收尾或仍有执行在运行，不能载入历史记录。");
 		}
 		for (const record of records) this.#calls.set(record.tool_call_id, structuredClone(record));
+		this.#latest.clear();
+		// records preserves admission order, including across pause checkpoints.
+		for (const record of this.#calls.values()) this.#latest.set(record.ticket, record);
+		this.#notifyProgress();
 	}
 
 	/** A failed retro is terminal too. No restart recovery and no automatic retro retries. */
@@ -229,6 +264,8 @@ export class TddWorkFlow {
 		this.#closing = true;
 		this.#finish = (async () => {
 			await Promise.all([...this.#pending]);
+			this.#finished = true;
+			this.#notifyProgress();
 			return this.summary();
 		})();
 		return this.#finish;

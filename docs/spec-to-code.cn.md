@@ -30,6 +30,8 @@ fork 改动的内容与位置由[上游对比蓝图](./upstream-differences.cn.m
 
 `implementation-node/tdd-execution.ts` 的主体是 `TddWorkFlow`：以 TDD 执行尝试为主，独立 retro 是后续附加动作；TDD 派发仍由现有工作流负责。`integration-node/ticket-integration.ts` 拥有每票合并尝试、集成报告及可续跑集成会话的状态。`hyper-auto-coding/workflow.ts` 负责 ticket 调度、集成与报告发布；可选的验收范围由普通 ticket 承载，不再有独立最终验证流程。`agent-tools.ts` 定义供主代理调用的工作流工具。
 
+进度辅助模块及其测试位于 `spec-to-code/` 下（`workflow-progress.ts` 和 `workflow-progress.test.ts`），不放在扩展根目录。OMP 按目录发现扩展时会把根目录的 TypeScript 文件当作扩展入口；内部模块与测试必须保留在子目录中。
+
 更新已有安装时，替换原有布局，并将按文件配置的扩展入口改为 `entry.ts`；只加载一个入口，避免重复注册工具和命令。
 
 自带的 `tdd.md` 在 frontmatter 中固定了 `deepseek/deepseek-flash:high`；模型配置不同时，请修改安装后的副本。
@@ -80,6 +82,12 @@ Phase 2——串行 TDD：
 - 如果工作流重试失败票据，retry 是一次独立的新 TDD 执行，并有自己的复盘；本功能不额外提供自动重试策略；
 - 每次执行（含失败）结束后，宿主在原 TDD 会话启动后台复盘；后续 TDD 不等待复盘，你也不需要等；
 - 全部执行与 retry 结束后，运行调用 `spec_to_code_finish` 等待所有复盘到达成功或失败终态并返回汇总；在此之前不会收尾。
+
+## 输入框上方的进度
+
+普通对话中组件隐藏；只有命令通过启动检查并开始工作流后才显示。Phase 1 显示准备票据，Phase 2 显示 `TDD ended 已结束数/总数`。总数是本轮发布的唯一 implementation ticket 数；每票只按最新一次 TDD 尝试计数，正常或失败结束都计入，retro 不影响进度。重试开始时撤回该票的完成计数，结束后恢复，总数不增加。
+
+进度满格只表示所有票据的最新 TDD 已结束，不代表验收成功或 retro 已结束；原有 `spec_to_code_finish` 收尾条件不变。最终进度保留至下次启动命令或切换会话。显示快照保存到当前会话，重新打开原会话时恢复显示；这不会恢复中断的串行执行，也不支持新会话接管。交互终端在输入框上方渲染；RPC 客户端决定是否显示 widget，非交互模式不保证可见。
 
 ## 复盘写在哪里
 
