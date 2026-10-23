@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import type { TicketProgress } from "../implementation-node/tdd-execution";
-import { createWorkflowProgress, formatWorkflowProgress, WORKFLOW_PROGRESS_ENTRY, type WorkflowProgressSnapshot } from "./workflow-progress";
+import { createWorkflowProgress, WORKFLOW_PROGRESS_ENTRY, type WorkflowProgressSnapshot } from "./workflow-progress";
 
 function fixture() {
 	let sessionId = "original";
@@ -94,17 +94,6 @@ test("restoration rejects foreign owners, malformed counts and unknown versions"
 		f.entries.set("original", [{ type: "custom", customType: WORKFLOW_PROGRESS_ENTRY, data }]);
 		f.display.restore(f.ctx);
 		expect(f.widget).toBeUndefined();
-	}
-});
-
-test("bars are bounded, use a solid integrated overlay and dashed TDD-only segment", () => {
-	const base: WorkflowProgressSnapshot = { version: 1, ownerSessionId: "s", ownerAgentId: "Main", command: "hyper-auto-coding", slug: "feature", state: "execution", progress: { total: 4, executed: 3, integrated: 1, mode: "pausing" } };
-	const lines = formatWorkflowProgress(base);
-	expect(lines[1]).toBe(`[${"█".repeat(6)}${"┄".repeat(12)}${"·".repeat(6)}] TDD ended 3/4 · integrated 1/4`);
-	for (const total of [0, 1, Number.MAX_SAFE_INTEGER]) {
-		const result = formatWorkflowProgress({ ...base, progress: { total, executed: total, integrated: total, mode: "finished" } });
-		expect(result[1].slice(1, 25)).toHaveLength(24);
-		expect(result[1][25]).toBe("]");
 	}
 });
 

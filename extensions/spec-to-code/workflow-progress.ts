@@ -53,9 +53,9 @@ export function formatWorkflowProgress(snapshot: WorkflowProgressSnapshot): stri
 	const p = snapshot.progress;
 	const width = 24;
 	const cells = (count: number) => p.total === 0 ? 0 : Math.max(0, Math.min(width, Math.floor(count / p.total * width)));
-	const solid = cells(p.integrated ?? p.executed);
-	const dashed = p.integrated === undefined ? 0 : Math.max(0, cells(p.executed) - solid);
-	const bar = "█".repeat(solid) + "┄".repeat(dashed) + "·".repeat(width - solid - dashed);
+	const integrated = cells(p.integrated ?? 0);
+	const tddOnly = Math.max(0, cells(p.executed) - integrated);
+	const bar = "█".repeat(integrated) + "░".repeat(tddOnly) + "·".repeat(width - integrated - tddOnly);
 	const state = snapshot.state === "execution" ? p.mode : snapshot.state;
 	return [
 		`${label} · ${slug} · Phase 2 · ${state}`,

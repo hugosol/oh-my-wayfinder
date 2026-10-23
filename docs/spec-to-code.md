@@ -85,7 +85,7 @@ Phase 2 — serial TDD:
 
 ## Above-input progress
 
-The widget is hidden in ordinary conversations and appears only after a command passes startup checks and starts a workflow. Phase 1 shows ticket preparation; Phase 2 shows `TDD ended ended/total`. The denominator is this run's distinct published implementation tickets. Each ticket counts only when its latest TDD attempt ends, successfully or unsuccessfully; retrospectives do not affect progress. Starting a retry retracts that ticket's count until the attempt ends, without increasing the total.
+The widget is hidden in ordinary conversations and appears only after a command passes startup checks and starts a workflow. Phase 1 shows ticket preparation; Phase 2 shows `TDD ended ended/total`. The bar uses shaded `░` cells for ended TDD work and `·` for the remainder. No blank row is added below the widget. The denominator is this run's distinct published implementation tickets. Each ticket counts only when its latest TDD attempt ends, successfully or unsuccessfully; retrospectives do not affect progress. Starting a retry retracts that ticket's count until the attempt ends, without increasing the total.
 
 A full bar means the latest TDD attempts have ended, not that acceptance succeeded or retrospectives finished; the existing `spec_to_code_finish` requirements remain unchanged. Final progress stays until another workflow starts or the session switches. Display snapshots are saved in the current session and restored when that original session reopens; this does not resume interrupted serial execution or permit takeover from a new session. Interactive terminals render above the input; RPC clients control widget presentation, and noninteractive visibility is not guaranteed.
 
