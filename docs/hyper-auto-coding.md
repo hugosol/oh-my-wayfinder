@@ -74,7 +74,7 @@ Dependencies release after a blocking ticket's first successful merge, while its
 
 ## Above-input dual-layer progress
 
-The widget appears only after a command passes startup checks and starts a workflow; ordinary conversations have no widget. Phase 1 shows ticket preparation. Phase 2 uses one layered bar: solid `█` cells represent successful integration, with dashed `┄` cells beyond the solid portion representing ended TDD work not yet integrated. Separate `TDD ended ended/total` and `integrated integrated/total` counts share the same denominator.
+The widget appears only after a command passes startup checks and starts a workflow; ordinary conversations have no widget. Phase 1 shows ticket preparation. Phase 2 uses one layered bar: solid `█` cells represent successful integration, while shaded `░` cells beyond that portion represent ended TDD work not yet integrated; `·` marks the remainder. No blank row is added below the widget. Separate `TDD ended ended/total` and `integrated integrated/total` counts share the same denominator.
 
 The total counts distinct published implementation tickets, including optional acceptance tickets published as ordinary implementation tickets. Execution counts use each ticket's latest TDD attempt, including successful and failed endings, without waiting for retro. A retry retracts that ticket's execution count until it ends and never increases the total. Solid progress requires `integrated`; the first merge is insufficient. Background changes refresh the widget without waiting for another main-agent tool call.
 
