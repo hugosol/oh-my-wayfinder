@@ -128,6 +128,7 @@ Skill 内的自动调用由 agent 执行指令，不是独立调度器；`/spec-
 | 我想…… | 阅读入口 |
 |---|---|
 | 选择下一步调用的 skill | [Ask Matt](skills/ask-matt/SKILL.md) |
+| 审计测试并给出建议，不自动修改（仅用户主动调用 `/test-audit`） | [Test Audit](skills/test-audit/SKILL.md) |
 | 理解本仓库改了什么、改动在哪里 | [上游对比蓝图](docs/upstream-differences.cn.md) |
 | 安装、配置和使用串行 OMP 自动化 | [Spec-to-code 使用指南](docs/spec-to-code.cn.md) |
 | 在本地集成分支上并行开发 | [Hyper-auto-coding 使用指南](docs/hyper-auto-coding.cn.md) |
