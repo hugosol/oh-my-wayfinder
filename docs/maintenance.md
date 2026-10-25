@@ -15,14 +15,14 @@ This repository ships the eight reworked skills as a **delta overlay**: `upstrea
 | [deltas/ops.mjs](../deltas/ops.mjs) | Op parsing and application, shared by the build and the preview so the two cannot disagree. |
 | [deltas/check-upstream.mjs](../deltas/check-upstream.mjs) | Compares the snapshot with `mattpocock/skills`, over the GitHub API or a local checkout. |
 | [deltas/preview.mjs](../deltas/preview.mjs) | Renders the mappings as a diff page (`deltas/preview.html`, gitignored). |
-| `skills/` | The install artifact: generated files for the eight skills, plus the hand-written `lighthouse`, `backtracer`, `traverse`, `to-contract` and `test-audit`. |
+| `skills/` | The install artifact: generated files for the eight skills, plus the hand-written `lighthouse`, `backtracer`, `traverse`, `to-contract`, `test-audit` and `test-optimize`. |
 
 ## Generated files vs hand-written skills
 
 `deltas/manifest.json` holds only a `files` array of `<skill>/<file>` paths. Only those paths are read from `upstream/` and written to `skills/`; the generated skill directories are derived from the first path segment.
 
 - **Generated skills.** The eight reworked skills above. Their `skills/<skill>/` directories hold exactly the manifest whitelist and nothing else.
-- **Hand-written skills.** [lighthouse](../skills/lighthouse/SKILL.md), [backtracer](../skills/backtracer/SKILL.md), [traverse](../skills/traverse/SKILL.md), [to-contract](../skills/to-contract/SKILL.md) and [test-audit](../skills/test-audit/SKILL.md) (including its suite reference) are native to this repository: not in the manifest, no `upstream/` counterpart, never touched by the build. Edit them directly.
+- **Hand-written skills.** [lighthouse](../skills/lighthouse/SKILL.md), [backtracer](../skills/backtracer/SKILL.md), [traverse](../skills/traverse/SKILL.md), [to-contract](../skills/to-contract/SKILL.md), [test-audit](../skills/test-audit/SKILL.md) (including its suite reference) and [test-optimize](../skills/test-optimize/SKILL.md) are native to this repository: not in the manifest, no `upstream/` counterpart, never touched by the build. Edit them directly.
 - **Verbatim files.** A listed file with no mapping ops is copied from the snapshot byte for byte (after line-ending normalization). It is still generated, and still subject to the pruning below.
 
 **Destructive pruning warning.** A writing build (`node deltas/build.mjs`) deletes every file inside a generated skill directory that is not in `manifest.files`, and removes the directories left empty. Never leave notes, scratch experiments or generated assets inside `skills/<skill>/` for one of the eight skills — they are removed without a prompt, including a committed file that upstream does not have. To ship an additional upstream file, copy it into `upstream/` and add it to the manifest.

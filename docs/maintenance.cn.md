@@ -15,14 +15,14 @@
 | [deltas/ops.mjs](../deltas/ops.mjs) | op 的解析与应用逻辑，构建与预览共用同一份实现，两者不可能各说各话。 |
 | [deltas/check-upstream.mjs](../deltas/check-upstream.mjs) | 将快照与 `mattpocock/skills` 对比，可走 GitHub API 或本地检出。 |
 | [deltas/preview.mjs](../deltas/preview.mjs) | 把映射渲染成差异页面（`deltas/preview.html`，已 gitignore）。 |
-| `skills/` | 安装产物：八个 skill 的生成文件，加上手写的 `lighthouse`、`backtracer`、`traverse`、`to-contract`、`test-audit`。 |
+| `skills/` | 安装产物：八个 skill 的生成文件，加上手写的 `lighthouse`、`backtracer`、`traverse`、`to-contract`、`test-audit`、`test-optimize`。 |
 
 ## 生成文件与手写 skill
 
 `deltas/manifest.json` 只包含一个 `files` 数组，每项是 `<skill>/<file>` 形式的路径。只有这些路径会从 `upstream/` 读取并写入 `skills/`；生成的 skill 目录由路径的第一段推导得出。
 
 - **生成 skill**：上面的八个改造 skill。它们的 `skills/<skill>/` 目录严格等于 manifest 白名单，不多一个文件。
-- **手写 skill**：[lighthouse](../skills/lighthouse/SKILL.md)、[backtracer](../skills/backtracer/SKILL.md)、[traverse](../skills/traverse/SKILL.md)、[to-contract](../skills/to-contract/SKILL.md)、[test-audit](../skills/test-audit/SKILL.md)（含其套件审计引用文件）是本仓库原生的：不在 manifest 中，没有 `upstream/` 对应物，构建不会碰它们，直接编辑即可。
+- **手写 skill**：[lighthouse](../skills/lighthouse/SKILL.md)、[backtracer](../skills/backtracer/SKILL.md)、[traverse](../skills/traverse/SKILL.md)、[to-contract](../skills/to-contract/SKILL.md)、[test-audit](../skills/test-audit/SKILL.md)（含其套件审计引用文件）、[test-optimize](../skills/test-optimize/SKILL.md) 是本仓库原生的：不在 manifest 中，没有 `upstream/` 对应物，构建不会碰它们，直接编辑即可。
 - **原样复制的文件**：白名单中没有映射 op 的文件会按快照逐字节复制（仅做换行归一化）。它仍然是生成文件，同样受下面的清理规则约束。
 
 **破坏性清理警告。** 写入式构建（`node deltas/build.mjs`）会删除生成 skill 目录中所有不在 `manifest.files` 里的文件，并删除因此变空的目录。不要在这八个 skill 的 `skills/<skill>/` 里放笔记、临时实验或生成的素材——它们会被无提示地删除，即使已经提交，只要上游没有对应文件也一样。要发布额外的上游文件，必须把它复制进 `upstream/` 并加入 manifest。

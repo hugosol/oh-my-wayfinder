@@ -1,5 +1,5 @@
 ---
-name: optimize-tests
+name: test-optimize
 description: "Find measured test bottlenecks and implement worthwhile, contract-preserving changes that create a safe optimization space."
 disable-model-invocation: true
 ---
