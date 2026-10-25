@@ -129,6 +129,7 @@ No agent modifications or custom installer are required for the skills: install 
 |---|---|
 | Choose the next skill | [Ask Matt](skills/ask-matt/SKILL.md) |
 | Audit tests without automatically changing them (invoke `/test-audit` explicitly) | [Test Audit](skills/test-audit/SKILL.md) |
+| Measure test bottlenecks and implement contract-preserving optimizations (invoke `/test-optimize` explicitly) | [Test Optimize](skills/test-optimize/SKILL.md) |
 | Understand what this fork changes and where | [Upstream comparison blueprint](docs/upstream-differences.md) |
 | Install, configure, and run serial OMP automation | [Spec-to-code guide](docs/spec-to-code.md) |
 | Develop concurrently on a local integration branch | [Hyper-auto-coding guide](docs/hyper-auto-coding.md) |
