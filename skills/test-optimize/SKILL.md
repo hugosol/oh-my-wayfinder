@@ -40,9 +40,11 @@ For each shortlisted hotspot, explain the cost mechanism and the smallest struct
 
 Compare candidates by expected wall-time benefit, implementation/maintenance cost, evidence strength, and preservation risk. Label estimates as estimates; account for resource saturation and the serial remainder. Reject or defer candidates whose likely benefit does not justify their complexity. A shorter profile is a separate feedback channel, not a speedup of the unchanged full gate.
 
-Present the leading candidate with its scope, expected benefit, safety conditions, and validation cost. Obtain confirmation before implementing unless the current request already authorizes that scope. Changes to production interfaces, dependencies, or infrastructure need authorization when outside the agreed scope.
+Present the leading candidate with its scope, expected benefit, safety conditions, and validation cost. Ask which candidate the user wants to explore.
 
-**Done:** select a justified candidate or conclude **keep as-is** with evidence. Avoid a deletion target, concurrency target, or required speedup invented in advance.
+Once the user picks a candidate, call the Skill tool with "grilling". Use the measured evidence to resolve scope, protected test commitments, resource ownership/lifetime, risks, and validation. Call the Skill tool with "domain-modeling" to clarify domain terms using the project's glossary. Changes to production interfaces, dependencies, or infrastructure need authorization when outside the agreed scope.
+
+**Done:** after grilling, the user confirms the selected candidate's scope and preservation/validation plan; only then proceed to Step 4. Alternatively, conclude **keep as-is** with evidence and skip grilling. Avoid a deletion target, concurrency target, or required speedup invented in advance.
 
 ## 4. Construct the safe optimization space
 
