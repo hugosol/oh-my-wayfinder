@@ -16,8 +16,10 @@
  *  - a conflicting integration-side merge is aborted and retried inside the
  *    ticket worktree (never a new or temporary worktree): the conflict stays
  *    there for the integration agent, and nothing is reset or discarded;
- *  - `cleanup` never passes `--force`, never deletes a branch, and only removes
- *    worktrees that are clean and already merged into the integration branch.
+ *  - worktree cleanup never passes `--force` and only removes clean worktrees
+ *    already merged into the captured integration ref; identities survive removal;
+ *  - branch cleanup shares the FIFO lock and only uses non-force deletion for
+ *    this run's integrated branches when no registered worktree still uses them.
  */
 
 import { createHash, randomUUID } from "node:crypto";
@@ -163,7 +165,7 @@ export class HyperGit {
 	readonly root: string;
 	/** Named branch the integration checkout was on at `inspect` time; never main/master. */
 	readonly branch: string;
-	/** Ticket worktrees created by this run, keyed by the ticket name passed to `createTicket`. */
+	/** This run's ticket identities, retained after directory/ref cleanup for pause/restore. */
 	readonly worktrees = new Map<string, TicketWorktree>();
 
 	#slug: string;
@@ -428,64 +430,123 @@ export class HyperGit {
 		}
 	}
 
-	/**
-	 * Best-effort removal of this run's worktrees. A worktree is removed only
-	 * when it lives under the OS temp root, is clean, and its branch is already
-	 * an ancestor of the integration branch; its branch is never deleted. Every
-	 * kept worktree (dirty, unmerged, or unremovable) is reported as a warning.
-	 */
+	/** Remove one clean, integrated ticket worktree, retaining its run identity and branch. */
+	async cleanupWorktree(ticket: string): Promise<string[]> {
+		return this.#withLock(() => this.#cleanupWorktree(ticket));
+	}
+
+	/** Retry all this run's worktrees; never discard identities needed by pause/restore. */
 	async cleanup(): Promise<string[]> {
-		const warnings: string[] = [];
-		const { branches, paths } = registeredWorktrees(await mustGit(this.root, ["worktree", "list", "--porcelain"]));
-		for (const [ticket, tree] of [...this.worktrees]) {
+		return this.#withLock(async () => {
+			const warnings: string[] = [];
+			for (const ticket of this.worktrees.keys()) warnings.push(...await this.#cleanupWorktree(ticket));
+			return warnings;
+		});
+	}
+
+	async #cleanupWorktree(ticket: string): Promise<string[]> {
+		const tree = this.worktrees.get(ticket);
+		if (tree === undefined) return [];
+		try {
+			const { branches, paths } = registeredWorktrees(await mustGit(this.root, ["worktree", "list", "--porcelain"]));
 			const ref = `refs/heads/${tree.branch}`;
 			const registeredPath = branches.get(ref);
+			const ownedPath = await this.#registeredPathFor(paths, tree.cwd);
 			if (registeredPath === undefined) {
-				const detached = await this.#registeredPathFor(paths, tree.cwd);
-				if (detached !== undefined) {
-					warnings.push(`票据 ${ticket} 的工作树已脱离票据分支 ${tree.branch}，保留：${detached}`);
-					continue;
+				if (ownedPath !== undefined) return [`票据 ${ticket} 的工作树已脱离票据分支 ${tree.branch}，保留：${ownedPath}`];
+				try {
+					await fs.lstat(tree.cwd);
+					return [`票据 ${ticket} 的目录不再是已注册工作树，保留：${tree.cwd}`];
+				} catch (error) {
+					if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+					throw error;
 				}
-				// Already gone (removed by hand); nothing left to clean for this ticket.
-				this.worktrees.delete(ticket);
-				continue;
+			}
+			if (ownedPath === undefined || path.resolve(ownedPath) !== path.resolve(registeredPath)) {
+				return [`票据 ${ticket} 的分支工作树位置已改变，保留：${registeredPath}`];
 			}
 			if (!(await underTempWorktreeRoot(registeredPath))) {
-				warnings.push(`票据 ${ticket} 的工作树不在系统临时目录（${registeredPath}），已跳过`);
-				continue;
+				return [`票据 ${ticket} 的工作树不在系统临时目录或目录不可用（${registeredPath}），已跳过`];
 			}
 			const ancestor = await git(this.root, ["merge-base", "--is-ancestor", ref, `refs/heads/${this.branch}`]);
-			if (ancestor.code !== 0) {
-				warnings.push(`票据 ${ticket} 的分支尚未合并进 ${this.branch}，保留工作树与分支：${tree.branch}`);
-				continue;
-			}
-			let dirty: string;
-			try {
-				dirty = (await mustGit(registeredPath, ["status", "--porcelain"])).trim();
-			} catch (error) {
-				warnings.push(`票据 ${ticket}（${tree.branch}）的工作树不可用（${errorText(error)}），已跳过`);
-				continue;
-			}
-			if (dirty !== "") {
-				warnings.push(
-					`票据 ${ticket}（${tree.branch}）的工作树有未提交改动，保留（不使用 --force）：${registeredPath}`,
-				);
-				continue;
-			}
+			if (ancestor.code !== 0) return [`票据 ${ticket} 的分支尚未确认合并进 ${this.branch}，保留工作树与分支：${tree.branch}`];
+			const dirty = (await mustGit(registeredPath, ["status", "--porcelain"])).trim();
+			if (dirty !== "") return [`票据 ${ticket}（${tree.branch}）的工作树有未提交改动，保留（不使用 --force）：${registeredPath}`];
 			const removed = await git(this.root, ["worktree", "remove", "--", registeredPath]);
 			if (removed.code !== 0) {
-				const detail = firstLines(removed.stderr || removed.stdout) || `退出码 ${removed.code}`;
-				warnings.push(`票据 ${ticket} 的工作树删除失败，已保留：${detail}`);
+				return [`票据 ${ticket} 的工作树删除失败，已保留：${firstLines(removed.stderr || removed.stdout) || `退出码 ${removed.code}`}`];
+			}
+			return [];
+		} catch (error) {
+			return [`票据 ${ticket}（${tree.branch}）的工作树清理失败，已保留：${errorText(error)}`];
+		}
+	}
+
+	/** Delete only this run's integrated branches with no registered worktree, using non-force deletion. */
+	async cleanupBranches(): Promise<string[]> {
+		return this.#withLock(async () => {
+			const warnings: string[] = [];
+			for (const [ticket, tree] of this.worktrees) {
+				try {
+					const ref = `refs/heads/${tree.branch}`;
+					const probe = await git(this.root, ["show-ref", "--verify", "--quiet", ref]);
+					if (probe.code === 1) continue;
+					if (probe.code !== 0) throw new Error(`无法检查分支 ${tree.branch}（退出码 ${probe.code}）`);
+					const { branches, paths } = registeredWorktrees(await mustGit(this.root, ["worktree", "list", "--porcelain"]));
+					if (branches.has(ref) || await this.#registeredPathFor(paths, tree.cwd) !== undefined) {
+						warnings.push(`票据 ${ticket} 的分支仍有关联工作树，保留：${tree.branch}`);
+						continue;
+					}
+					try {
+						await fs.lstat(tree.cwd);
+						warnings.push(`票据 ${ticket} 的原工作树目录仍有残留，保留分支 ${tree.branch}：${tree.cwd}`);
+						continue;
+					} catch (error) {
+						if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+					}
+					const ancestor = await git(this.root, ["merge-base", "--is-ancestor", ref, `refs/heads/${this.branch}`]);
+					if (ancestor.code !== 0) {
+						warnings.push(`票据 ${ticket} 的分支尚未确认合并进 ${this.branch}，保留：${tree.branch}`);
+						continue;
+					}
+					await mustGit(this.root, ["branch", "-d", "--", tree.branch]);
+				} catch (error) {
+					warnings.push(`票据 ${ticket} 的分支清理失败，已保留 ${tree.branch}：${errorText(error)}`);
+				}
+			}
+			return warnings;
+		});
+	}
+
+	/** Existing local branch refs belonging to this run, not historical runs. */
+	async retainedBranches(): Promise<string[]> {
+		const refs = new Set((await mustGit(this.root, ["for-each-ref", "--format=%(refname)", "refs/heads/"])).trim().split(/\r?\n/));
+		return [...this.worktrees.values()].filter((tree) => refs.has(`refs/heads/${tree.branch}`)).map((tree) => tree.branch);
+	}
+
+	/** This run's worktree identities still registered (even if missing on disk) or present on disk. */
+	async retainedWorktrees(): Promise<TicketWorktree[]> {
+		const { branches, paths } = registeredWorktrees(await mustGit(this.root, ["worktree", "list", "--porcelain"]));
+		const retained: TicketWorktree[] = [];
+		for (const tree of this.worktrees.values()) {
+			if (branches.has(`refs/heads/${tree.branch}`) || await this.#registeredPathFor(paths, tree.cwd) !== undefined) {
+				retained.push({ ...tree });
 				continue;
 			}
-			this.worktrees.delete(ticket);
+			try { await fs.lstat(tree.cwd); retained.push({ ...tree }); }
+			catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
 		}
-		return warnings;
+		return retained;
 	}
 
 	/** The registered worktree path that resolves to `cwd`, when git still lists it. */
 	async #registeredPathFor(paths: readonly string[], cwd: string): Promise<string | undefined> {
 		for (const candidate of paths) {
+			const candidatePath = path.resolve(candidate);
+			const ownedPath = path.resolve(cwd);
+			if (candidatePath === ownedPath || (process.platform === "win32" && candidatePath.toLowerCase() === ownedPath.toLowerCase())) {
+				return candidate;
+			}
 			try {
 				const [left, right] = await Promise.all([fs.realpath(candidate), fs.realpath(cwd)]);
 				if (left === right || (process.platform === "win32" && left.toLowerCase() === right.toLowerCase())) {

@@ -1,5 +1,7 @@
 import {
 	buildSkillPromptMessage,
+	createAgentSession,
+	type AgentSession,
 	discoverSkills,
 	readSessionHeaderId,
 	runSubagentFollowUpTurn,
@@ -8,12 +10,112 @@ import {
 	type ExtensionContext,
 	type SingleResult,
 } from "@oh-my-pi/pi-coding-agent";
+import { initializeExtensions } from "@oh-my-pi/pi-coding-agent/modes/runtime-init";
 import { AgentLifecycleManager } from "@oh-my-pi/pi-coding-agent/registry/agent-lifecycle";
 import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
 import { discoverAgents } from "@oh-my-pi/pi-coding-agent/task";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { TddWorkFlow, type ExecutionIdentity, type RetroPorts } from "./tdd-execution";
+
+/**
+ * Reopen the original transcript, not a fork, without touching its former cwd.
+ * SDK follow-up has no cwd override: its warm reviver captures spawn-time cwd
+ * (task/executor.ts), while cold revival first stats the header cwd
+ * (task/persisted-revive.ts). Moving only a live manager would fix neither.
+ * Park awaits disposal/JSONL flush; moveTo with the existing session directory
+ * rewrites the header in place, preserving session id, file and history provenance.
+ * Our narrow reviver also survives another park without resurrecting spawn tools
+ * or extensions. Only yield is available: this turn analyzes replayed history,
+ * never the current checkout, and cannot execute the implementation's write tools.
+ */
+export async function prepareRetroSession(
+	identity: { agent_id: string; session_id: string | null; session_file: string | null; workspace: string },
+	parent: AgentSession,
+): Promise<AgentSession> {
+	const registry = AgentRegistry.global();
+	const lifecycle = AgentLifecycleManager.global();
+	const ref = registry.get(identity.agent_id);
+	if (!ref || !identity.session_file || !identity.session_id || ref.sessionFile !== identity.session_file) {
+		throw new Error("原 TDD 会话记录缺失或已替换，拒绝在替代会话中复盘。");
+	}
+	if (ref.session?.isStreaming) throw new Error("原 TDD 会话仍在运行，不能切换为复盘。");
+	await lifecycle.park(identity.agent_id);
+	if (ref.session) throw new Error("原 TDD 会话未能安全停放，不能迁移复盘工作目录。");
+	const workspace = path.resolve(identity.workspace);
+	const manager = await SessionManager.open(identity.session_file, undefined, undefined, {
+		suppressBreadcrumb: true,
+		throwIfMissing: true,
+	});
+	try {
+		if (manager.getSessionId() !== identity.session_id) throw new Error("原 TDD 会话身份已改变。");
+		if (!manager.getEntries().some(entry => entry.type === "message")) {
+			throw new Error("原 TDD 会话没有对话历史，拒绝生成替代复盘。");
+		}
+		await manager.moveTo(workspace, path.dirname(identity.session_file));
+	} finally {
+		await manager.close();
+	}
+	const recorded = await SessionManager.peekSessionInit(identity.session_file);
+	if (!recorded?.init || recorded.init.isolated) throw new Error("原 TDD 会话无法安全恢复复盘。");
+	const init = recorded.init;
+	const sessionFile = identity.session_file;
+	lifecycle.adopt(identity.agent_id, {
+		idleTtlMs: 0,
+		async revive(expectedAgentRef) {
+			const reopened = await SessionManager.open(sessionFile, undefined, undefined, {
+				suppressBreadcrumb: true,
+				throwIfMissing: true,
+			});
+			try {
+				if (reopened.getSessionId() !== identity.session_id) throw new Error("原 TDD 会话身份已改变。");
+				const { session } = await createAgentSession({
+					cwd: workspace,
+					sessionManager: reopened,
+					agentId: identity.agent_id,
+					agentDisplayName: ref.displayName,
+					agentName: init.agent ?? "tdd",
+					parentAgentId: ref.parentId,
+					parentTaskPrefix: identity.agent_id,
+					taskDepth: 1,
+					bindProcessState: false,
+					expectedAgentRef,
+					authStorage: parent.modelRegistry.authStorage,
+					modelRegistry: parent.modelRegistry,
+					settings: parent.settings.overlay(),
+					modelPattern: init.resolvedModel,
+					systemPrompt: () => [...init.systemPrompt],
+					toolNames: ["yield"],
+					restrictToolNames: true,
+					requireYieldTool: true,
+					spawns: "",
+					hasUI: false,
+					enableLsp: false,
+					enableIrc: false,
+					enableMCP: false,
+					disableExtensionDiscovery: true,
+					preloadedExtensionPaths: [],
+					preloadedCustomToolPaths: [],
+					skills: [],
+					contextFiles: [],
+					promptTemplates: [],
+					slashCommands: [],
+					workspaceTree: { rootPath: workspace, rendered: "", truncated: false, totalLines: 0, agentsMdFiles: [] },
+				});
+				await initializeExtensions(session, {
+					reportSendError: (_action, error) => { throw error; },
+					reportRuntimeError: error => { throw error.error; },
+					filterActiveTools: names => names.filter(name => name === "yield"),
+				});
+				return session;
+			} catch (error) {
+				await reopened.close();
+				throw error;
+			}
+		},
+	}, ref);
+	return lifecycle.ensureLive(identity.agent_id);
+}
 
 /**
  * Capture the original definition and source paths once, before any ticket
@@ -56,7 +158,15 @@ export async function createRetroPorts(pi: ExtensionAPI, ctx: ExtensionContext):
 				await buildSkillPromptMessage(writing, { args: "本轮只生成复盘建议正文，由宿主保存文档。" }, "autoload")
 			).message;
 			if (result.isolated) throw new Error("隔离执行的原会话不可续跑，本次复盘未交付。");
-			const live = await AgentLifecycleManager.global().ensureLive(result.id);
+			const parent = AgentRegistry.global().get(ctx.agent.id)?.session;
+			if (!parent) throw new Error("父会话不可用，无法安全恢复原 TDD 会话。");
+			if (!record.agent_id || !record.session_id || !record.session_file) {
+				throw new Error("原 TDD 会话身份不完整，无法在原会话复盘。");
+			}
+			const live = await prepareRetroSession({
+				agent_id: record.agent_id, session_id: record.session_id,
+				session_file: record.session_file, workspace: record.workspace,
+			}, parent);
 			if (live.sessionManager.getSessionId() !== record.session_id) {
 				throw new Error("原 TDD 会话身份已改变，拒绝在替代会话中复盘。");
 			}

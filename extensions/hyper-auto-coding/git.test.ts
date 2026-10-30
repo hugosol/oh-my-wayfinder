@@ -444,10 +444,142 @@ test("cleanup removes only clean merged worktrees, keeps branches, and warns for
 	expect(branches).toContain(merged.branch);
 	expect(branches).toContain(unmerged.branch);
 	expect(branches).toContain(dirty.branch);
-	expect([...backend.worktrees.keys()].sort()).toEqual(["02.md", "03.md"]);
+	expect([...backend.worktrees.keys()].sort()).toEqual(["01.md", "02.md", "03.md"]);
+	expect((await backend.retainedWorktrees()).map((tree) => tree.branch).sort()).toEqual([unmerged.branch, dirty.branch].sort());
 
 	// A second round still protects the unmerged and dirty worktrees.
 	expect((await backend.cleanup()).length).toBe(2);
+});
+
+test("cleanupWorktree scopes removal to one ticket, preserves restore identity, and reclaims ignored build output", async () => {
+	const repo = await initRepo();
+	await write(path.join(repo.root, ".gitignore"), "build/\n");
+	await git(repo.root, "add", ".gitignore");
+	await git(repo.root, "commit", "-q", "-m", "ignore build output");
+	const backend = await HyperGit.inspect(repo.root, repo.slug);
+	const first = await createTicket(backend, "01.md");
+	const second = await createTicket(backend, "02.md");
+	await write(path.join(first.cwd, "build", "large-output.bin"), "ignored build output\n");
+	expect(await backend.cleanupWorktree("01.md")).toEqual([]);
+	await expect(fs.stat(first.cwd)).rejects.toThrow();
+	expect((await fs.stat(second.cwd)).isDirectory()).toBe(true);
+	expect(await backend.cleanupWorktree("01.md")).toEqual([]);
+	expect(await backend.cleanupWorktree("unknown.md")).toEqual([]);
+	expect(backend.worktrees.get("01.md")).toEqual(first);
+	expect((await backend.retainedBranches()).sort()).toEqual([first.branch, second.branch].sort());
+	const restored = HyperGit.adopt(backend.root, backend.branch, repo.slug, [...backend.worktrees]);
+	expect(await restored.cleanupWorktree("01.md")).toEqual([]);
+	expect((await restored.cleanupBranches()).join("\n")).toContain(second.branch);
+	expect(await restored.retainedBranches()).toEqual([second.branch]);
+	expect(restored.worktrees.get("01.md")).toEqual(first);
+	expect(await restored.cleanup()).toEqual([]);
+	expect(await restored.cleanupBranches()).toEqual([]);
+	expect(await restored.cleanupBranches()).toEqual([]);
+	expect(await restored.retainedBranches()).toEqual([]);
+});
+
+test("cleanup retries dirty worktrees without touching another run's resources", async () => {
+	const repo = await initRepo();
+	const backend = await HyperGit.inspect(repo.root, repo.slug);
+	const otherRun = await HyperGit.inspect(repo.root, repo.slug);
+	const tree = await createTicket(backend, "01.md");
+	const foreign = await createTicket(otherRun, "01.md");
+	await write(path.join(tree.cwd, "wip.txt"), "keep\n");
+	expect((await backend.cleanupWorktree("01.md")).join("\n")).toContain("未提交");
+	await fs.rm(path.join(tree.cwd, "wip.txt"));
+	expect(await backend.cleanup()).toEqual([]);
+	expect(await backend.cleanupBranches()).toEqual([]);
+	expect((await fs.stat(foreign.cwd)).isDirectory()).toBe(true);
+	expect(await otherRun.retainedBranches()).toEqual([foreign.branch]);
+});
+
+test("cleanupBranches refuses branches checked out elsewhere or detached owned worktrees", async () => {
+	const repo = await initRepo();
+	const backend = await HyperGit.inspect(repo.root, repo.slug);
+	const tree = await createTicket(backend, "01.md");
+	await git(tree.cwd, "checkout", "-q", "--detach");
+	const external = await tempDir("hyper-external-checkout-");
+	await git(repo.root, "worktree", "add", external, tree.branch);
+	trackTree(external);
+	expect((await backend.cleanupBranches()).join("\n")).toContain(tree.branch);
+	await git(repo.root, "worktree", "remove", "--", external);
+	// Even without a branch checkout, the detached owned worktree is retained.
+	expect((await backend.cleanupBranches()).join("\n")).toContain(tree.branch);
+	await git(repo.root, "worktree", "remove", "--", tree.cwd);
+	expect(await backend.cleanupBranches()).toEqual([]);
+});
+
+test("cleanupBranches preserves a branch while an unregistered original directory remains", async () => {
+	const repo = await initRepo();
+	const backend = await HyperGit.inspect(repo.root, repo.slug);
+	const tree = await createTicket(backend, "01.md");
+	await git(repo.root, "worktree", "remove", "--", tree.cwd);
+	await write(path.join(tree.cwd, "remaining.txt"), "preserve this leftover\n");
+	expect((await backend.cleanup()).join("\n")).toContain(tree.cwd);
+	expect((await backend.cleanupBranches()).join("\n")).toContain(tree.branch);
+	expect(await backend.retainedBranches()).toEqual([tree.branch]);
+	expect(await fs.readFile(path.join(tree.cwd, "remaining.txt"), "utf8")).toBe("preserve this leftover\n");
+	await fs.rm(tree.cwd, { recursive: true });
+	expect(await backend.cleanupBranches()).toEqual([]);
+});
+
+test("cleanupBranches checks the captured integration ref, not externally switched HEAD", async () => {
+	const repo = await initRepo();
+	const backend = await HyperGit.inspect(repo.root, repo.slug);
+	const tree = await createTicket(backend, "01.md");
+	await write(path.join(tree.cwd, "unmerged.txt"), "not integrated\n");
+	await git(tree.cwd, "add", "unmerged.txt");
+	await git(tree.cwd, "commit", "-q", "-m", "unmerged work");
+	await git(repo.root, "worktree", "remove", "--", tree.cwd);
+	await git(repo.root, "checkout", "-q", "-b", "outside-integration", tree.branch);
+	expect((await backend.cleanupBranches()).join("\n")).toContain(tree.branch);
+	expect(await backend.retainedBranches()).toEqual([tree.branch]);
+	// An externally removed branch is an idempotent success.
+	await git(repo.root, "branch", "-d", "--", tree.branch);
+	expect(await backend.cleanupBranches()).toEqual([]);
+});
+
+test("cleanup and branch deletion queue behind an in-flight merge in the same FIFO", async () => {
+	const repo = await initRepo();
+	const backend = await HyperGit.inspect(repo.root, repo.slug);
+	const tree = await createTicket(backend, "01.md");
+	await write(path.join(tree.cwd, "work.txt"), "integrate first\n");
+	await git(tree.cwd, "add", "work.txt");
+	await git(tree.cwd, "commit", "-q", "-m", "ticket work");
+	const merge = backend.mergeTicket(tree, false);
+	const cleanup = backend.cleanupWorktree("01.md");
+	const branches = backend.cleanupBranches();
+	const created = createTicket(backend, "02.md");
+	expect((await merge).merged).toBe(true);
+	expect(await cleanup).toEqual([]);
+	expect(await branches).toEqual([]);
+	const next = await created;
+	expect(await backend.ticketHead(next)).toBe(await backend.head());
+	expect(await backend.retainedBranches()).toEqual([next.branch]);
+	await expect(fs.stat(tree.cwd)).rejects.toThrow();
+});
+
+test("cleanup does not follow a ticket branch into an externally moved worktree", async () => {
+	const repo = await initRepo();
+	const backend = await HyperGit.inspect(repo.root, repo.slug);
+	const tree = await createTicket(backend, "01.md");
+	const destination = path.join(await tempDir("hyper-moved-parent-"), "moved-worktree");
+	await git(repo.root, "worktree", "move", tree.cwd, destination);
+	trackTree(destination);
+	expect((await backend.cleanupWorktree("01.md")).join("\n")).toContain("位置已改变");
+	expect((await fs.stat(destination)).isDirectory()).toBe(true);
+	expect((await backend.cleanupBranches()).join("\n")).toContain(tree.branch);
+});
+
+test("cleanup retains missing but registered worktrees and does not prune them", async () => {
+	const repo = await initRepo();
+	const backend = await HyperGit.inspect(repo.root, repo.slug);
+	const tree = await createTicket(backend, "01.md");
+	await fs.rm(tree.cwd, { recursive: true });
+	await backend.cleanup();
+	expect(await backend.retainedWorktrees()).toEqual([tree]);
+	expect((await backend.cleanupBranches()).join("\n")).toContain(tree.branch);
+	expect(await backend.retainedBranches()).toEqual([tree.branch]);
 });
 
 test("cleanup keeps a worktree that no longer sits on its ticket branch", async () => {

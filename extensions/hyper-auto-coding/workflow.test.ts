@@ -39,6 +39,7 @@ interface CheckpointSnapshot {
 	planned: boolean;
 	temporaryDir: string;
 	reports: string[];
+	cleanup?: { attempts: { phase: string; warnings: string[] }[]; warnings: string[] };
 	attempts: { ticket: string; id: string; report?: string; error?: string }[];
 	retro: { tickets: string[]; records: { ticket: string; tool_call_id: string; retro_status: string; retro_error?: string }[] };
 	tickets: CheckpointTicket[];
@@ -47,6 +48,10 @@ interface FinishSummary {
 	reports: string[];
 	warnings: string[];
 	retainedBranches: string[];
+	retainedWorktrees: { branch: string; cwd: string }[];
+	cleanupReport: string;
+	cleanupCommit?: string;
+	residualsConfirmed: boolean;
 }
 interface Ledger {
 	attempts: { ticket: string; id: string; report?: string; error?: string }[];
@@ -369,7 +374,8 @@ test("failed implementation retries reuse the original branch and worktree witho
 	await workflow.retro.drain();
 	expect(snapshots).toHaveLength(notificationCount);
 	expect(ticketSnapshot(await status(workflow), "a.md").worktree).toEqual(first.worktree);
-	expect(await fs.readFile(path.join(first.worktree!.cwd, "a.txt"), "utf8")).toBe("delivered a\n");
+	expect(await fs.stat(first.worktree!.cwd).catch(() => null)).toBeNull();
+	expect(await fs.readFile(path.join(workflow.git.root, "a.txt"), "utf8")).toBe("delivered a\n");
 });
 
 test("post-test merge conflicts resume the same integration session in the original worktree and then terminate", async () => {
@@ -410,7 +416,7 @@ test("post-test merge conflicts resume the same integration session in the origi
 	expect([...workflow.git.worktrees.values()].map((tree) => tree.cwd).sort()).toEqual(
 		(await status(workflow)).tickets.filter((ticket) => ticket.worktree).map((ticket) => ticket.worktree!.cwd).sort(),
 	);
-	expect((await git(root, "worktree", "list", "--porcelain")).match(/^worktree /gm)?.length).toBe(3);
+	expect((await git(root, "worktree", "list", "--porcelain")).match(/^worktree /gm)?.length).toBe(1);
 });
 
 test("first-merge conflict starts one integration child; its successful merge does not run validation again", async () => {
@@ -458,11 +464,22 @@ test("integrated tickets can be published without independent final verification
 	const summary = await finishing as unknown as FinishSummary;
 	expect(summary.warnings).toEqual([]);
 	expect(await git(root, "status", "--porcelain")).toBe("");
-	for (const branch of branches) expect(await git(root, "rev-parse", "--verify", branch)).toMatch(/^[a-f0-9]{40}$/);
+	for (const branch of branches) expect(await git(root, "branch", "--list", branch)).toBe("");
 	expect((await git(root, "worktree", "list", "--porcelain")).match(/^worktree /gm)).toEqual(["worktree "]);
 	for (const file of summary.reports)
 		expect(await git(root, "ls-files", "--error-unmatch", path.relative(root, file))).toBe(path.relative(root, file).split(path.sep).join("/"));
-	expect(summary.retainedBranches.slice().sort()).toEqual(branches.slice().sort());
+	expect(summary.retainedBranches).toEqual([]);
+	expect(summary.retainedWorktrees).toEqual([]);
+	const cleanup = JSON.parse(await fs.readFile(summary.cleanupReport, "utf8"));
+	expect(cleanup.attempts.map((attempt: { phase: string }) => attempt.phase)).toEqual([
+		"integrated", "integrated", "integrated", "finish-worktrees", "finish-branches",
+	]);
+	expect(cleanup.retainedBranches).toEqual([]);
+	expect(cleanup.retainedWorktrees).toEqual([]);
+	expect(cleanup.residualsConfirmed).toBe(true);
+	expect(await git(root, "log", "-2", "--format=%s")).toBe(
+		"hyper-auto-coding: feature cleanup report\nhyper-auto-coding: feature execution reports",
+	);
 	const unpublished = JSON.stringify(["contract.md", "implementation", "spec.md"]);
 	const published = JSON.stringify(["contract.md", "execution", "implementation", "retro", "spec.md"]);
 	const probes = events.filter((event) => event.startsWith("retro:"));
@@ -489,6 +506,137 @@ test("integrated tickets can be published without independent final verification
 	expect(retroWarnings.some((warning) => warning.includes("b.md"))).toBe(true);
 	expect(await fs.stat(before.temporaryDir).catch(() => null)).toBeNull();
 }, 30000);
+
+test("integration reclaims its worktree before retro completes and keeps branch identity", async () => {
+	const retro = gate();
+	const { workflow, root } = await fixture({ retroGate: retro.promise });
+	await complete(workflow, "a.md");
+	const tree = workflow.git.worktrees.get("a.md")!;
+	expect(await fs.stat(tree.cwd).catch(() => null)).toBeNull();
+	expect(await git(root, "branch", "--list", tree.branch)).not.toBe("");
+	expect(workflow.retro.records[0].retro_status).not.toBe("completed");
+	const directory = path.join(workflow.temporaryDir, "cleanup");
+	const records = await fs.readdir(directory);
+	expect(records).toHaveLength(1);
+	expect(JSON.parse(await fs.readFile(path.join(directory, records[0]), "utf8"))).toMatchObject({
+		phase: "integrated", ticket: "a.md", resources: [{ ticket: "a.md", ...tree }], warnings: [],
+	});
+	retro.release();
+});
+
+test("failed early cleanup is checkpointed, restored and retried after report publication", async () => {
+	const { workflow, host, root } = await fixture();
+	const remove = workflow.git.cleanupWorktree.bind(workflow.git);
+	workflow.git.cleanupWorktree = async () => { throw new Error("worktree busy"); };
+	await complete(workflow, "a.md");
+	workflow.git.cleanupWorktree = remove;
+	const paused = await workflow.pause() as StatusSnapshot;
+	const state = JSON.parse(await fs.readFile(paused.checkpoint, "utf8")) as CheckpointSnapshot;
+	expect(state.cleanup?.attempts[0]).toMatchObject({ phase: "integrated", warnings: [expect.stringContaining("worktree busy")] });
+	const restored = await HyperWorkflow.restore(paused.checkpoint, host, "parent", "Main", null);
+	workflows.push(restored);
+	await restored.resume();
+	await complete(restored, "b.md");
+	await complete(restored, "c.md");
+	const cleanup = restored.git.cleanup.bind(restored.git);
+	restored.git.cleanup = async () => {
+		expect(await git(root, "log", "-1", "--format=%s")).toBe("hyper-auto-coding: feature execution reports");
+		return cleanup();
+	};
+	const summary = await restored.execute({ action: "finish" }) as FinishSummary;
+	expect(restored.finished).toBe(true);
+	expect(summary.warnings.some((warning) => warning.includes("worktree busy"))).toBe(true);
+	expect(summary.retainedBranches).toEqual([]);
+	expect(summary.retainedWorktrees).toEqual([]);
+	const report = JSON.parse(await fs.readFile(summary.cleanupReport, "utf8"));
+	expect(report.attempts[0]).toEqual(state.cleanup!.attempts[0]);
+	expect(report.attempts.slice(-2).map((attempt: { phase: string }) => attempt.phase)).toEqual(["finish-worktrees", "finish-branches"]);
+});
+
+test("dirty ticket worktrees and their branches survive final cleanup with precise residuals", async () => {
+	const { workflow, root } = await fixture();
+	const remove = workflow.git.cleanupWorktree.bind(workflow.git);
+	workflow.git.cleanupWorktree = async (ticket) => {
+		if (ticket === "a.md") {
+			const tree = workflow.git.worktrees.get(ticket)!;
+			await fs.writeFile(path.join(tree.cwd, "keep-uncommitted.txt"), "user work");
+		}
+		return remove(ticket);
+	};
+	for (const name of ["a.md", "b.md", "c.md"]) await complete(workflow, name);
+	workflow.git.cleanupWorktree = remove;
+	const tree = workflow.git.worktrees.get("a.md")!;
+	const summary = await workflow.execute({ action: "finish" }) as FinishSummary;
+	expect(workflow.finished).toBe(true);
+	expect(summary.retainedWorktrees).toEqual([tree]);
+	expect(summary.retainedBranches).toEqual([tree.branch]);
+	expect(summary.residualsConfirmed).toBe(true);
+	expect(await fs.readFile(path.join(tree.cwd, "keep-uncommitted.txt"), "utf8")).toBe("user work");
+	expect(await git(root, "status", "--porcelain")).toBe("");
+	const report = JSON.parse(await fs.readFile(summary.cleanupReport, "utf8"));
+	expect(report.retainedWorktrees).toEqual([tree]);
+	expect(report.attempts[0].warnings.length).toBeGreaterThan(0);
+	expect(report.attempts.at(-2).warnings.length).toBeGreaterThan(0);
+});
+
+test("cleanup audit storage failure cannot fail an integrated ticket", async () => {
+	const { workflow } = await fixture();
+	await fs.writeFile(path.join(workflow.temporaryDir, "cleanup"), "blocked audit directory");
+	await complete(workflow, "a.md");
+	const paused = await workflow.pause() as StatusSnapshot;
+	const state = JSON.parse(await fs.readFile(paused.checkpoint, "utf8")) as CheckpointSnapshot;
+	expect(state.cleanup?.attempts).toHaveLength(1);
+	expect(state.cleanup?.warnings.some((warning) => warning.includes("未能持久化"))).toBe(true);
+});
+
+test("legacy checkpoints without cleanup history restore with an empty audit", async () => {
+	const { workflow, host } = await fixture();
+	const paused = await workflow.pause() as StatusSnapshot;
+	const state = JSON.parse(await fs.readFile(paused.checkpoint, "utf8")) as CheckpointSnapshot;
+	delete state.cleanup;
+	await fs.writeFile(paused.checkpoint, JSON.stringify(state));
+	const restored = await HyperWorkflow.restore(paused.checkpoint, host, "parent", "Main", null);
+	workflows.push(restored);
+	expect(restored.status()).toMatchObject({ cleanup: { attempts: [], warnings: [] } });
+	await restored.resume();
+	await complete(restored, "a.md");
+});
+
+test("cleanup report commit failure warns about its index state and still finishes", async () => {
+	const { workflow, root } = await fixture();
+	for (const name of ["a.md", "b.md", "c.md"]) await complete(workflow, name);
+	const commit = workflow.git.commitFiles.bind(workflow.git);
+	workflow.git.commitFiles = async (files, message) => {
+		if (message.endsWith("cleanup report")) {
+			await git(root, "add", "--", files[0]);
+			throw new Error("cleanup commit hook rejected");
+		}
+		return commit(files, message);
+	};
+	const summary = await workflow.execute({ action: "finish" }) as FinishSummary;
+	expect(workflow.finished).toBe(true);
+	expect(summary.cleanupCommit).toBeUndefined();
+	expect(summary.warnings.some((warning) => warning.includes(summary.cleanupReport) && warning.includes("暂存区"))).toBe(true);
+	expect(await git(root, "diff", "--cached", "--name-only")).toBe(path.relative(root, summary.cleanupReport).split(path.sep).join("/"));
+	expect(await fs.stat(workflow.temporaryDir).catch(() => null)).toBeNull();
+});
+
+test("post-publication cleanup and residual query failures remain nonfatal", async () => {
+	const { workflow } = await fixture();
+	workflow.git.cleanupWorktree = async () => ["retain for final retry"];
+	for (const name of ["a.md", "b.md", "c.md"]) await complete(workflow, name);
+	workflow.git.cleanup = async () => { throw new Error("cleanup unavailable"); };
+	workflow.git.cleanupBranches = async () => { throw new Error("branch cleanup unavailable"); };
+	workflow.git.retainedBranches = async () => { throw new Error("branch query unavailable"); };
+	workflow.git.retainedWorktrees = async () => { throw new Error("worktree query unavailable"); };
+	const summary = await workflow.execute({ action: "finish" }) as FinishSummary;
+	expect(workflow.finished).toBe(true);
+	expect(summary.retainedBranches.sort()).toEqual([...workflow.git.worktrees.values()].map((tree) => tree.branch).sort());
+	expect(summary.retainedWorktrees).toEqual([...workflow.git.worktrees.values()]);
+	expect(summary.residualsConfirmed).toBe(false);
+	expect(summary.warnings.some((warning) => warning.includes("保守清单"))).toBe(true);
+	expect(summary.warnings.some((warning) => warning.includes("branch cleanup unavailable"))).toBe(true);
+});
 
 async function waitFor(matches: () => boolean): Promise<void> {
 	while (!matches()) await new Promise<void>((resolve) => setImmediate(resolve));
