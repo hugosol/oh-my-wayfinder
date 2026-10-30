@@ -213,6 +213,17 @@ insert: |-
    Before starting or resuming grilling, read the ticket's fields, Question and current Handoff, then the Lighthouse topics needed by that question and its prerequisites, including published parts of unfinished tickets. Use the map index and dependency links to select those authorities. Reuse available context without rereading it; follow history/evidence links only for a concrete ambiguity or changed premise. For a legacy ticket, locate its latest applicable recovery point and read from it; leave its layout unchanged until that ticket's next publication boundary.
 ```
 
+### grilling-baseline-investigation
+
+Require evidence-backed investigation before framing choices; retain the existing context scope and one-sentence brief.
+
+```op
+anchor: |-
+  <oh-my-wayfinder:insert>3. Resolve it as the type its `wayfinder:<type>` label names (see [Ticket Types](#ticket-types)). Read the label, not just the body: the body never states the type.
+insert: |-
+   **Investigate before framing questions.** Follow the ticket’s inputs and user-designated references for the mechanisms this ticket discusses. Before grilling, establish an evidence-backed normal path and distinguish settled decisions, factual unknowns, and genuine choices. Resolve factual unknowns through investigation before asking questions that depend on them.
+```
+
 ### grilling-frontier-refresh
 
 Recompute the saved frontier against intervening results and route missing cross-ticket choices through Pause. Append after `grilling-context-reuse` at the same upstream resolution anchor, before the opening brief.

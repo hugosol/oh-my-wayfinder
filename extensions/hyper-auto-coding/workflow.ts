@@ -33,6 +33,15 @@ interface ExecutionAttempt {
 	report?: string;
 	error?: string;
 }
+interface CleanupAttempt {
+	id: string;
+	at: string;
+	phase: "integrated" | "finish-worktrees" | "finish-branches";
+	ticket?: string;
+	resources: { ticket: string; branch: string; cwd: string }[];
+	warnings: string[];
+}
+
 export interface HyperInput {
 	action: HyperAction;
 	plan?: TicketPlan[];
@@ -91,6 +100,8 @@ interface Checkpoint {
 	planned: boolean;
 	reports: string[];
 	attempts: ExecutionAttempt[];
+	/** Absent in older v1 checkpoints; missing cleanup history starts empty. */
+	cleanup?: { attempts: CleanupAttempt[]; warnings: string[] };
 	retro: { tickets: string[]; records: ExecutionRecord[] };
 	tickets: (Omit<TicketState, "integration"> & { integration?: TicketIntegrationSnapshot })[];
 }
@@ -110,6 +121,8 @@ export class HyperWorkflow {
 	#wakeCollection?: () => void;
 	readonly #reports: string[] = [];
 	readonly #attempts: ExecutionAttempt[] = [];
+	readonly #cleanupAttempts: CleanupAttempt[] = [];
+	readonly #cleanupWarnings: string[] = [];
 	/** The orchestration call holding the mutex, if any; a pause must let it finish admitting work. */
 	#busyJob?: Promise<object>;
 	#finished = false;
@@ -200,6 +213,8 @@ export class HyperWorkflow {
 		workflow.#pauseId = state.pauseId;
 		workflow.#reports.push(...state.reports);
 		workflow.#attempts.push(...state.attempts);
+		workflow.#cleanupAttempts.push(...state.cleanup?.attempts ?? []);
+		workflow.#cleanupWarnings.push(...state.cleanup?.warnings ?? []);
 		for (const { integration, ...ticket } of state.tickets) {
 			workflow.tickets.set(ticket.ticket, {
 				...ticket,
@@ -290,6 +305,7 @@ export class HyperWorkflow {
 				reportSuccessful: report && succeeded(report.result),
 			})),
 			finished: this.#finished,
+			cleanup: { attempts: this.#cleanupAttempts, warnings: this.#cleanupWarnings },
 			lastReport: this.#reports[this.#reports.length - 1],
 		};
 	}
@@ -354,6 +370,7 @@ export class HyperWorkflow {
 					planned: this.#planned,
 					reports: [...this.#reports],
 					attempts: this.#attempts,
+					cleanup: { attempts: this.#cleanupAttempts, warnings: this.#cleanupWarnings },
 					retro: { tickets: [...this.retro.tickets], records: [...this.retro.records] },
 					tickets: [...this.tickets.values()].map(({ integration, ...ticket }) => ({
 						...ticket,
@@ -534,9 +551,10 @@ export class HyperWorkflow {
 			(role, result, head) => this.#save(role, result, head),
 			() => this.#requestCheck());
 		ticket.integration = integration;
-		const job = integration.run(ticket.ticket, ticket.worktree!, ticket.report!.path).then(() => {
+		const job = integration.run(ticket.ticket, ticket.worktree!, ticket.report!.path).then(async () => {
 			ticket.status = "integrated";
 			this.#notifyProgress();
+			await this.#cleanup("integrated", () => this.git.cleanupWorktree(ticket.ticket), ticket.ticket);
 		}).catch(async (error) => {
 			ticket.status = "failed";
 			ticket.error = error instanceof Error ? error.message : String(error);
@@ -566,6 +584,27 @@ export class HyperWorkflow {
 		this.#reports.push(file);
 		return { path: file, result, head };
 	}
+	/** Resource reclamation and its audit storage never change an integration outcome. */
+	async #cleanup(phase: CleanupAttempt["phase"], run: () => Promise<string[]>, ticket?: string): Promise<void> {
+		const attempt: CleanupAttempt = {
+			id: randomUUID(), at: new Date().toISOString(), phase, ticket,
+			resources: [...this.git.worktrees].filter(([name]) => !ticket || name === ticket)
+				.map(([name, tree]) => ({ ticket: name, ...tree })),
+			warnings: [],
+		};
+		try { attempt.warnings.push(...await run()); }
+		catch (error) { attempt.warnings.push(`资源清理失败（${phase}${ticket ? `: ${ticket}` : ""}）：${error instanceof Error ? error.message : String(error)}`); }
+		this.#cleanupAttempts.push(attempt);
+		this.#cleanupWarnings.push(...attempt.warnings);
+		try {
+			const directory = path.join(this.temporaryDir, "cleanup");
+			await fs.mkdir(directory, { recursive: true });
+			await atomicWrite(path.join(directory, `${attempt.id}.json`), `${JSON.stringify(attempt, null, 2)}\n`);
+		} catch (error) {
+			this.#cleanupWarnings.push(`清理尝试记录未能持久化（${attempt.id}）：${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
 	async #finish(): Promise<object> {
 		this.#allIntegrated();
 		await this.retro.finish();
@@ -589,8 +628,38 @@ export class HyperWorkflow {
 			files.map((file) => path.relative(this.git.root, file).split(path.sep).join("/")),
 			`hyper-auto-coding: ${this.slug} execution reports`,
 		);
-		const retainedBranches = [...this.git.worktrees.values()].map((tree) => tree.branch);
-		const warnings = await this.git.cleanup();
+		await this.#cleanup("finish-worktrees", () => this.git.cleanup());
+		await this.#cleanup("finish-branches", () => this.git.cleanupBranches());
+		const warnings = [...this.#cleanupWarnings];
+		// Query failures preserve the full identity list conservatively and are explicit, not false success.
+		let retainedBranches = [...this.git.worktrees.values()].map((tree) => tree.branch);
+		let retainedWorktrees = [...this.git.worktrees.values()];
+		let residualsConfirmed = true;
+		try { retainedBranches = await this.git.retainedBranches(); }
+		catch (error) {
+			residualsConfirmed = false;
+			warnings.push(`无法确认残留 branch，返回本轮保守清单：${error instanceof Error ? error.message : String(error)}`);
+		}
+		try { retainedWorktrees = await this.git.retainedWorktrees(); }
+		catch (error) {
+			residualsConfirmed = false;
+			warnings.push(`无法确认残留 worktree，返回本轮保守清单：${error instanceof Error ? error.message : String(error)}`);
+		}
+		const cleanupReport = path.join(directory, "cleanup.json");
+		let cleanupCommit: string | undefined;
+		try {
+			await fs.writeFile(cleanupReport, `${JSON.stringify({
+				version: 1, branch: this.git.branch, attempts: this.#cleanupAttempts,
+				warnings, retainedBranches, retainedWorktrees, residualsConfirmed,
+			}, null, 2)}\n`, "utf8");
+			cleanupCommit = await this.git.commitFiles(
+				[path.relative(this.git.root, cleanupReport).split(path.sep).join("/")],
+				`hyper-auto-coding: ${this.slug} cleanup report`,
+			);
+			files.push(cleanupReport);
+		} catch (error) {
+			warnings.push(`清理报告提交失败：${cleanupReport}；该文件可能未提交或仍在暂存区，未重置暂存区以保护其他改动；请检查此路径的 git status：${error instanceof Error ? error.message : String(error)}`);
+		}
 		try { await this.host.close(); }
 		catch (error) { warnings.push(`宿主临时产物清理失败：${error instanceof Error ? error.message : String(error)}`); }
 		this.#finished = true;
@@ -608,6 +677,7 @@ export class HyperWorkflow {
 		catch (error) { warnings.push(`暂停检查点未能删除，可能被再次恢复：${checkpoint}；${error instanceof Error ? error.message : String(error)}`); }
 		try { await fs.rm(this.temporaryDir, { recursive: true }); }
 		catch (error) { warnings.push(`报告临时目录保留：${this.temporaryDir}；${error instanceof Error ? error.message : String(error)}`); }
-		return { branch: this.git.branch, commit, reports: files, executions: this.retro.records, warnings, retainedBranches };
+		return { branch: this.git.branch, commit, cleanupCommit, cleanupReport, reports: files,
+			executions: this.retro.records, warnings, retainedBranches, retainedWorktrees, residualsConfirmed };
 	}
 }

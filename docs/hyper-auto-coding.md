@@ -86,14 +86,17 @@ Only explicitly enrolled ticket implementations get retro, including first attem
 
 Every implementation ending starts asynchronous retro in the original TDD session, without waiting for merge, once per execution. Integration takes the worktree in a different session; retro only assesses history and proposes advice, without editing code or operating Git. Retro outcomes remain independent of implementation outcomes.
 
-Reports are generated outside the Git checkout in a unique OS-temp directory (`%TEMP%` on Windows, otherwise the runtime OS-temp location). There is no per-merge report movement.
+Reports are generated outside the Git checkout in a unique OS-temp directory (`%TEMP%` on Windows, otherwise the runtime OS-temp location). There is no per-merge report movement. Retrospectives are staged in `retro/`, and cleanup attempts in the same run directory's `cleanup/`.
+
+Each truly integrated ticket immediately attempts safe cleanup of its own worktree, without waiting for retro or touching other tickets still in flight. The first merge is not a cleanup trigger: integration testing, repairs, and the final merge must have ended. Removing the directory retains this run's ticket-branch identity, and cleanup failure does not undo integration. Retro runs from the original session history without requiring the development worktree to remain present.
 
 After all ticket integration processing, `finish`:
 
 1. Waits for all retro success/failure terminal outcomes.
 2. Publishes reports and records into the integration checkout and commits only explicit output files.
-3. Safely removes clean, merged original ticket worktrees while retaining local ticket branches and the integration branch.
-4. Returns the final commit, report paths, independent retro outcomes, and cleanup warnings.
+3. Retries this run's remaining worktrees, then safely deletes its merged ticket branches only when their worktrees are gone. A residual worktree keeps its branch; the user's integration branch is always retained.
+4. Best-effort publishes and separately commits `cleanup.json`, recording early attempts, final retries, branch cleanup, and residual resources. Cleanup-report write or commit failures only warn and do not block completion.
+5. Cleans temporary artifacts and returns the delivery commit, cleanup-report commit if successful, report paths, independent retro outcomes, and residual resources and warnings.
 
 Final outputs:
 
@@ -102,11 +105,12 @@ Final outputs:
 .scratch/<slug>/retro/<ticket-file>/<execution-id>.md
 .scratch/<slug>/execution/<run-directory>/*.md
 .scratch/<slug>/execution/<run-directory>/workflow.json
+.scratch/<slug>/execution/<run-directory>/cleanup.json
 ```
 
 Retro Markdown exists only for delivered retros; failure records are still committed. Implementation, every integration round, fix, and verification reports and execution states are retained. Published report pointers are rebased to final locations. Main-agent acceptance decisions are no longer generated.
 
-Copy or commit failures preserve temporary artifacts and report errors, without rerunning implementation or claiming everything is committed. Dirty, unmerged, or unsafe-to-remove worktrees are retained with warnings, never force-removed.
+Delivery/retro report copy or commit failures preserve temporary artifacts and report errors, without rerunning implementation or claiming everything is committed. Cleanup and its supplementary report are best-effort: `cleanup.json` is not a completion gate. A failed commit can leave that report uncommitted or staged; the result identifies its path without forcibly resetting the index. Dirty, unmerged, or unsafe-to-remove worktrees are retained with warnings, never force-removed. Only this run's recorded resources are considered, not historical leftovers; cleanup history and branch identities survive pause checkpoints.
 
 ## Orchestration surface and limits
 
@@ -126,7 +130,7 @@ Workflow control is command-only: `/hyper-auto-coding pause` and `/hyper-auto-co
 
 1. It closes admission of new implementation attempts in the owning session immediately, including retries of failed tickets. No later `dispatch` starts an implementation.
 2. Work already in flight continues to a known outcome and is never aborted: running TDD implementations, their retrospectives, background integrations, and conflict continuations all finish, and an implementation already running may still start its own background integration child.
-3. Once nothing remains in flight, the workflow writes a checkpoint of state-machine-relevant data and becomes **paused**; the completion notice reports the checkpoint path. It does not finish: it publishes no reports, removes no worktrees, and makes no final commit, even when every ticket is already integrated and no retrospective is pending.
+3. Once nothing remains in flight, the workflow writes a checkpoint of state-machine-relevant data and becomes **paused**; the completion notice reports the checkpoint path. It does not run finish: it publishes no reports, deletes no ticket branches, and makes no final commit, even when every ticket is already integrated and no retrospective is pending. In-flight tickets still attempt immediate worktree cleanup as they become integrated.
 
 `pause` resolves with the paused snapshot. Asking again while a drain is still running joins that same drain instead of starting a second one, and the command is rejected when the workflow is already paused or already finished.
 
@@ -145,7 +149,7 @@ Workflow control is command-only: `/hyper-auto-coding pause` and `/hyper-auto-co
 
 - The checkpoint lives outside the repository, under the OS temp directory, as a per-session `hyper-auto-coding-pause-*.json` file whose name is deterministic (`HyperWorkflow.checkpointPath(sessionId)`), so it never enters the integration branch or a commit.
 - It is a temporary aid, not durable storage: OS temp cleanup, or terminating the process before the drain finishes, leaves nothing to restore, and `resume` validates and repairs nothing beyond loading that file.
-- Pausing assumes the existing artifacts remain available: ticket worktrees and branches, the integration branch and its checkout, and the run's report temp directory. Resume neither copies nor repairs the environment, and performs no extra Git validation.
+- Pausing assumes the artifacts still needed remain available: unfinished tickets' worktrees, retained ticket branches, the integration branch and its checkout, and the run's report temp directory. Integrated tickets' worktrees may already be removed; checkpoint paths retain resource identity and history, not a requirement to recreate them. Resume neither copies nor repairs the environment, and performs no extra Git validation.
 - Pause/resume cover a deliberate suspension, not an arbitrary interruption: they do not recover a workflow whose host died mid-flight, do not recreate missing artifacts, and do not transfer a checkpoint to another session or slug.
 - Pausing does not stop an in-flight ticket, its retrospective, or its integration, and does not by itself change what `finish` later publishes.
 
