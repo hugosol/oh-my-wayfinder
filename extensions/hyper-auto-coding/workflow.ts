@@ -6,20 +6,22 @@ import type { SingleResult } from "@oh-my-pi/pi-coding-agent";
 import { TddWorkFlow, type ExecutionRecord, type TicketProgress } from "../implementation-node/tdd-execution";
 import { TicketIntegration, type TicketIntegrationSnapshot } from "../integration-node/ticket-integration";
 import { HyperGit, type TicketWorktree } from "./git";
+import { loadRepositories } from "./repositories";
 import type { HyperHost, HyperRole } from "./subagent-host";
 
 export interface TicketPlan {
 	ticket: string;
 	blockedBy: string[];
+	repositories?: string[];
 }
 export interface Report {
 	path: string;
 	result: SingleResult;
-	head: string;
+	heads: Record<string, string>;
 }
 interface TicketState extends TicketPlan {
 	status: "ready" | "running" | "integrating" | "integrated" | "failed";
-	worktree?: TicketWorktree;
+	worktrees?: Record<string, TicketWorktree>;
 	report?: Report;
 	integration?: TicketIntegration;
 	error?: string;
@@ -38,7 +40,7 @@ interface CleanupAttempt {
 	at: string;
 	phase: "integrated" | "finish-worktrees" | "finish-branches";
 	ticket?: string;
-	resources: { ticket: string; branch: string; cwd: string }[];
+	resources: { repository: string; ticket: string; branch: string; cwd: string }[];
 	warnings: string[];
 }
 
@@ -49,7 +51,7 @@ export interface HyperInput {
 }
 
 /** Checkpoint format version; a mismatch means the saved pause is not ours to load. */
-const CHECKPOINT_VERSION = 1;
+const CHECKPOINT_VERSION = 2;
 
 /** A checkpoint only ever counts once fully written: a partial file must never look like a pause. */
 async function atomicWrite(file: string, content: string): Promise<void> {
@@ -93,6 +95,7 @@ interface Checkpoint {
 	root: string;
 	branch: string;
 	baseline: string;
+	repositories: Record<string, { root: string; branch: string; baseline: string }>;
 	temporaryDir: string;
 	maxParallelTickets: number;
 	ownerSessionId: string;
@@ -138,12 +141,14 @@ export class HyperWorkflow {
 	private constructor(
 		readonly slug: string,
 		readonly git: HyperGit,
+		readonly repositories: Map<string, HyperGit>,
 		readonly host: HyperHost,
 		readonly maxParallelTickets: number,
 		readonly ownerSessionId: string,
 		readonly ownerAgentId: string,
 		readonly temporaryDir: string,
 		readonly baseline: string,
+		readonly baselines: Record<string, string>,
 		readonly retro: TddWorkFlow,
 	) {}
 
@@ -156,12 +161,15 @@ export class HyperWorkflow {
 		agentId: string,
 		sessionFile: string | null,
 	): Promise<HyperWorkflow> {
+		const repositories = await loadRepositories(slug, git);
 		const baseline = await git.commitTickets();
 		// Phase 1 owns the checkout until now. Publication commits the ticket files
 		// and the contract mapping it filled; anything else left tracked or untracked
 		// would make every later integration merge fail assertClean, so refuse to
 		// start instead of dispatching tickets into that dead lock.
 		await git.assertClean();
+		const baselines: Record<string, string> = {};
+		for (const [id, repository] of repositories) baselines[id] = await repository.head();
 		const temporaryDir = await fs.mkdtemp(path.join(os.tmpdir(), "hyper-auto-coding-"));
 		const entries = await fs.readdir(path.join(git.root, ".scratch", slug, "implementation"), { withFileTypes: true });
 		const names = entries.filter((entry) => entry.isFile() && entry.name.endsWith(".md")).map((entry) => entry.name);
@@ -170,7 +178,7 @@ export class HyperWorkflow {
 			storageRoot: path.join(temporaryDir, "retro"),
 		});
 		const workflow = new HyperWorkflow(
-			slug, git, host, maxParallelTickets, sessionId, agentId, temporaryDir, baseline, retro,
+			slug, git, repositories, host, maxParallelTickets, sessionId, agentId, temporaryDir, baseline, baselines, retro,
 		);
 		for (const ticket of names) workflow.tickets.set(ticket, { ticket, blockedBy: [], status: "ready" });
 		return workflow;
@@ -196,17 +204,25 @@ export class HyperWorkflow {
 				`暂停检查点属于会话 ${state.ownerSessionId}/${state.ownerAgentId}，不能由此会话恢复：${checkpoint}`,
 			);
 		}
-		const worktrees: [string, TicketWorktree][] = [];
-		for (const ticket of state.tickets) if (ticket.worktree) worktrees.push([ticket.ticket, ticket.worktree]);
-		const git = HyperGit.adopt(state.root, state.branch, state.slug, worktrees);
+		const repositories = new Map<string, HyperGit>();
+		for (const [id, repository] of Object.entries(state.repositories)) {
+			const worktrees: [string, TicketWorktree][] = [];
+			for (const ticket of state.tickets) {
+				if (ticket.worktrees && Object.prototype.hasOwnProperty.call(ticket.worktrees, id)) worktrees.push([ticket.ticket, ticket.worktrees[id]]);
+			}
+			repositories.set(id, HyperGit.adopt(repository.root, repository.branch, state.slug, worktrees));
+		}
+		const git = [...repositories.values()].find((repository) => repository.root === state.root);
+		if (!git) throw new Error("Checkpoint has no coordinator repository");
+		const baselines = Object.fromEntries(Object.entries(state.repositories).map(([id, repository]) => [id, repository.baseline]));
 		const retro = new TddWorkFlow(state.slug, state.root, sessionId, agentId, sessionFile,
 			new Set(state.retro.tickets), host.retro, {
 				maxConcurrent: state.maxParallelTickets,
 				storageRoot: path.join(state.temporaryDir, "retro"),
 			});
 		retro.restore(state.retro.records);
-		const workflow = new HyperWorkflow(state.slug, git, host, state.maxParallelTickets, sessionId, agentId,
-			state.temporaryDir, state.baseline, retro);
+		const workflow = new HyperWorkflow(state.slug, git, repositories, host, state.maxParallelTickets, sessionId, agentId,
+			state.temporaryDir, state.baseline, baselines, retro);
 		workflow.#planned = state.planned;
 		workflow.#paused = true;
 		workflow.#checkpoint = checkpoint;
@@ -218,7 +234,7 @@ export class HyperWorkflow {
 		for (const { integration, ...ticket } of state.tickets) {
 			workflow.tickets.set(ticket.ticket, {
 				...ticket,
-				integration: integration && TicketIntegration.restore(git, host, workflow.#references(),
+				integration: integration && TicketIntegration.restore(workflow.#ticketRepositories(ticket), host, workflow.#references(),
 					(role, result, head) => workflow.#save(role, result, head),
 					() => workflow.#requestCheck(), integration),
 			});
@@ -291,6 +307,7 @@ export class HyperWorkflow {
 			checkpoint: this.#checkpoint ?? HyperWorkflow.checkpointPath(this.ownerSessionId),
 			branch: this.git.branch,
 			baseline: this.baseline,
+			repositories: this.#repositorySnapshots(),
 			temporaryDir: this.temporaryDir,
 			maxParallelTickets: this.maxParallelTickets,
 			active: [...this.#running.keys()],
@@ -363,6 +380,7 @@ export class HyperWorkflow {
 					root: this.git.root,
 					branch: this.git.branch,
 					baseline: this.baseline,
+					repositories: this.#repositorySnapshots(),
 					temporaryDir: this.temporaryDir,
 					maxParallelTickets: this.maxParallelTickets,
 					ownerSessionId: this.ownerSessionId,
@@ -429,6 +447,9 @@ export class HyperWorkflow {
 		const graph = new Map(plan.map((item) => [item.ticket, item.blockedBy]));
 		for (const item of plan) {
 			this.#ticket(item.ticket);
+			const repositories = item.repositories ?? (this.repositories.size === 1 ? [...this.repositories.keys()] : []);
+			if (!repositories.length || new Set(repositories).size !== repositories.length || repositories.some((id) => !this.repositories.has(id)))
+				throw new Error(`Ticket repositories must be nonempty, distinct, known repository IDs: ${item.ticket}`);
 			for (const blocker of item.blockedBy) if (!graph.has(blocker)) throw new Error(`未知依赖票据：${blocker}`);
 		}
 		const visited = new Set<string>(), visiting = new Set<string>();
@@ -441,7 +462,11 @@ export class HyperWorkflow {
 			visited.add(name);
 		};
 		for (const name of graph.keys()) visit(name);
-		for (const item of plan) this.#ticket(item.ticket).blockedBy = [...item.blockedBy];
+		for (const item of plan) {
+			const ticket = this.#ticket(item.ticket);
+			ticket.blockedBy = [...item.blockedBy];
+			ticket.repositories = [...(item.repositories ?? this.repositories.keys())];
+		}
 		this.#planned = true;
 	}
 	#ticket(name: string): TicketState {
@@ -450,10 +475,20 @@ export class HyperWorkflow {
 		return ticket;
 	}
 	#ready(ticket: TicketState): boolean {
-		return ticket.status === "ready" && ticket.blockedBy.every((name) => !!this.#ticket(name).integration?.snapshot.mergedHead);
+		return ticket.status === "ready" && ticket.blockedBy.every((name) => !!this.#ticket(name).integration?.snapshot.merged);
+	}
+	#repositorySnapshots(): Record<string, { root: string; branch: string; baseline: string }> {
+		return Object.fromEntries([...this.repositories].map(([id, git]) => [id, { root: git.root, branch: git.branch, baseline: this.baselines[id] }]));
+	}
+	#ticketRepositories(ticket: TicketState) {
+		return (ticket.repositories ?? []).map((repository) => {
+			const worktree = ticket.worktrees?.[repository];
+			if (!worktree || !Object.prototype.hasOwnProperty.call(ticket.worktrees!, repository)) throw new Error(`Missing worktree: ${ticket.ticket}/${repository}`);
+			return { repository, git: this.repositories.get(repository)!, worktree };
+		});
 	}
 	#references(): string {
-		return `集成分支：${this.git.branch}\nspec：${path.join(this.git.root, ".scratch", this.slug, "spec.md")}\ncontract：${path.join(this.git.root, ".scratch", this.slug, "contract.md")}`;
+		return `协调仓集成分支：${this.git.branch}\nspec：${path.join(this.git.root, ".scratch", this.slug, "spec.md")}\ncontract：${path.join(this.git.root, ".scratch", this.slug, "contract.md")}`;
 	}
 
 	async #dispatch(names: string[]): Promise<void> {
@@ -465,9 +500,21 @@ export class HyperWorkflow {
 			// A pause closes admission between two tickets, including while the previous worktree is created.
 			if (this.#pausing || this.#paused) break;
 			const ticket = this.#ticket(name);
-			const worktree = await this.git.createTicket(name);
-			ticket.worktree = worktree;
+			ticket.worktrees ??= Object.create(null) as Record<string, TicketWorktree>;
+			try {
+				for (const repository of ticket.repositories!) {
+					if (this.#pausing || this.#paused) break;
+					if (!Object.prototype.hasOwnProperty.call(ticket.worktrees, repository))
+						ticket.worktrees[repository] = await this.repositories.get(repository)!.createTicket(name);
+				}
+			} catch (error) {
+				ticket.error = error instanceof Error ? error.message : String(error);
+				this.#requestCheck();
+				throw error;
+			}
 			if (this.#pausing || this.#paused) break;
+			const repositories = this.#ticketRepositories(ticket);
+			const worktree = repositories[0].worktree;
 			const id = randomUUID();
 			const previous = ticket.report?.path;
 			const previousError = ticket.error;
@@ -477,15 +524,16 @@ export class HyperWorkflow {
 			const attempt: ExecutionAttempt = { ticket: name, id };
 			this.#attempts.push(attempt);
 			await this.retro.begin(id, name);
-			const task = `${previousError ? `上次执行未被工作流接收，原因如下：\n${previousError}\n请先处理上述原因，再完成本票交付；保留已有工作，不要重复已完成且无需重跑的工作。\n\n` : ""}在当前 worktree 实现唯一票据：${path.join(worktree.cwd, ".scratch", this.slug, "implementation", name)}。\n${this.#references()}\n${previous ? `接手此前实现进度，不丢弃已有修改。上次报告：${previous}` : "这是本票首次执行。"}\n遵守 tdd skill，自行负责本票验收并报告实际验证与未完成事项。完成后尽快提交本票实现，交出 worktree，由独立集成子代理接管。不要修改其他票据或工作流报告，不操作集成分支工作区，不自行合入集成分支，不调用 retro、不派发其他票据。不得 reset 丢弃既有工作。`;
+			const task = `${previousError ? `上次执行未被工作流接收，原因如下：\n${previousError}\n请先处理上述原因，再完成本票交付；保留已有工作，不要重复已完成且无需重跑的工作。\n\n` : ""}在当前 worktree 实现唯一票据：${path.join(this.git.root, ".scratch", this.slug, "implementation", name)}。\n本票唯一实现代理拥有下列全部仓库 worktrees；先读取每个 worktree 的项目指令，可在任意列出的仓库完成本票，勿修改未列出的仓库：\n${JSON.stringify(repositories.map(({ repository, worktree }) => ({ repository, ...worktree })), null, 2)}\n${this.#references()}\n${previous ? `接手此前实现进度，不丢弃已有修改。上次报告：${previous}` : "这是本票首次执行。"}\n遵守 tdd skill，自行负责本票验收并报告实际验证与未完成事项。完成后尽快提交本票实现，交出 worktree，由独立集成子代理接管。不要修改其他票据或工作流报告，不操作集成分支工作区，不自行合入集成分支，不调用 retro、不派发其他票据。不得 reset 丢弃既有工作。`;
 			const job = (async () => {
 				let result: SingleResult | undefined, failure: string | undefined;
 				try {
 					result = await this.host.run({ role: "implement", cwd: worktree.cwd, name: `${name}-${id}`, task });
-					ticket.report = await this.#save("implement", result, await this.git.ticketHead(worktree));
+					const heads = Object.fromEntries(await Promise.all(repositories.map(async ({ repository, git, worktree }) => [repository, await git.ticketHead(worktree)])));
+					ticket.report = await this.#save("implement", result, heads);
 					attempt.report = ticket.report.path;
 					if (!succeeded(result)) throw new Error(`实现执行未正常完成：${ticket.report.path}`);
-					await this.git.assertTicketClean(worktree);
+					for (const { git, worktree } of repositories) await git.assertTicketClean(worktree);
 					ticket.status = "integrating";
 					this.#startIntegration(ticket);
 				} catch (error) {
@@ -547,14 +595,15 @@ export class HyperWorkflow {
 	}
 
 	#startIntegration(ticket: TicketState): void {
-		const integration = new TicketIntegration(this.git, this.host, this.#references(),
+		const integration = new TicketIntegration(this.#ticketRepositories(ticket), this.host, this.#references(),
 			(role, result, head) => this.#save(role, result, head),
 			() => this.#requestCheck());
 		ticket.integration = integration;
-		const job = integration.run(ticket.ticket, ticket.worktree!, ticket.report!.path).then(async () => {
+		const job = integration.run(ticket.ticket, ticket.report!.path).then(async () => {
 			ticket.status = "integrated";
 			this.#notifyProgress();
-			await this.#cleanup("integrated", () => this.git.cleanupWorktree(ticket.ticket), ticket.ticket);
+			for (const { repository, git } of this.#ticketRepositories(ticket))
+				await this.#cleanup("integrated", repository, () => git.cleanupWorktree(ticket.ticket), ticket.ticket);
 		}).catch(async (error) => {
 			ticket.status = "failed";
 			ticket.error = error instanceof Error ? error.message : String(error);
@@ -576,20 +625,20 @@ export class HyperWorkflow {
 		await fs.writeFile(file, message, "utf8");
 		this.#reports.push(file);
 	}
-	async #save(role: HyperRole, result: SingleResult, head: string): Promise<Report> {
+	async #save(role: HyperRole, result: SingleResult, heads: Record<string, string>): Promise<Report> {
 		const file = path.join(this.temporaryDir, `${role}-${randomUUID()}.md`);
-		const metadata = { role, agent: result.agent, agent_id: result.id, head,
+		const metadata = { role, agent: result.agent, agent_id: result.id, heads,
 			exitCode: result.exitCode, error: result.error, aborted: result.aborted, truncated: result.truncated };
 		await fs.writeFile(file, `# ${role}\n\n\`\`\`json\n${JSON.stringify(metadata, null, 2)}\n\`\`\`\n\n${result.output}\n`, "utf8");
 		this.#reports.push(file);
-		return { path: file, result, head };
+		return { path: file, result, heads };
 	}
 	/** Resource reclamation and its audit storage never change an integration outcome. */
-	async #cleanup(phase: CleanupAttempt["phase"], run: () => Promise<string[]>, ticket?: string): Promise<void> {
+	async #cleanup(phase: CleanupAttempt["phase"], repository: string, run: () => Promise<string[]>, ticket?: string): Promise<void> {
 		const attempt: CleanupAttempt = {
 			id: randomUUID(), at: new Date().toISOString(), phase, ticket,
-			resources: [...this.git.worktrees].filter(([name]) => !ticket || name === ticket)
-				.map(([name, tree]) => ({ ticket: name, ...tree })),
+			resources: [...this.repositories.get(repository)!.worktrees].filter(([name]) => !ticket || name === ticket)
+				.map(([name, tree]) => ({ repository, ticket: name, ...tree })),
 			warnings: [],
 		};
 		try { attempt.warnings.push(...await run()); }
@@ -628,22 +677,27 @@ export class HyperWorkflow {
 			files.map((file) => path.relative(this.git.root, file).split(path.sep).join("/")),
 			`hyper-auto-coding: ${this.slug} execution reports`,
 		);
-		await this.#cleanup("finish-worktrees", () => this.git.cleanup());
-		await this.#cleanup("finish-branches", () => this.git.cleanupBranches());
+		for (const [repository, git] of this.repositories) await this.#cleanup("finish-worktrees", repository, () => git.cleanup());
+		for (const [repository, git] of this.repositories) await this.#cleanup("finish-branches", repository, () => git.cleanupBranches());
 		const warnings = [...this.#cleanupWarnings];
-		// Query failures preserve the full identity list conservatively and are explicit, not false success.
-		let retainedBranches = [...this.git.worktrees.values()].map((tree) => tree.branch);
-		let retainedWorktrees = [...this.git.worktrees.values()];
+		const retainedBranches: { repository: string; branch: string }[] = [];
+		const retainedWorktrees: { repository: string; branch: string; cwd: string }[] = [];
 		let residualsConfirmed = true;
-		try { retainedBranches = await this.git.retainedBranches(); }
-		catch (error) {
-			residualsConfirmed = false;
-			warnings.push(`无法确认残留 branch，返回本轮保守清单：${error instanceof Error ? error.message : String(error)}`);
-		}
-		try { retainedWorktrees = await this.git.retainedWorktrees(); }
-		catch (error) {
-			residualsConfirmed = false;
-			warnings.push(`无法确认残留 worktree，返回本轮保守清单：${error instanceof Error ? error.message : String(error)}`);
+		for (const [repository, git] of this.repositories) {
+			let branches = [...git.worktrees.values()].map((tree) => tree.branch);
+			let trees = [...git.worktrees.values()];
+			try { branches = await git.retainedBranches(); }
+			catch (error) {
+				residualsConfirmed = false;
+				warnings.push(`无法确认残留 branch（${repository}），返回本轮保守清单：${error instanceof Error ? error.message : String(error)}`);
+			}
+			try { trees = await git.retainedWorktrees(); }
+			catch (error) {
+				residualsConfirmed = false;
+				warnings.push(`无法确认残留 worktree（${repository}），返回本轮保守清单：${error instanceof Error ? error.message : String(error)}`);
+			}
+			retainedBranches.push(...branches.map((branch) => ({ repository, branch })));
+			retainedWorktrees.push(...trees.map((tree) => ({ repository, ...tree })));
 		}
 		const cleanupReport = path.join(directory, "cleanup.json");
 		let cleanupCommit: string | undefined;

@@ -137,6 +137,10 @@ Backtracer 的范围是相关已发布主题，包含未完成票中的已发布
 
 新增独立命令 [`/hyper-auto-coding`](./hyper-auto-coding.cn.md)，借鉴上游 `implement-spec` 的依赖 frontier 与每票 worktree，但集成分支由用户预先创建并提交 spec/contract。它原样复用现有 Phase 1，提交票据后并行实现，首次合入即放行下游，复用原开发 worktree 异步测试、修复并在同一集成会话处理冲突，仅短暂双向 merge 串行；不自动执行最终整体验收，需要时由可选普通 ticket 指定范围，验收结果可能早于并行集成中的后续修改。没有 code-review 或主代理验收门禁。只有票据实现执行触发 retro，报告先在系统临时目录生成，收尾统一提交；每票 integrated 后立即尝试安全回收 worktree，retro 不依赖原工作目录；finish 提交交付报告后重试残留 worktree 并安全删除本轮已合入的票据 branch，保留集成分支。清理记录另行尽力提交，失败只警告。不增加 Phase 1 门禁、重试次数策略或中断恢复。调度与可选 ticket 验收见 [`hyper-auto-coding/`](../extensions/hyper-auto-coding/)，单票集成见 [`integration-node/`](../extensions/integration-node/)，配置与 Jev 共用现有文件，默认实现并发数 4。
 
+可选本地多仓库交付仍由一个协调仓库持有全局票据、依赖图与实现槽位上限。协调仓库 manifest 声明仓库 ID 与本地路径；开发票指定一个 ID，跨仓库集成/验收票指定所需全部仓库，并负责明确的跨仓库检查与证据。每票的一个实现会话与随后一个集成会话先后拥有这些仓库的全部原 worktree。全部仓库首次合入后才释放依赖（无改动仓库不必创建空提交）；部分失败不回滚此前的合并。报告、复盘与安全清理记录集中提交。全局暂停排水覆盖全部仓库，仅由原会话恢复；后续干净合并不增加完整验证门禁。串行 `/spec-to-code` 不变。
+
+规划改动分别锚定在 To-tickets 的 [local-repository-manifest](../deltas/mappings/to-tickets.md#local-repository-manifest)、[repository-ownership](../deltas/mappings/to-tickets.md#repository-ownership)、[repository-ownership-quiz](../deltas/mappings/to-tickets.md#repository-ownership-quiz) 和 [template-repositories-local](../deltas/mappings/to-tickets.md#template-repositories-local)。运行机制仍由扩展源码负责，不放进生成技能。
+
 其他 agent 用户可手动完成通用流程，不会仅靠复制 skills 获得 OMP 的自动调度。
 
 ## 7. 决策生命周期、适用范围与迁移影响

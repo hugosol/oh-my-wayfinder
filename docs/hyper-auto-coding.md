@@ -18,6 +18,23 @@ Before starting:
 
 All Git operations are local: no push, PR, or merge to main. The command does not create the integration branch, stash changes, or commit unrelated edits. The slug is a single safe path segment.
 
+## Optional local multi-repository mode
+
+The current repository is the **coordinator repository**: it holds the spec, contract, global ticket files, reports, retrospectives, and cleanup records. To include other local Git repositories, supply `.scratch/<slug>/repositories.json` in the coordinator (Phase 1 may create it):
+
+```json
+{
+  "repositories": [
+    { "id": "frontend", "path": "." },
+    { "id": "backend", "path": "../backend" }
+  ]
+}
+```
+
+This is the manifest schema: a nonempty `repositories` array of `{ "id": string, "path": string }` entries. IDs match `[A-Za-z0-9][A-Za-z0-9_-]*` and are unique. Paths are absolute or relative to the coordinator Git root; exactly one must resolve to the coordinator. Entries must identify distinct Git repositories: aliases sharing a Git common directory are rejected. Every target needs a clean working tree/index, a usable Git identity, and a checked-out named integration branch other than `main`/`master`. Only the coordinator needs spec/contract inputs. All repository checks happen before implementation begins.
+
+With no manifest, the sole repository ID is `coordinator` and existing single-repository behavior is preserved. In a single-entry manifest the declared ID is the sole default instead. Multi-repository tickets must include `**Repositories:** frontend, backend` with nonempty comma-separated manifest IDs; single-repository tickets may omit it. Ticket filenames/IDs, dependency graph, and implementation slots remain global, not per repository. A development ticket targets exactly one repository; an integration/acceptance ticket may target several and its owner may modify any listed repository. This local-only mode adds no push, remote orchestration, scheduling gate, or change to serial `/spec-to-code`.
+
 ## Configuration
 
 The concurrency limit shares `extensions/spec-to-code/config.json` with Jev and is read once at extension load:
@@ -35,16 +52,16 @@ The concurrency limit shares `extensions/spec-to-code/config.json` with Jev and 
 
 ### Phase 1: reuse ticket cutting
 
-The existing `/to-tickets` activation, automatic answers, Jev decisions, 15-intervention budget, and ticket-file transition are unchanged. No new whole-ticket-set publication gate is added: existing nonempty tickets end Phase 1 under the original rules. The command then commits the implementation ticket files together with the slug's `contract.md` (whose "Delivering work" mapping Phase 1 fills in), and refuses to start Phase 2 while anything else is still tracked or untracked, because every later integration merge requires a fully clean integration checkout.
+The existing `/to-tickets` activation, automatic answers, Jev decisions, 15-intervention budget, and ticket-file transition are unchanged. No new whole-ticket-set publication gate is added: existing nonempty tickets end Phase 1 under the original rules. The command then commits the implementation ticket files together with the optional `repositories.json` and the slug's `contract.md` (whose "Delivering work" mapping Phase 1 fills in), and refuses to start Phase 2 while anything else is still tracked or untracked, because every later integration merge requires a fully clean integration checkout.
 
 ### Phase 2: implementation and background integration
 
 The main agent reads published tickets and registers the execution dependency graph, without recutting tickets. It schedules only: it does not judge whether report evidence is sufficient or manually accept/confirm each ticket. Children own their acceptance; normal completion counts as success, without interpreting report prose.
 
-- First execution creates a ticket branch and an OS-temp worktree from the current integration tip.
+- First dispatch creates one ticket branch and OS-temp worktree per listed repository, from each repository's current integration HEAD at dispatch time. Retries reuse all original branches/worktrees.
 - A fresh TDD child implements, validates, and promptly commits its ticket, without an extra integration-tip synchronization stage. Ending implementation automatically starts background integration, outside implementation slot limits.
-- TDD and integration are different sessions taking sequential ownership of the same worktree and branch. They do not write code concurrently. No extra integration worktree is created.
-- The first successful merge releases downstream tickets immediately, before integration tests or repairs finish. Status lists implementation in `active` and background integration separately in `integrating`.
+- One TDD session and one later integration session take sequential ownership of all the ticket's original repository worktrees and branches. They do not write code concurrently. No extra integration worktree is created.
+- Only after every listed repository has its first successful merge are downstream tickets released, before integration tests or repairs finish. An unchanged repository counts as merged without an empty commit. Status lists implementation in `active` and background integration separately in `integrating`.
 - Failed implementations can retry with a fresh implementer in the original branch/worktree, retaining progress. The retry task begins with the previous rejection reason verbatim and asks the implementer to address it first, preserve existing work, and avoid repeating completed work that needs no rerun; the previous implementation report remains available as handoff context. An original TDD session already running retro is not continued for implementation.
 
 ### The short bidirectional merge critical section
@@ -60,7 +77,7 @@ Never release the lock with an unresolved merge in the integration checkout. Tic
 
 ### One integration child closes the loop
 
-The first attempt always starts a fresh integration child, distinct from the original TDD session. In the original development worktree it resolves existing conflicts, runs the project's global test suite, fixes issues directly, and commits. These global tests remain part of ticket integration. Additional acceptance work—such as complex scripts, cross-ticket checks, or real-device smoke—belongs in an explicitly scoped ticket when desired, not in an automatic final gate.
+The first attempt always starts one fresh integration child, distinct from the original TDD session, owning all original repository worktrees. It resolves existing conflicts, runs each listed repository's global test suite plus any explicitly required cross-repository checks, fixes issues directly, and commits in the affected repositories. These global tests remain part of ticket integration. Additional acceptance work—such as complex scripts, cross-ticket checks, or real-device smoke—belongs in an explicitly scoped ticket when desired, not in an automatic final gate.
 
 Then the workflow attempts to merge the result back: success (including no new commits) ends integration. A conflict triggers the abort/reverse-sync critical section, followed by a continuation of the exact same integration child outside the lock. That child resolves and commits, and the workflow queues another attempt. Later success does not trigger another full validation pass; subsequent rounds do not mandate a full test rerun. The child reads code and judges conflict resolutions itself, without main-agent approval or a fixed retry limit.
 
@@ -68,9 +85,9 @@ Integration HEAD advancing is not a rejection condition: clean merges proceed wi
 
 ### Optional acceptance tickets
 
-When final or cross-ticket acceptance is useful, `/to-tickets` can produce a ticket whose own text defines the scope, steps, and evidence. It is optional and is handled like every other ticket: ordinary dependency scheduling, a dedicated worktree, ticket execution, integration tests, and merge. The workflow never creates a separate verifier or fixer and does not judge ticket reports.
+When final, cross-ticket, or cross-repository acceptance is useful, `/to-tickets` can produce an integration/acceptance ticket whose own text defines the target repository IDs, scope, required checks and run steps against those worktrees, approved seams, test ownership, and evidence for each promise. Development tickets own their single-repository behavior; the cross-repository ticket owns observation across its listed repositories, not merely running each repository's suite. Acceptance tickets are optional for other deliveries; when the contract includes cross-repository behavior, `/to-tickets` must assign an explicit cross-repository integration/acceptance ticket whose checks pass in each participating repository. It is handled like every other ticket: ordinary dependency scheduling, original worktrees in its listed repositories, ticket execution, integration tests, and merges. The workflow never creates a separate verifier or fixer and does not judge ticket reports.
 
-Dependencies release after a blocking ticket's first successful merge, while its integration tests and repairs may still be running. An acceptance ticket can therefore run against an earlier tree; later clean merges do not trigger another acceptance pass. This is an accepted tradeoff for parallel development, not a hidden delivery gate.
+Dependencies release after a blocking ticket's first successful merge in every listed repository, while its integration tests and repairs may still be running. An acceptance ticket can therefore run against an earlier tree; later clean merges do not trigger another acceptance pass. This is an accepted tradeoff for parallel development, not a hidden delivery gate.
 
 ## Above-input dual-layer progress
 
@@ -88,13 +105,13 @@ Every implementation ending starts asynchronous retro in the original TDD sessio
 
 Reports are generated outside the Git checkout in a unique OS-temp directory (`%TEMP%` on Windows, otherwise the runtime OS-temp location). There is no per-merge report movement. Retrospectives are staged in `retro/`, and cleanup attempts in the same run directory's `cleanup/`.
 
-Each truly integrated ticket immediately attempts safe cleanup of its own worktree, without waiting for retro or touching other tickets still in flight. The first merge is not a cleanup trigger: integration testing, repairs, and the final merge must have ended. Removing the directory retains this run's ticket-branch identity, and cleanup failure does not undo integration. Retro runs from the original session history without requiring the development worktree to remain present.
+Each truly integrated ticket immediately attempts safe cleanup of all its own repository worktrees, without waiting for retro or touching other tickets still in flight. The first merge is not a cleanup trigger: integration testing, repairs, and the final merge must have ended. Removing the directory retains this run's ticket-branch identity, and cleanup failure does not undo integration. Retro runs from the original session history without requiring the development worktree to remain present.
 
 After all ticket integration processing, `finish`:
 
 1. Waits for all retro success/failure terminal outcomes.
-2. Publishes reports and records into the integration checkout and commits only explicit output files.
-3. Retries this run's remaining worktrees, then safely deletes its merged ticket branches only when their worktrees are gone. A residual worktree keeps its branch; the user's integration branch is always retained.
+2. Publishes all reports, retrospectives, and records centrally into the coordinator integration checkout and commits only explicit output files. Report heads are keyed by repository ID.
+3. Retries this run's remaining worktrees across all repositories, then safely deletes its merged ticket branches only when their worktrees are gone. A residual worktree keeps its branch; every user integration branch is retained.
 4. Best-effort publishes and separately commits `cleanup.json`, recording early attempts, final retries, branch cleanup, and residual resources. Cleanup-report write or commit failures only warn and do not block completion.
 5. Cleans temporary artifacts and returns the delivery commit, cleanup-report commit if successful, report paths, independent retro outcomes, and residual resources and warnings.
 
@@ -116,7 +133,9 @@ Delivery/retro report copy or commit failures preserve temporary artifacts and r
 
 `hyper_auto_coding` exposes only `plan`, `dispatch`, `collect`, `finish`, and read-only `status`. `dispatch` returns after starting implementation. Implementation completion or failure, the first merge releasing dependencies, and integration completion or failure request a `collect` check; progress between calls is retained until the next call. `collect` returns the latest state immediately when progress is pending, otherwise waits for the next change. Notifications coalesce into one check; changes after a check starts are not cleared at its end and remain pending for the next check. Overlapping `collect` calls share one check, and waiting does not hold the orchestration guard or block `dispatch`. The main agent retains the existing result-handling and dispatch logic; no automatic dispatcher is added. Integration and conflict continuations are automatic; native task calls must not bypass the workflow to dispatch tickets.
 
-Status includes `temporaryDir`, `active`, `integrating`, the merge-released `ready` frontier, each ticket's first `mergedHead`, report paths, and the pause `mode` with its `checkpoint` path. `finish` returns a delivery summary, not a status snapshot.
+Status includes `temporaryDir`, `active`, `integrating`, the merge-released `ready` frontier, repository-keyed ticket worktrees and first `mergedHeads`, report paths, and the pause `mode` with its `checkpoint` path. `finish` returns a delivery summary, not a status snapshot.
+
+A failure isolates the affected dependency chain; independent tickets can continue. A merge already completed in another repository is not rolled back: there is no cross-repository transaction or rollback. Later clean merges do not require another full validation pass.
 
 One workflow runs through the extension at a time. It assumes a session completes all tickets; interruption, cancellation, and recovery from an arbitrary interruption are not implemented — only the explicit `pause`/`resume` commands below suspend and continue a workflow. Execution errors are recorded honestly; the normal-exit-is-success assumption adds no report-content acceptance logic.
 
@@ -147,6 +166,7 @@ Workflow control is command-only: `/hyper-auto-coding pause` and `/hyper-auto-co
 
 ### Assumptions and limits
 
+- The version-2 checkpoint retains every repository's integration baseline, ticket worktree/branch identity, first-merge evidence, reports, and cleanup history under the same session owner. It does not change the global pause/drain behavior. Version-1 checkpoints are not migrated: finish existing paused workflows with the old version before upgrading; the new version cannot resume an old checkpoint.
 - The checkpoint lives outside the repository, under the OS temp directory, as a per-session `hyper-auto-coding-pause-*.json` file whose name is deterministic (`HyperWorkflow.checkpointPath(sessionId)`), so it never enters the integration branch or a commit.
 - It is a temporary aid, not durable storage: OS temp cleanup, or terminating the process before the drain finishes, leaves nothing to restore, and `resume` validates and repairs nothing beyond loading that file.
 - Pausing assumes the artifacts still needed remain available: unfinished tickets' worktrees, retained ticket branches, the integration branch and its checkout, and the run's report temp directory. Integrated tickets' worktrees may already be removed; checkpoint paths retain resource identity and history, not a requirement to recreate them. Resume neither copies nor repairs the environment, and performs no extra Git validation.
@@ -160,6 +180,7 @@ Workflow control is command-only: `/hyper-auto-coding pause` and `/hyper-auto-co
 - [Orchestration tool and main-agent instructions](../extensions/hyper-auto-coding/agent-tools.ts)
 - [Workflow scheduling and report publication](../extensions/hyper-auto-coding/workflow.ts)
 - [Ticket integration state, merge attempts, and conflict continuation](../extensions/integration-node/ticket-integration.ts)
+- [Local repository manifest and startup checks](../extensions/hyper-auto-coding/repositories.ts)
 - [Local Git and worktrees](../extensions/hyper-auto-coding/git.ts)
 - [Fresh sessions and integration continuations](../extensions/hyper-auto-coding/subagent-host.ts)
 - [Original TDD-session retro](../extensions/implementation-node/retro-host.ts), [execution records and final draining](../extensions/implementation-node/tdd-execution.ts)
