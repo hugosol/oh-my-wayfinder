@@ -183,10 +183,11 @@ export class HyperGit {
 
 	/**
 	 * Validate `cwd`'s actual top-level repository as the integration checkout:
-	 * a named branch other than main/master, a clean tree and index, and
-	 * committed tracked `.scratch/<slug>/spec.md` plus `contract.md`.
+	 * a named branch other than main/master and a clean tree and index.
+	 * The coordinator also requires committed `.scratch/<slug>/spec.md` and
+	 * `contract.md`; other targets use requireInputs=false.
 	 */
-	static async inspect(cwd: string, slug: string): Promise<HyperGit> {
+	static async inspect(cwd: string, slug: string, options: { requireInputs?: boolean } = {}): Promise<HyperGit> {
 		assertSlug(slug);
 		const top = (await mustGit(cwd, ["rev-parse", "--show-toplevel"])).trim();
 		if (top === "") throw new Error(`无法解析 Git 顶层目录（git rev-parse --show-toplevel 无输出）：${cwd}`);
@@ -206,7 +207,7 @@ export class HyperGit {
 			throw new Error(`集成分支工作区或暂存区不干净；请先提交或清理：\n${status.trimEnd()}`);
 		}
 
-		for (const name of ["spec.md", "contract.md"]) {
+		for (const name of options.requireInputs === false ? [] : ["spec.md", "contract.md"]) {
 			const file = `.scratch/${slug}/${name}`;
 			const tracked = await git(root, ["ls-files", "--error-unmatch", "--", literal(file)]);
 			if (tracked.code !== 0) {
@@ -230,6 +231,12 @@ export class HyperGit {
 		return adopted;
 	}
 
+	/** Canonical shared Git directory: linked checkouts must not acquire independent locks. */
+	async commonDirectory(): Promise<string> {
+		const directory = (await mustGit(this.root, ["rev-parse", "--path-format=absolute", "--git-common-dir"])).trim();
+		return fs.realpath(directory);
+	}
+
 	/** Current integration HEAD commit SHA. */
 	async head(): Promise<string> {
 		return (await mustGit(this.root, ["rev-parse", "HEAD"])).trim();
@@ -237,8 +244,9 @@ export class HyperGit {
 
 	/**
 	 * Stage and commit the implementation `.md` files phase 1 published under
-	 * `.scratch/<slug>/implementation/` together with the slug's `contract.md`,
-	 * whose "Delivering work" mapping phase 1 fills in. Committing the contract
+	 * `.scratch/<slug>/implementation/` together with `contract.md` and the
+	 * optional `repositories.json` manifest. Phase 1 fills the contract's
+	 * "Delivering work" mapping. Committing the contract
 	 * here is what keeps the integration checkout clean: every later merge runs
 	 * `assertClean`, which rejects any tracked or untracked modification. Refuses
 	 * when anything else is staged; when the paths already match HEAD the current
@@ -250,6 +258,13 @@ export class HyperGit {
 			throw new Error(`实现票据目录中没有 *.md 票据文件：.scratch/${this.#slug}/implementation`);
 		}
 		const paths = [...files, `.scratch/${this.#slug}/contract.md`];
+		const manifest = `.scratch/${this.#slug}/repositories.json`;
+		try {
+			await fs.access(path.join(this.root, manifest));
+			paths.push(manifest);
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+		}
 		await this.#rejectForeignStaged(paths);
 		return this.#commitStagedPaths(paths, `Publish implementation tickets for ${this.#slug}`);
 	}

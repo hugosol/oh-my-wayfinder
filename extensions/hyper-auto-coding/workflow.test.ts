@@ -12,8 +12,9 @@ import { HyperWorkflow } from "./workflow";
 interface TicketSnapshot {
 	ticket: string;
 	status: "ready" | "running" | "integrating" | "integrated" | "failed";
-	mergedHead?: string;
-	worktree?: { branch: string; cwd: string };
+	merged?: boolean;
+	mergedHeads?: Record<string, string>;
+	worktrees?: Record<string, { branch: string; cwd: string }>;
 	error?: string;
 }
 interface StatusSnapshot {
@@ -31,8 +32,9 @@ interface StatusSnapshot {
 interface CheckpointTicket {
 	ticket: string;
 	status: TicketSnapshot["status"];
-	worktree?: { branch: string; cwd: string };
-	integration?: { mergedHead?: string; integrationReport?: string; integrationAgentId?: string };
+	worktrees?: Record<string, { branch: string; cwd: string }>;
+	integration?: { merged?: boolean;
+	mergedHeads?: Record<string, string>; integrationReport?: string; integrationAgentId?: string };
 }
 interface CheckpointSnapshot {
 	version: number;
@@ -47,8 +49,8 @@ interface CheckpointSnapshot {
 interface FinishSummary {
 	reports: string[];
 	warnings: string[];
-	retainedBranches: string[];
-	retainedWorktrees: { branch: string; cwd: string }[];
+	retainedBranches: { repository: string; branch: string }[];
+	retainedWorktrees: { repository: string; branch: string; cwd: string }[];
 	cleanupReport: string;
 	cleanupCommit?: string;
 	residualsConfirmed: boolean;
@@ -229,7 +231,7 @@ test("implementation slots are bounded; first merge releases dependencies while 
 	expect(dispatched.active).toEqual(["a.md", "b.md"]);
 	await expect(workflow.execute({ action: "dispatch", tickets: ["c.md"] })).rejects.toThrow("并发上限");
 	implementing.release();
-	while (!ticketSnapshot(await status(workflow), "a.md").mergedHead)
+	while (!ticketSnapshot(await status(workflow), "a.md").merged)
 		await workflow.execute({ action: "collect" });
 	while ((await status(workflow)).active.length) await workflow.execute({ action: "collect" });
 	const state = await status(workflow);
@@ -238,7 +240,7 @@ test("implementation slots are bounded; first merge releases dependencies while 
 	expect(state.ready).toContain("c.md");
 	expect(await fs.readFile(path.join(root, "a.txt"), "utf8")).toBe("delivered a\n");
 	await workflow.execute({ action: "dispatch", tickets: ["c.md"] });
-	const c = ticketSnapshot(await status(workflow), "c.md").worktree!;
+	const c = ticketSnapshot(await status(workflow), "c.md").worktrees!.coordinator;
 	expect(await git(c.cwd, "show", "HEAD:a.txt")).toBe("delivered a");
 	integrating.release();
 	await drain(workflow);
@@ -291,7 +293,7 @@ test("collect coalesces earlier changes but retains completion after a previous 
 	const { workflow } = await fixture({ integrationWork: async () => { await integrating.promise; } });
 	await workflow.execute({ action: "dispatch", tickets: ["a.md", "b.md"] });
 	await waitForState(workflow, (state) => state.active.length === 0 &&
-		["a.md", "b.md"].every((name) => !!ticketSnapshot(state, name).mergedHead));
+		["a.md", "b.md"].every((name) => !!ticketSnapshot(state, name).merged));
 	const snapshot = await collectBeforeNextTurn(workflow.execute({ action: "collect" }));
 	expect(snapshot.integrating).toEqual(["a.md", "b.md"]);
 	expect(snapshot.ready).toEqual(["c.md"]);
@@ -358,7 +360,7 @@ test("failed implementation retries reuse the original branch and worktree witho
 	await drain(workflow);
 	const first = ticketSnapshot(await status(workflow), "a.md");
 	expect(first.status).toBe("ready");
-	expect(first.mergedHead).toBeUndefined();
+	expect(first.merged).toBeUndefined();
 	expect(workflow.progress).toEqual({ total: 3, executed: 1, integrated: 0, mode: "running" });
 	fail = false;
 	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
@@ -373,8 +375,8 @@ test("failed implementation retries reuse the original branch and worktree witho
 	const notificationCount = snapshots.length;
 	await workflow.retro.drain();
 	expect(snapshots).toHaveLength(notificationCount);
-	expect(ticketSnapshot(await status(workflow), "a.md").worktree).toEqual(first.worktree);
-	expect(await fs.stat(first.worktree!.cwd).catch(() => null)).toBeNull();
+	expect(ticketSnapshot(await status(workflow), "a.md").worktrees).toEqual(first.worktrees);
+	expect(await fs.stat(first.worktrees!.coordinator.cwd).catch(() => null)).toBeNull();
 	expect(await fs.readFile(path.join(workflow.git.root, "a.txt"), "utf8")).toBe("delivered a\n");
 });
 
@@ -409,12 +411,12 @@ test("post-test merge conflicts resume the same integration session in the origi
 	await drain(workflow);
 	expect(ticketSnapshot(await status(workflow), "a.md").status).toBe("integrated");
 	expect(await fs.readFile(path.join(root, "shared.txt"), "utf8")).toBe("A fix with B\n");
-	const aTree = ticketSnapshot(await status(workflow), "a.md").worktree!;
+	const aTree = ticketSnapshot(await status(workflow), "a.md").worktrees!.coordinator;
 	const aIntegration = runs.filter((run) => run.role === "integrate" && run.cwd === aTree.cwd);
 	expect(aIntegration.map((run) => run.resumed)).toEqual([false, true]);
 	expect(aIntegration[1].id).toBe(aIntegration[0].id);
 	expect([...workflow.git.worktrees.values()].map((tree) => tree.cwd).sort()).toEqual(
-		(await status(workflow)).tickets.filter((ticket) => ticket.worktree).map((ticket) => ticket.worktree!.cwd).sort(),
+		(await status(workflow)).tickets.filter((ticket) => ticket.worktrees).map((ticket) => ticket.worktrees!.coordinator.cwd).sort(),
 	);
 	expect((await git(root, "worktree", "list", "--porcelain")).match(/^worktree /gm)?.length).toBe(1);
 });
@@ -458,7 +460,7 @@ test("integrated tickets can be published without independent final verification
 	const scratch = path.join(root, ".scratch", "feature");
 	expect((await fs.readdir(scratch)).sort()).toEqual(["contract.md", "implementation", "spec.md"]);
 	const before = await status(workflow);
-	const branches = before.tickets.map((ticket) => ticket.worktree!.branch);
+	const branches = before.tickets.map((ticket) => ticket.worktrees!.coordinator.branch);
 	const finishing = workflow.execute({ action: "finish" });
 	retros.release();
 	const summary = await finishing as unknown as FinishSummary;
@@ -568,13 +570,13 @@ test("dirty ticket worktrees and their branches survive final cleanup with preci
 	const tree = workflow.git.worktrees.get("a.md")!;
 	const summary = await workflow.execute({ action: "finish" }) as FinishSummary;
 	expect(workflow.finished).toBe(true);
-	expect(summary.retainedWorktrees).toEqual([tree]);
-	expect(summary.retainedBranches).toEqual([tree.branch]);
+	expect(summary.retainedWorktrees).toEqual([{ repository: "coordinator", ...tree }]);
+	expect(summary.retainedBranches).toEqual([{ repository: "coordinator", branch: tree.branch }]);
 	expect(summary.residualsConfirmed).toBe(true);
 	expect(await fs.readFile(path.join(tree.cwd, "keep-uncommitted.txt"), "utf8")).toBe("user work");
 	expect(await git(root, "status", "--porcelain")).toBe("");
 	const report = JSON.parse(await fs.readFile(summary.cleanupReport, "utf8"));
-	expect(report.retainedWorktrees).toEqual([tree]);
+	expect(report.retainedWorktrees).toEqual([{ repository: "coordinator", ...tree }]);
 	expect(report.attempts[0].warnings.length).toBeGreaterThan(0);
 	expect(report.attempts.at(-2).warnings.length).toBeGreaterThan(0);
 });
@@ -631,8 +633,8 @@ test("post-publication cleanup and residual query failures remain nonfatal", asy
 	workflow.git.retainedWorktrees = async () => { throw new Error("worktree query unavailable"); };
 	const summary = await workflow.execute({ action: "finish" }) as FinishSummary;
 	expect(workflow.finished).toBe(true);
-	expect(summary.retainedBranches.sort()).toEqual([...workflow.git.worktrees.values()].map((tree) => tree.branch).sort());
-	expect(summary.retainedWorktrees).toEqual([...workflow.git.worktrees.values()]);
+	expect(summary.retainedBranches.map((item) => item.branch).sort()).toEqual([...workflow.git.worktrees.values()].map((tree) => tree.branch).sort());
+	expect(summary.retainedWorktrees).toEqual([...workflow.git.worktrees.values()].map((tree) => ({ repository: "coordinator", ...tree })));
 	expect(summary.residualsConfirmed).toBe(false);
 	expect(summary.warnings.some((warning) => warning.includes("保守清单"))).toBe(true);
 	expect(summary.warnings.some((warning) => warning.includes("branch cleanup unavailable"))).toBe(true);
@@ -671,13 +673,13 @@ test("pause drains in-flight implementation, integration and delayed retro, then
 	expect(snapshot.mode).toBe("paused");
 	expect(ticketSnapshot(snapshot, "a.md").status).toBe("integrated");
 	expect(ticketSnapshot(snapshot, "b.md").status).toBe("ready");
-	expect(ticketSnapshot(snapshot, "b.md").worktree).toBeUndefined();
+	expect(ticketSnapshot(snapshot, "b.md").worktrees).toBeUndefined();
 	expect(snapshot.active).toEqual([]);
 	expect(snapshot.integrating).toEqual([]);
 	expect(runs.filter((run) => run.role === "implement")).toHaveLength(1);
 	expect(["pausing", "paused"]).toContain((await collecting as StatusSnapshot).mode);
 	const saved = JSON.parse(await fs.readFile(snapshot.checkpoint, "utf8")) as CheckpointSnapshot;
-	expect(saved.version).toBe(1);
+	expect(saved.version).toBe(2);
 	expect(saved.planned).toBe(true);
 	expect(saved.attempts.map((attempt) => attempt.ticket)).toEqual(["a.md"]);
 	expect(saved.retro.tickets.slice().sort()).toEqual(["a.md", "b.md", "c.md"]);
@@ -687,7 +689,7 @@ test("pause drains in-flight implementation, integration and delayed retro, then
 	expect(saved.reports.length).toBeGreaterThan(0);
 	const delivered = saved.tickets.find((ticket) => ticket.ticket === "a.md")!;
 	expect(delivered.status).toBe("integrated");
-	expect(delivered.integration?.mergedHead).toBeTruthy();
+	expect(delivered.integration?.merged).toBeTruthy();
 	expect(saved.tickets.find((ticket) => ticket.ticket === "b.md")?.status).toBe("ready");
 	await workflow.resume();
 	expect(workflow.paused).toBe(false);
@@ -726,11 +728,11 @@ test("pause during a dispatch loop stops admission without checkpointing an atte
 	expect(saved.attempts).toEqual([]);
 	expect(saved.tickets.every((ticket) => ticket.status === "ready")).toBe(true);
 	// The worktree reserved by the interrupted loop is kept, so a resumed run reuses it.
-	const reserved = saved.tickets.find((ticket) => ticket.ticket === "a.md")!.worktree!;
+	const reserved = saved.tickets.find((ticket) => ticket.ticket === "a.md")!.worktrees!.coordinator;
 	expect(reserved.cwd).toBeTruthy();
 	await workflow.resume();
 	await complete(workflow, "a.md");
-	expect(ticketSnapshot(await status(workflow), "a.md").worktree).toEqual(reserved);
+	expect(ticketSnapshot(await status(workflow), "a.md").worktrees!.coordinator).toEqual(reserved);
 });
 
 test("a restored pause keeps dependency evidence, the ledger and remaining scheduling", async () => {
@@ -762,8 +764,8 @@ test("a restored pause keeps dependency evidence, the ledger and remaining sched
 	expect(reopened.ready.slice().sort()).toEqual(["b.md", "c.md"]);
 	expect(ticketSnapshot(reopened, "a.md")).toMatchObject({
 		status: "integrated",
-		mergedHead: ticketSnapshot(before, "a.md").mergedHead,
-		worktree: ticketSnapshot(before, "a.md").worktree,
+		merged: ticketSnapshot(before, "a.md").merged,
+		worktrees: ticketSnapshot(before, "a.md").worktrees,
 	});
 	await expect(restored.execute({ action: "plan", plan: [] })).rejects.toThrow("已暂停");
 	await expect(restored.execute({ action: "dispatch", tickets: ["b.md"] })).rejects.toThrow("已暂停");

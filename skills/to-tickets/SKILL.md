@@ -20,6 +20,8 @@ Work from whatever is already in the conversation context. If the user passes a 
 
 ### 2. Explore the codebase (optional)
 
+For local `/hyper-auto-coding` multi-repository work, read or create `.scratch/<feature-slug>/repositories.json` in the coordinator repository with this exact shape: `{"repositories":[{"id":"frontend","path":"."},{"id":"backend","path":"../backend"}]}`. Paths are absolute or relative to the coordinator Git root. IDs match `[A-Za-z0-9][A-Za-z0-9_-]*` and are unique; entries identify distinct Git repositories, not aliases sharing a Git common directory. Exactly one entry resolves to the coordinator. Every target must have a clean named integration branch other than `main`/`master`; only the coordinator needs the spec and contract. Publish the manifest with the central tickets and contract. Without a manifest, existing single-repository behavior remains unchanged. This mode is local-only and does not change serial `/spec-to-code`.
+
 If you have not already explored the codebase, do so to understand the current state of the code. Ticket titles and descriptions should use the project's domain glossary vocabulary, and respect ADRs in the area you're touching.
 
 Look for opportunities to prefactor the code to make the implementation easier. "Make the change easy, then make the easy change."
@@ -27,6 +29,8 @@ Look for opportunities to prefactor the code to make the implementation easier. 
 ### 3. Draft vertical slices
 
 Break the work into **tracer bullet** tickets.
+
+For local multi-repository `/hyper-auto-coding`, assign each development ticket exactly one repository ID. When the contract includes cross-repository behavior, publish an explicit integration/acceptance ticket listing every repository it needs and requiring each participating repository's checks to pass separately; the same ticket owner may modify any of its listed repositories. Keep one global ticket ID sequence and dependency graph in the coordinator, not separate per-repository ticket sets. Name the contributing development tickets as blockers. The integration/acceptance ticket owns the cross-repository tests and must state the required checks, how to run them against its repository worktrees, and the evidence that demonstrates each contract promise; a repository's global suite is not a substitute for these checks. Preserve the contract's approved seams and per-test ownership. These are ordinary tickets sharing the existing implementation slots and first-merge dependency scheduling, not a new final gate or a requirement to wait for blockers to finish background integration.
 
 <vertical-slice-rules>
 
@@ -55,6 +59,7 @@ When a promise spans more than one ticket, **one of those tickets owns writing i
 Present the proposed breakdown as a numbered list. For each ticket, show:
 
 - **Title**: short descriptive name
+- **Repositories** (local multi-repository `/hyper-auto-coding` only): manifest IDs, with the development or cross-repository integration/acceptance owner and its required checks
 - **Blocked by**: which other tickets (if any) must complete first
 - **Delivers**: the contract promise IDs this ticket makes observable — or the promise it unblocks, for an enabling slice
 - **What it delivers**: the end-to-end behaviour this ticket makes work
@@ -105,6 +110,10 @@ Do NOT close or modify any parent issue.
 **Test owner for:** P3 (omit this line unless this ticket writes tests for a promise it does not itself complete)
 
 **Blocked by:** the numbers/titles of the tickets that gate this one, or "None (can start immediately)".
+
+**Repositories:** frontend, backend
+
+<!-- In multi-repository hyper-auto-coding, replace these examples with nonempty comma-separated manifest IDs on every ticket: one for development, multiple when needed for integration/acceptance. In single-repository mode this field is optional and defaults to its sole repository ID. -->
 
 **Status:** ready-for-agent
 

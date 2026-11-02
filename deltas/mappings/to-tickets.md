@@ -165,6 +165,58 @@ content: |-
   **Blocked
 ```
 
+### local-repository-manifest
+
+Optional local multi-repository hyper-auto-coding inputs are centralized in the coordinator. The upstream context heading anchors this behavior independently of contract gathering.
+
+```op
+anchor: |-
+  ### 2. Explore the codebase (optional)
+  <oh-my-wayfinder:insert>
+insert: |
+
+  For local `/hyper-auto-coding` multi-repository work, read or create `.scratch/<feature-slug>/repositories.json` in the coordinator repository with this exact shape: `{"repositories":[{"id":"frontend","path":"."},{"id":"backend","path":"../backend"}]}`. Paths are absolute or relative to the coordinator Git root. IDs match `[A-Za-z0-9][A-Za-z0-9_-]*` and are unique; entries identify distinct Git repositories, not aliases sharing a Git common directory. Exactly one entry resolves to the coordinator. Every target must have a clean named integration branch other than `main`/`master`; only the coordinator needs the spec and contract. Publish the manifest with the central tickets and contract. Without a manifest, existing single-repository behavior remains unchanged. This mode is local-only and does not change serial `/spec-to-code`.
+```
+
+### repository-ownership
+
+Development stays single-repository; explicitly scoped integration/acceptance tickets own cross-repository observation. This is ticket scope, not an extra scheduler gate.
+
+```op
+anchor: |-
+  Break the work into **tracer bullet** tickets.
+  <oh-my-wayfinder:insert>
+insert: |
+
+  For local multi-repository `/hyper-auto-coding`, assign each development ticket exactly one repository ID. When the contract includes cross-repository behavior, publish an explicit integration/acceptance ticket listing every repository it needs and requiring each participating repository's checks to pass separately; the same ticket owner may modify any of its listed repositories. Keep one global ticket ID sequence and dependency graph in the coordinator, not separate per-repository ticket sets. Name the contributing development tickets as blockers. The integration/acceptance ticket owns the cross-repository tests and must state the required checks, how to run them against its repository worktrees, and the evidence that demonstrates each contract promise; a repository's global suite is not a substitute for these checks. Preserve the contract's approved seams and per-test ownership. These are ordinary tickets sharing the existing implementation slots and first-merge dependency scheduling, not a new final gate or a requirement to wait for blockers to finish background integration.
+```
+
+### repository-ownership-quiz
+
+Show target ownership during the existing breakdown approval, without adding a publication gate.
+
+```op
+anchor: |-
+  - **Title**: short descriptive name
+  <oh-my-wayfinder:insert>
+insert: |
+  - **Repositories** (local multi-repository `/hyper-auto-coding` only): manifest IDs, with the development or cross-repository integration/acceptance owner and its required checks
+```
+
+### template-repositories-local
+
+Local tickets declare their target repositories using a machine-readable field. The upstream status line remains available after the Delivers insertion.
+
+```op
+anchor: |-
+  <oh-my-wayfinder:insert>**Status:** ready-for-agent
+insert: |
+  **Repositories:** frontend, backend
+
+  <!-- In multi-repository hyper-auto-coding, replace these examples with nonempty comma-separated manifest IDs on every ticket: one for development, multiple when needed for integration/acceptance. In single-repository mode this field is optional and defaults to its sole repository ID. -->
+
+```
+
 ### template-delivers-issue
 
 Issue template gains the Delivers section.

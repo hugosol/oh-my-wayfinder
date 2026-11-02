@@ -39,6 +39,7 @@ import { createWorkflowSession, MAX_AUTO_ACTIONS } from "./spec-to-code/workflow
 import { createRetroWorkflow, tddTicket, tddResult } from "./implementation-node/retro-host";
 import type { TddWorkFlow } from "./implementation-node/tdd-execution";
 import { HyperGit } from "./hyper-auto-coding/git";
+import { loadRepositories } from "./hyper-auto-coding/repositories";
 import { createHyperHost } from "./hyper-auto-coding/subagent-host";
 import { HyperWorkflow } from "./hyper-auto-coding/workflow";
 import { registerHyperTools, startHyperPhase2 } from "./hyper-auto-coding/agent-tools";
@@ -450,6 +451,7 @@ export default function specToCode(pi: ExtensionAPI): void {
 			async prepare(slug: string, ctx: ExtensionCommandContext): Promise<boolean> {
 				try {
 					hyperGit = await HyperGit.inspect(ctx.cwd, slug);
+					await loadRepositories(slug, hyperGit);
 					return true;
 				} catch (error) {
 					ctx.ui.notify(
@@ -579,7 +581,8 @@ export default function specToCode(pi: ExtensionAPI): void {
 					const success = await activateSkill(
 						pi,
 						"to-tickets",
-						`请分析以下spec，生成独立的 ticket 文件。\nspec 路径：${spec}\ncontract 路径：${contract}`,
+						`请分析以下spec，生成独立的 ticket 文件。\nspec 路径：${spec}\ncontract 路径：${contract}` +
+							(command.hyperMode ? `\n当前为 Hyper-Auto-Coding。本轮交付材料集中在协调仓 ${hyperGit!.root}。多仓交付时，在 .scratch/${slug}/repositories.json 发布本轮仓库清单，格式为 {"repositories":[{"id":"frontend","path":"."},{"id":"backend","path":"../backend"}]}，path 相对协调仓根目录或为绝对路径，必须包含协调仓，各仓使用用户已准备的本地集成分支。每票用 **Repositories:** 声明清单中的仓库 ID：开发票一个，跨仓联调／验收票列出参与仓库，并明确各仓检查分别通过的标准。跨仓交付必须有显式联调／验收票和依赖。单仓无需仓库清单。` : ""),
 					);
 					if (!success && display.isCurrent()) {
 						session.reset();

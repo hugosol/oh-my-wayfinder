@@ -58,21 +58,27 @@ New implementation attempts are no longer admitted, while already-started attemp
 **Workflow paused**:
 No implementation attempt, retrospective, or ticket integration remains in flight, and new implementation attempts remain suspended until explicitly resumed. A paused workflow is not necessarily delivery complete or successful.
 
+**Coordinator repository**:
+The repository from which a local multi-repository workflow is started and where its planning artifacts, global ticket set, reports, retrospectives, and cleanup records are published.
+
+**Development ticket**:
+An implementation ticket responsible for behavior within one repository. A cross-repository promise is observed by its explicitly named integration/acceptance ticket.
+
 **Integration branch**:
-The user-prepared development branch that receives the assembled delivery. It is distinct from the individual ticket branches and the repository's main branch.
+The user-prepared development branch in each participating repository that receives that repository's assembled delivery. It is distinct from the individual ticket branches and the repository's main branch.
 _Avoid_: main, ticket branch
 
 **Ticket integration**:
-The process of bringing an implementation ticket's worktree branch into the integration branch, including integration testing, repairs, conflict resolution, and any further merge attempts needed to land the resulting changes. Integration does not certify later combinations of changes.
+The process of bringing an implementation ticket's worktree branches into their respective integration branches, including integration testing, repairs, conflict resolution, and any further merge attempts needed to land the resulting changes across all its repositories. Integration does not certify later combinations of changes.
 
 **Acceptance ticket**:
-An optional ticket explicitly scoped to confirm specified behavior of the assembled delivery, with its scope, steps, and evidence stated in the ticket.
+An implementation ticket explicitly scoped to confirm specified behavior of the assembled delivery. It is optional except when the contract includes cross-repository behavior, which requires an explicit integration/acceptance ticket. It names the participating repositories, required checks, run steps, test ownership, and evidence. It uses ordinary ticket scheduling, not a separate final gate.
 
 **Merged ticket**:
-An implementation ticket whose work has first reached the integration branch. This releases its dependent tickets without claiming integration testing or repairs are complete.
+An implementation ticket whose work has first reached the integration branch in every repository it targets; an unchanged repository counts without an empty commit. This releases its dependent tickets without claiming integration testing or repairs are complete.
 
 **Integrated ticket**:
-A merged implementation ticket whose integration testing and any resulting repairs and conflict resolution are complete, with all resulting changes merged into the integration branch. This does not certify later combinations of changes.
+A merged implementation ticket whose integration testing and any resulting repairs and conflict resolution are complete, with all resulting changes merged into the corresponding integration branches. This does not certify later combinations of changes.
 
 **Implementation frontier**:
 The implementation tickets available to start because all their blocking tickets have been merged; those blockers need not yet be integrated.
