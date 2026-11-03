@@ -71,13 +71,15 @@ export class TicketIntegration {
 	 * original worktrees. Conflicting follow-up merges resume that same child.
 	 * Successful first merges survive failures in other repositories; no rollback.
 	 */
-	async run(ticket: string, implementationReport: string): Promise<void> {
-		const first = await this.#merge(true);
+	async run(ticket: string, implementationReport: string, previousError?: string): Promise<void> {
+		const retryContext = previousError === undefined ? "" :
+			`这是一次集成重试，不重新执行 TDD。上次失败原因：${previousError}\n上次集成报告：${this.#integrationReport ?? "未生成"}。保留已有工作，重新完成本轮集成验收，允许修复并提交。\n`;
+		const first = await this.#merge(true, previousError !== undefined);
 		const request = {
 			role: "integrate" as const,
 			cwd: this.repositories[0]!.worktree.cwd,
 			name: `integrate-${ticket}-${randomUUID()}`,
-			task: `接管本票全部原开发 worktree 和 branch，TDD 会话已结束，不复用它。票据：${ticket}。实现报告：${implementationReport}。\n${this.references}\n本票仓库及首次合入状态：\n${this.#describe(first)}\n宿主已在各仓库独立尝试合入，并将各自的集成提交 merge 回对应原开发分支；集成工作区如有合并冲突已 abort。解决各原 worktree 中遗留的冲突，检查同步结果。\n本轮自行完成集成验收：读取每个原 worktree 的项目指令，在本票列出的每一个仓库中运行该项目的全局测试，并完成票据明确要求的跨仓联调与回归，所有相关仓库检查分别通过前直接修复问题。联调的源码、构建与服务路径均使用本票 worktree，不使用共享集成目录。解决冲突及修复均提交到对应原开发分支，保持全部工作区干净。不得操作任何集成工作区、切换分支、新建 worktree、reset 丢弃工作或调用 retro。不要直接合入集成分支；返回后宿主在各仓库排队合并。如再次冲突，会在此同一会话继续，不另派 fixer。`,
+			task: `${retryContext}接管本票全部原开发 worktree 和 branch，TDD 会话已结束，不复用它。票据：${ticket}。实现报告：${implementationReport}。\n${this.references}\n本票仓库及首次合入状态：\n${this.#describe(first)}\n宿主按仓库尝试合入并反向同步集成提交；重试中原 worktree 已有的未完成合并会保留给你处理，不重复同步。集成工作区如有合并冲突已 abort。解决各原 worktree 中遗留的冲突，检查同步结果。\n本轮自行完成集成验收：读取每个原 worktree 的项目指令，在本票列出的每一个仓库中运行该项目的全局测试，并完成票据明确要求的跨仓联调与回归，所有相关仓库检查分别通过前直接修复问题。联调的源码、构建与服务路径均使用本票 worktree，不使用共享集成目录。解决冲突及修复均提交到对应原开发分支，保持全部工作区干净。不得操作任何集成工作区、切换分支、新建 worktree、reset 丢弃工作或调用 retro。不要直接合入集成分支；返回后宿主在各仓库排队合并。如再次冲突，会在此同一会话继续，不另派 fixer。`,
 		};
 		let result = await this.host.run(request);
 		const integrationAgentId = result.id;
@@ -102,9 +104,15 @@ export class TicketIntegration {
 	}
 
 	/** Record first-merge evidence immediately, even if a later repository fails. */
-	async #merge(syncAfterSuccess: boolean): Promise<Map<string, MergeTicketResult>> {
+	async #merge(syncAfterSuccess: boolean, retry = false): Promise<Map<string, MergeTicketResult>> {
 		const results = new Map<string, MergeTicketResult>();
 		for (const { repository, git, worktree } of this.repositories) {
+			// A failed child can leave the reverse merge unresolved. Let the fresh
+			// child finish it before attempting another forward/reverse merge.
+			if (retry && await git.pendingTicketMerge(worktree)) {
+				results.set(repository, { merged: false, conflicts: true, head: await git.head() });
+				continue;
+			}
 			const merge = await git.mergeTicket(worktree, syncAfterSuccess);
 			results.set(repository, merge);
 			if (merge.merged && !Object.prototype.hasOwnProperty.call(this.#mergedHeads, repository)) {

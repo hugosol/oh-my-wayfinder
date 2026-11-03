@@ -411,6 +411,16 @@ export class HyperGit {
 		return (await mustGit(owned.cwd, ["rev-parse", "HEAD"])).trim();
 	}
 
+	/** Inspect a retry's original worktree without discarding an unfinished merge. */
+	async pendingTicketMerge(worktree: TicketWorktree): Promise<boolean> {
+		const owned = this.#owned(worktree);
+		const current = (await mustGit(owned.cwd, ["symbolic-ref", "--quiet", "--short", "HEAD"])).trim();
+		if (current !== owned.branch) throw new Error(`票据工作树已切换分支：期望 ${owned.branch}，实际 ${current}（${owned.cwd}）`);
+		if (await this.#mergeInProgress(owned.cwd)) return true;
+		await this.assertTicketClean(owned);
+		return false;
+	}
+
 	/** The ticket worktree must still be on its captured branch with a clean worktree and index. */
 	async assertTicketClean(worktree: TicketWorktree): Promise<void> {
 		const owned = this.#owned(worktree);
