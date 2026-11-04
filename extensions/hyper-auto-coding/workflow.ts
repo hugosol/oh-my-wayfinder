@@ -26,7 +26,7 @@ interface TicketState extends TicketPlan {
 	integration?: TicketIntegration;
 	error?: string;
 }
-export type HyperAction = "status" | "plan" | "dispatch" | "collect" | "finish";
+export type HyperAction = "status" | "plan" | "dispatch" | "retry_integration" | "collect" | "finish";
 
 /** One implementation attempt of one ticket, recorded for the audit ledger. */
 interface ExecutionAttempt {
@@ -335,11 +335,12 @@ export class HyperWorkflow {
 		const job = (async (): Promise<object> => {
 			if (this.#pausing || this.#paused)
 				throw new Error(
-					`Hyper-Auto-Coding ${this.#pausing ? "正在暂停" : "已暂停"}；暂停期间只有 status 与 collect 可用，请先恢复再 plan、dispatch 或 finish。`,
+					`Hyper-Auto-Coding ${this.#pausing ? "正在暂停" : "已暂停"}；暂停期间只有 status 与 collect 可用，请先恢复再 plan、dispatch、retry_integration 或 finish。`,
 				);
 			switch (input.action) {
 				case "plan": this.#plan(input.plan ?? []); break;
 				case "dispatch": await this.#dispatch(input.tickets ?? []); break;
+				case "retry_integration": this.#retryIntegration(input.tickets ?? []); break;
 				case "finish": return await this.#finish();
 				default: throw new Error(`未知编排操作：${String(input.action)}`);
 			}
@@ -594,12 +595,23 @@ export class HyperWorkflow {
 		await this.retro.drain();
 	}
 
-	#startIntegration(ticket: TicketState): void {
-		const integration = new TicketIntegration(this.#ticketRepositories(ticket), this.host, this.#references(),
+	#retryIntegration(names: string[]): void {
+		if (names.length !== 1) throw new Error("retry_integration 必须指定且只能指定一个票据。");
+		const ticket = this.#ticket(names[0]);
+		if (ticket.status !== "failed" || !ticket.report || !succeeded(ticket.report.result) || !ticket.integration ||
+			this.#running.has(ticket.ticket) || this.#integrating.has(ticket.ticket))
+			throw new Error("只能重试实现已成功、集成失败的票据；TDD 失败请使用 dispatch。");
+		this.#startIntegration(ticket, ticket.error ?? "上次集成未完成");
+	}
+
+	#startIntegration(ticket: TicketState, previousError?: string): void {
+		const integration = ticket.integration ?? new TicketIntegration(this.#ticketRepositories(ticket), this.host, this.#references(),
 			(role, result, head) => this.#save(role, result, head),
 			() => this.#requestCheck());
 		ticket.integration = integration;
-		const job = integration.run(ticket.ticket, ticket.report!.path).then(async () => {
+		ticket.status = "integrating";
+		ticket.error = undefined;
+		const job = integration.run(ticket.ticket, ticket.report!.path, previousError).then(async () => {
 			ticket.status = "integrated";
 			this.#notifyProgress();
 			for (const { repository, git } of this.#ticketRepositories(ticket))

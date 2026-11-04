@@ -15,6 +15,10 @@ interface TicketSnapshot {
 	merged?: boolean;
 	mergedHeads?: Record<string, string>;
 	worktrees?: Record<string, { branch: string; cwd: string }>;
+	report?: string;
+	reportSuccessful?: boolean;
+	integrationReport?: string;
+	integrationAgentId?: string;
 	error?: string;
 }
 interface StatusSnapshot {
@@ -119,7 +123,7 @@ async function fixture(options: {
 	retroGate?: Promise<void>;
 	throwImplementation?: () => boolean;
 	implementationWork?: (request: HyperRun) => Promise<void>;
-	integrationWork?: (request: HyperRun) => Promise<void>;
+	integrationWork?: (request: HyperRun) => Promise<void | Partial<SingleResult>>;
 	resumeWork?: (request: HyperRun & { id: string }) => Promise<void>;
 	failRetro?: (ticket: string) => boolean;
 } = {}) {
@@ -149,7 +153,7 @@ async function fixture(options: {
 				await git(request.cwd, "add", ".");
 				await git(request.cwd, "commit", "--allow-empty", "-m", `deliver ${name}`);
 			} else if (request.role === "integrate") {
-				await options.integrationWork?.(request);
+				Object.assign(execution, await options.integrationWork?.(request));
 			}
 			return execution;
 		},
@@ -380,6 +384,135 @@ test("failed implementation retries reuse the original branch and worktree witho
 	expect(await fs.readFile(path.join(workflow.git.root, "a.txt"), "utf8")).toBe("delivered a\n");
 });
 
+test("failed integrations can retry repeatedly in the original tree without repeating implementation or retro", async () => {
+	const repairing = gate(), repairEntered = gate();
+	let attempts = 0;
+	const { workflow, root, runs, retroIds } = await fixture({ integrationWork: async (request) => {
+		attempts++;
+		if (attempts < 3) {
+			await write(path.join(request.cwd, "repair.txt"), `repair attempt ${attempts}\n`);
+			await git(request.cwd, "add", "repair.txt");
+			await git(request.cwd, "commit", "-m", `retain repair attempt ${attempts}`);
+			throw new Error(`integration attempt ${attempts} failed`);
+		}
+		repairEntered.release();
+		await repairing.promise;
+		expect(await fs.readFile(path.join(request.cwd, "repair.txt"), "utf8")).toBe("repair attempt 2\n");
+		await write(path.join(request.cwd, "repair.txt"), "verified integration repair\n");
+		await git(request.cwd, "add", "repair.txt");
+		await git(request.cwd, "commit", "-m", "complete integration repair");
+	} });
+	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
+	await drain(workflow);
+	await workflow.retro.drain();
+	const failed = ticketSnapshot(await status(workflow), "a.md");
+	expect(failed).toMatchObject({ status: "failed", merged: true, reportSuccessful: true });
+	expect(Object.keys(failed.mergedHeads!)).toEqual(["coordinator"]);
+	const originalTree = failed.worktrees!.coordinator;
+	const originalReport = await fs.readFile(failed.report!, "utf8");
+	const originalRetros = [...retroIds];
+	expect(originalRetros).toHaveLength(1);
+	expect(await fs.stat(originalTree.cwd)).toBeDefined();
+
+	await workflow.execute({ action: "retry_integration", tickets: ["a.md"] });
+	await drain(workflow);
+	const failedAgain = ticketSnapshot(await status(workflow), "a.md");
+	expect(failedAgain).toMatchObject({ status: "failed", error: "integration attempt 2 failed" });
+	expect(failedAgain.worktrees).toEqual(failed.worktrees);
+	expect(failedAgain.mergedHeads).toEqual(failed.mergedHeads);
+
+	await workflow.execute({ action: "retry_integration", tickets: ["a.md"] });
+	await repairEntered.promise;
+	expect(ticketSnapshot(await status(workflow), "a.md").status).toBe("integrating");
+	await expect(workflow.execute({ action: "retry_integration", tickets: ["a.md"] })).rejects.toThrow();
+	repairing.release();
+	await drain(workflow);
+	await workflow.retro.drain();
+	const integrated = ticketSnapshot(await status(workflow), "a.md");
+	expect(integrated).toMatchObject({ status: "integrated", merged: true, report: failed.report });
+	expect(integrated.error).toBeUndefined();
+	expect(integrated.worktrees).toEqual(failed.worktrees);
+	expect(integrated.mergedHeads).toEqual(failed.mergedHeads);
+	expect(await fs.readFile(failed.report!, "utf8")).toBe(originalReport);
+	expect(await fs.readFile(path.join(root, "repair.txt"), "utf8")).toBe("verified integration repair\n");
+	expect(await git(root, "status", "--porcelain")).toBe("");
+	expect(await git(root, "merge-base", "--is-ancestor", failed.mergedHeads!.coordinator, "HEAD")).toBe("");
+	expect(runs.filter((run) => run.role === "implement")).toHaveLength(1);
+	const integrations = runs.filter((run) => run.role === "integrate");
+	expect(integrations).toHaveLength(3);
+	expect(new Set(integrations.map((run) => run.id)).size).toBe(3);
+	expect(integrations.every((run) => !run.resumed && run.cwd === originalTree.cwd)).toBe(true);
+	expect(retroIds).toEqual(originalRetros);
+	await expect(workflow.execute({ action: "retry_integration", tickets: ["a.md"] })).rejects.toThrow();
+});
+
+test("integration retry rejects ready tickets, failed TDD, multiple tickets and pausing or paused workflows", async () => {
+	let implementationFails = false;
+	const retros = gate();
+	const { workflow, runs } = await fixture({
+		retroGate: retros.promise,
+		throwImplementation: () => implementationFails,
+		integrationWork: async () => { throw new Error("integration unavailable"); },
+	});
+	await expect(workflow.execute({ action: "retry_integration", tickets: ["a.md"] })).rejects.toThrow();
+	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
+	await drain(workflow);
+	expect(ticketSnapshot(await status(workflow), "a.md").status).toBe("failed");
+	implementationFails = true;
+	await workflow.execute({ action: "dispatch", tickets: ["b.md"] });
+	await drain(workflow);
+	expect(ticketSnapshot(await status(workflow), "b.md")).toMatchObject({ status: "ready", error: "implementation transport failed" });
+	await expect(workflow.execute({ action: "retry_integration", tickets: ["b.md"] })).rejects.toThrow();
+	for (const tickets of [[], ["a.md", "b.md"], ["a.md", "a.md"]])
+		await expect(workflow.execute({ action: "retry_integration", tickets })).rejects.toThrow();
+	const pausing = workflow.pause();
+	expect((await status(workflow)).mode).toBe("pausing");
+	await expect(workflow.execute({ action: "retry_integration", tickets: ["a.md"] })).rejects.toThrow();
+	retros.release();
+	await pausing;
+	await expect(workflow.execute({ action: "retry_integration", tickets: ["a.md"] })).rejects.toThrow();
+	expect((await status(workflow)).mode).toBe("paused");
+	expect(ticketSnapshot(await status(workflow), "a.md").status).toBe("failed");
+	expect(runs.filter((run) => run.role === "integrate")).toHaveLength(1);
+});
+
+test("a restored failed integration retries with its original worktree, report and first-merge evidence", async () => {
+	let fail = true;
+	const { workflow, host, root, runs, retroIds } = await fixture({ integrationWork: async (request) => {
+		if (fail) throw new Error("integration interrupted before repair");
+		await write(path.join(request.cwd, "restored-repair.txt"), "repaired after restore\n");
+		await git(request.cwd, "add", "restored-repair.txt");
+		await git(request.cwd, "commit", "-m", "repair restored integration");
+	} });
+	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
+	await drain(workflow);
+	const failed = ticketSnapshot(await status(workflow), "a.md");
+	expect(failed.status).toBe("failed");
+	const paused = await workflow.pause() as StatusSnapshot;
+	const beforeRetros = [...retroIds];
+	const restored = await HyperWorkflow.restore(paused.checkpoint, host, "parent", "Main", null);
+	workflows.push(restored);
+	expect(ticketSnapshot(await status(restored), "a.md")).toMatchObject({
+		status: "failed", report: failed.report, worktrees: failed.worktrees, mergedHeads: failed.mergedHeads,
+	});
+	await expect(restored.execute({ action: "retry_integration", tickets: ["a.md"] })).rejects.toThrow();
+	await restored.resume();
+	fail = false;
+	await restored.execute({ action: "retry_integration", tickets: ["a.md"] });
+	await drain(restored);
+	await restored.retro.drain();
+	const integrated = ticketSnapshot(await status(restored), "a.md");
+	expect(integrated).toMatchObject({ status: "integrated", report: failed.report });
+	expect(integrated.worktrees).toEqual(failed.worktrees);
+	expect(integrated.mergedHeads).toEqual(failed.mergedHeads);
+	expect(await fs.readFile(path.join(root, "restored-repair.txt"), "utf8")).toBe("repaired after restore\n");
+	expect(runs.filter((run) => run.role === "implement")).toHaveLength(1);
+	expect(runs.filter((run) => run.role === "integrate").map((run) => run.cwd)).toEqual([
+		failed.worktrees!.coordinator.cwd, failed.worktrees!.coordinator.cwd,
+	]);
+	expect(retroIds).toEqual(beforeRetros);
+});
+
 test("post-test merge conflicts resume the same integration session in the original worktree and then terminate", async () => {
 	const aTesting = gate(), releaseA = gate();
 	const { workflow, root, runs } = await fixture({
@@ -449,6 +582,64 @@ test("first-merge conflict starts one integration child; its successful merge do
 	expect(await fs.readFile(path.join(root, "shared.txt"), "utf8")).toBe("resolved A and integration\n");
 	expect((await status(workflow)).ready).toContain("c.md");
 	expect(runs.filter((run) => run.role === "integrate").map((run) => run.resumed)).toEqual([false]);
+});
+
+test("a fresh integration retry resolves the original tree's surviving Git conflict", async () => {
+	const implementationDone = gate(), beginImplementation = gate();
+	let attempts = 0;
+	const { workflow, root, runs, retroIds } = await fixture({
+		implementationWork: async (request) => {
+			await write(path.join(request.cwd, "shared.txt"), "ticket change\n");
+			implementationDone.release();
+			await beginImplementation.promise;
+		},
+		integrationWork: async (request) => {
+			attempts++;
+			expect(await git(root, "status", "--porcelain")).toBe("");
+			expect(await git(request.cwd, "diff", "--name-only", "--diff-filter=U")).toBe("shared.txt");
+			if (attempts === 1) return { exitCode: 1, error: "conflict resolution interrupted", output: "Unresolved shared.txt conflict." };
+			await write(path.join(request.cwd, "shared.txt"), "resolved ticket and integration\n");
+			await git(request.cwd, "add", "shared.txt");
+			await git(request.cwd, "commit", "-m", "resolve conflict in fresh integration session");
+		},
+	});
+	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
+	await implementationDone.promise;
+	await write(path.join(root, "shared.txt"), "integration change\n");
+	await git(root, "add", "shared.txt");
+	await git(root, "commit", "-m", "parallel integration change before ticket merge");
+	beginImplementation.release();
+	await drain(workflow);
+	await workflow.retro.drain();
+	const failed = ticketSnapshot(await status(workflow), "a.md");
+	expect(failed).toMatchObject({ status: "failed", merged: false, mergedHeads: {}, reportSuccessful: true });
+	expect((await status(workflow)).ready).not.toContain("c.md");
+	const tree = failed.worktrees!.coordinator;
+	const mergeHead = await git(tree.cwd, "rev-parse", "--verify", "MERGE_HEAD");
+	const failedReport = await fs.readFile(failed.integrationReport!, "utf8");
+	expect(failedReport).toContain("Unresolved shared.txt conflict.");
+	const originalRetros = [...retroIds];
+
+	await workflow.execute({ action: "retry_integration", tickets: ["a.md"] });
+	await drain(workflow);
+	await workflow.retro.drain();
+	const integrated = ticketSnapshot(await status(workflow), "a.md");
+	expect(integrated).toMatchObject({ status: "integrated", merged: true, report: failed.report });
+	expect(integrated.worktrees).toEqual(failed.worktrees);
+	expect(integrated.integrationAgentId).not.toBe(failed.integrationAgentId);
+	expect(integrated.integrationReport).not.toBe(failed.integrationReport);
+	expect(await fs.readFile(failed.integrationReport!, "utf8")).toBe(failedReport);
+	expect(await fs.readFile(path.join(root, "shared.txt"), "utf8")).toBe("resolved ticket and integration\n");
+	expect(await git(root, "merge-base", "--is-ancestor", mergeHead, "HEAD")).toBe("");
+	expect(await git(root, "status", "--porcelain")).toBe("");
+	expect((await status(workflow)).ready).toContain("c.md");
+	expect(runs.filter((run) => run.role === "implement")).toHaveLength(1);
+	const integrations = runs.filter((run) => run.role === "integrate");
+	expect(integrations.map((run) => ({ cwd: run.cwd, resumed: run.resumed }))).toEqual([
+		{ cwd: tree.cwd, resumed: false }, { cwd: tree.cwd, resumed: false },
+	]);
+	expect(integrations[1].id).not.toBe(integrations[0].id);
+	expect(retroIds).toEqual(originalRetros);
 });
 
 test("integrated tickets can be published without independent final verification", async () => {

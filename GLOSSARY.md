@@ -71,6 +71,10 @@ _Avoid_: main, ticket branch
 **Ticket integration**:
 The process of bringing an implementation ticket's worktree branches into their respective integration branches, including integration testing, repairs, conflict resolution, and any further merge attempts needed to land the resulting changes across all its repositories. Integration does not certify later combinations of changes.
 
+**Integration retry**:
+A new attempt to complete a failed ticket integration after the ticket's implementation has succeeded. It continues the same delivery work without repeating implementation or discarding earlier merges.
+_Avoid_: implementation retry, manual merge
+
 **Acceptance ticket**:
 An implementation ticket explicitly scoped to confirm specified behavior of the assembled delivery. It is optional except when the contract includes cross-repository behavior, which requires an explicit integration/acceptance ticket. It names the participating repositories, required checks, run steps, test ownership, and evidence. It uses ordinary ticket scheduling, not a separate final gate.
 

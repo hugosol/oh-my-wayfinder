@@ -60,7 +60,7 @@ The main agent reads published tickets and registers the execution dependency gr
 
 - First dispatch creates one ticket branch and OS-temp worktree per listed repository, from each repository's current integration HEAD at dispatch time. Retries reuse all original branches/worktrees.
 - A fresh TDD child implements, validates, and promptly commits its ticket, without an extra integration-tip synchronization stage. Ending implementation automatically starts background integration, outside implementation slot limits.
-- One TDD session and one later integration session take sequential ownership of all the ticket's original repository worktrees and branches. They do not write code concurrently. No extra integration worktree is created.
+- Each implementation attempt uses one TDD session; each integration attempt uses one later integration session. They take sequential ownership of all the ticket's original repository worktrees and branches and do not write code concurrently. An integration retry starts a fresh integration session without another TDD execution. No extra integration worktree is created.
 - Only after every listed repository has its first successful merge are downstream tickets released, before integration tests or repairs finish. An unchanged repository counts as merged without an empty commit. Status lists implementation in `active` and background integration separately in `integrating`.
 - Failed implementations can retry with a fresh implementer in the original branch/worktree, retaining progress. The retry task begins with the previous rejection reason verbatim and asks the implementer to address it first, preserve existing work, and avoid repeating completed work that needs no rerun; the previous implementation report remains available as handoff context. An original TDD session already running retro is not continued for implementation.
 
@@ -75,13 +75,30 @@ Attempts queue FIFO. The lock covers:
 
 Never release the lock with an unresolved merge in the integration checkout. Ticket-worktree creation coordinates with this same lock rather than inspecting a half-completed merge. The lock never waits for an agent, tests, or repairs.
 
-### One integration child closes the loop
+### One integration child per attempt closes the loop
 
 The first attempt always starts one fresh integration child, distinct from the original TDD session, owning all original repository worktrees. It resolves existing conflicts, runs each listed repository's global test suite plus any explicitly required cross-repository checks, fixes issues directly, and commits in the affected repositories. These global tests remain part of ticket integration. Additional acceptance work—such as complex scripts, cross-ticket checks, or real-device smoke—belongs in an explicitly scoped ticket when desired, not in an automatic final gate.
 
 Then the workflow attempts to merge the result back: success (including no new commits) ends integration. A conflict triggers the abort/reverse-sync critical section, followed by a continuation of the exact same integration child outside the lock. That child resolves and commits, and the workflow queues another attempt. Later success does not trigger another full validation pass; subsequent rounds do not mandate a full test rerun. The child reads code and judges conflict resolutions itself, without main-agent approval or a fixed retry limit.
 
 Integration HEAD advancing is not a rejection condition: clean merges proceed without chasing new HEADs or reacceptance. Background repair and conflict handling do not pause other tickets' dispatch or merges. Only after processing ends and all resulting changes are merged is a ticket **integrated**; its first merge only makes it **merged**.
+
+### Retrying a failed integration
+
+Use `hyper_auto_coding` with `action=retry_integration` only when a ticket's implementation succeeded but its integration is `failed`. Reuse the `tickets` array with exactly one registered ticket ID (replace the example filename with the target ticket):
+
+```json
+{
+  "action": "retry_integration",
+  "tickets": ["01-example.md"]
+}
+```
+
+The call starts background integration and returns without rerunning TDD or implementation. It reuses all original repository worktrees and branches, existing report paths, and the first `mergedHeads`; earlier successful merges are neither reset nor rolled back. A fresh integration agent receives the previous integration error and report context rather than continuing the failed agent's session.
+
+This is the full ordinary integration process, not a merge-only retry: the agent may resolve conflicts, run the required checks, repair code, commit, and automatically merge the results. No manual merge is required. The state transitions from `failed` to `integrating`, then to `integrated` or `failed`. Success still requires completed integration testing and all resulting repairs and conflict resolutions merged into every corresponding integration branch; neither starting the retry nor an earlier first merge counts as success.
+
+Observe progress and outcomes with `status` (read-only) and `collect`, as for the initial integration. A retry is refused while the workflow is `pausing` or `paused`, or while that ticket already has an integration attempt in flight. It does not apply to failed implementations, tickets that are already integrated, or integrations that have not failed.
 
 ### Optional acceptance tickets
 
@@ -131,7 +148,7 @@ Delivery/retro report copy or commit failures preserve temporary artifacts and r
 
 ## Orchestration surface and limits
 
-`hyper_auto_coding` exposes only `plan`, `dispatch`, `collect`, `finish`, and read-only `status`. `dispatch` returns after starting implementation. Implementation completion or failure, the first merge releasing dependencies, and integration completion or failure request a `collect` check; progress between calls is retained until the next call. `collect` returns the latest state immediately when progress is pending, otherwise waits for the next change. Notifications coalesce into one check; changes after a check starts are not cleared at its end and remain pending for the next check. Overlapping `collect` calls share one check, and waiting does not hold the orchestration guard or block `dispatch`. The main agent retains the existing result-handling and dispatch logic; no automatic dispatcher is added. Integration and conflict continuations are automatic; native task calls must not bypass the workflow to dispatch tickets.
+`hyper_auto_coding` exposes only `plan`, `dispatch`, `retry_integration`, `collect`, `finish`, and read-only `status`. `dispatch` returns after starting implementation. Implementation completion or failure, the first merge releasing dependencies, and integration completion or failure request a `collect` check; progress between calls is retained until the next call. `collect` returns the latest state immediately when progress is pending, otherwise waits for the next change. Notifications coalesce into one check; changes after a check starts are not cleared at its end and remain pending for the next check. Overlapping `collect` calls share one check, and waiting does not hold the orchestration guard or block `dispatch`. The main agent retains the existing result-handling and dispatch logic; no automatic dispatcher is added. Integration and conflict continuations are automatic; native task calls must not bypass the workflow to dispatch tickets.
 
 Status includes `temporaryDir`, `active`, `integrating`, the merge-released `ready` frontier, repository-keyed ticket worktrees and first `mergedHeads`, report paths, and the pause `mode` with its `checkpoint` path. `finish` returns a delivery summary, not a status snapshot.
 
@@ -153,7 +170,7 @@ Workflow control is command-only: `/hyper-auto-coding pause` and `/hyper-auto-co
 
 `pause` resolves with the paused snapshot. Asking again while a drain is still running joins that same drain instead of starting a second one, and the command is rejected when the workflow is already paused or already finished.
 
-`hyper_auto_coding` `action=status` reports the pause `mode`: `running` while new attempts are still admitted, `pausing` once the gate is closed but work is still draining, and `paused` after the checkpoint exists; it also reports the `checkpoint` path, which exists on every status call even while running. While `mode` is `pausing` or `paused`, `plan`, `dispatch`, and `finish` are refused: only `status` and `collect` remain usable, the main agent keeps calling `collect` until the drain ends, then ends its turn and waits for the user to resume. Pausing aborts nothing, so `collect` still observes implementations, retrospectives, and integrations reaching their normal outcomes.
+`hyper_auto_coding` `action=status` reports the pause `mode`: `running` while new attempts are still admitted, `pausing` once the gate is closed but work is still draining, and `paused` after the checkpoint exists; it also reports the `checkpoint` path, which exists on every status call even while running. While `mode` is `pausing` or `paused`, `plan`, `dispatch`, `retry_integration`, and `finish` are refused: only `status` and `collect` remain usable, the main agent keeps calling `collect` until the drain ends, then ends its turn and waits for the user to resume. Pausing aborts nothing, so `collect` still observes implementations, retrospectives, and integrations reaching their normal outcomes.
 
 ### `resume`: unlock and continue
 
