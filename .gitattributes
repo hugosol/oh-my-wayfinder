@@ -1,3 +1,6 @@
 # Store and check out every text file with LF so the delta build is
 # byte-deterministic across platforms (see README "Sources & build").
 * text=auto eol=lf
+
+# Dependency snapshots preserve upstream working-tree bytes, including line endings.
+dependent-skills/** -text

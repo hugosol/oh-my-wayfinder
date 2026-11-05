@@ -123,6 +123,10 @@ No agent modifications or custom installer are required for the skills: install 
 
 **OMP users:** install and run the optional extension using the [spec-to-code guide](docs/spec-to-code.md). Copying skills alone does not install `/spec-to-code`.
 
+## Scenario dependency collections
+
+The two Suite-specific collections, `dependent-skills/codebase-exploration/` and `dependent-skills/code-implementation/`, bundle only the external skills needed for each scenario. They complement the unchanged `skills/` tree; they are not the historical `upstream/` baseline. Suites load these committed copies directly, without copying skills at startup. Source revisions, every resource's SHA-256, update rules, and licensing caveats are documented in the [maintenance guide](docs/maintenance.md#scenario-dependency-collections) and [provenance](dependent-skills/sources.json).
+
 ## Further reading
 
 | I want to… | Read |
@@ -154,4 +158,4 @@ Built on [mattpocock/skills](https://github.com/mattpocock/skills). Thank you to
 
 ## License
 
-MIT; see [LICENSE](./LICENSE). The upstream copyright notice is preserved: *Copyright (c) 2026 Matt Pocock*.
+MIT; see [LICENSE](./LICENSE). The upstream copyright notice is preserved: *Copyright (c) 2026 Matt Pocock*. This does not grant a license for the separately sourced `expert-translate` dependency, whose source has no license grant at the recorded revision; see the [dependency licensing notes](docs/maintenance.md#scenario-dependency-collections).

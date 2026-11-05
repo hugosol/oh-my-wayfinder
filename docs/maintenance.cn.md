@@ -17,6 +17,16 @@
 | [deltas/preview.mjs](../deltas/preview.mjs) | 把映射渲染成差异页面（`deltas/preview.html`，已 gitignore）。 |
 | `skills/` | 安装产物：八个 skill 的生成文件，加上手写的 `lighthouse`、`backtracer`、`traverse`、`to-contract`、`test-audit`、`test-optimize`。 |
 
+## 场景依赖技能集合
+
+`dependent-skills/codebase-exploration/` 与 `dependent-skills/code-implementation/` 按两个场景按需收录外部技能的完整目录。它们**不是**历史基线 `upstream/`，不是增量叠加层的生成输入，也不替代 `skills/`。共享技能在两个集合中各保留一份独立实体副本；Wayfinder 自有技能仍留在 `skills/`。
+
+这些文件是提交到仓库的快照，由对应 Suite 直接加载，不使用启动复制、启动同步或符号链接。[sources.json](../dependent-skills/sources.json) 记录来源仓库和 revision、源相对路径、目标路径，以及每个资源的字节数和 SHA-256；其中的资源审查区分随包引用、工作区文件和运行时前提。保留来源工作区的原始字节，不归一化换行（`.gitattributes` 对此目录单独豁免）；不要用 delta build 生成这些集合。
+
+更新集合时，明确选择来源 revision 和完整技能目录，审查目录外相对资源引用及许可证，再一起更新副本和 provenance。已有目标若内容不同，不得静默覆盖。检查完整文件清单及原始字节哈希，而不只检查 `SKILL.md`，并在更新后加载对应 Suite。
+
+Matt Pocock 的 MIT 版权与许可全文保留在 [dependent-skills/LICENSE](../dependent-skills/LICENSE)。独立的 [expert-translate 来源仓库](https://github.com/hugosol/expert-translate) 在所记录 revision 没有许可证授权；收录不代表本仓库 MIT 协议适用于该技能。向已获授权的使用范围之外分发此集合前，应确认其再分发许可。
+
 ## 生成文件与手写 skill
 
 `deltas/manifest.json` 只包含一个 `files` 数组，每项是 `<skill>/<file>` 形式的路径。只有这些路径会从 `upstream/` 读取并写入 `skills/`；生成的 skill 目录由路径的第一段推导得出。
@@ -78,7 +88,7 @@ insert: |-
 - `find` 只覆盖改动本身，不要带上周围语境：过宽的 `find` 不改变构建结果（闸门是锚点），却会把语境重复进 `content`、掩盖这个 op 真正拥有的内容。
 - `anchor`/`find` 中的上游文本必须原样保留。Markdown 表格在原始源码中保持列对齐；`content:`/`insert:` 中自拟的表格以及手写 skill 也自行做列对齐。
 - fork 新增的选择项按用途命名（例如 `mode`），避免 `branch` 这类容易被误认成 Git 操作的词。
-- 所有文件都是 LF：`.gitattributes` 固定 `* text=auto eol=lf`；出现裸 CR 或缺少结尾换行都会让构建失败。
+- 叠加层文件都是 LF：`.gitattributes` 固定 `* text=auto eol=lf`；出现裸 CR 或缺少结尾换行都会让构建失败。独立的 `dependent-skills/` 快照使用 `-text` 例外保留来源字节，不参与此构建。
 
 ## 命令
 

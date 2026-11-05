@@ -17,6 +17,16 @@ This repository ships the eight reworked skills as a **delta overlay**: `upstrea
 | [deltas/preview.mjs](../deltas/preview.mjs) | Renders the mappings as a diff page (`deltas/preview.html`, gitignored). |
 | `skills/` | The install artifact: generated files for the eight skills, plus the hand-written `lighthouse`, `backtracer`, `traverse`, `to-contract`, `test-audit` and `test-optimize`. |
 
+## Scenario dependency collections
+
+`dependent-skills/codebase-exploration/` and `dependent-skills/code-implementation/` are curated, on-demand collections of complete external skill directories. They are **not** the historical `upstream/` baseline, generated overlay inputs, or a replacement for `skills/`. Shared skills have an independent physical copy in each collection; native Wayfinder skills stay in `skills/`.
+
+These files are committed snapshots, loaded directly by the corresponding Suite. There is no startup copy, synchronization step, or symlink. [sources.json](../dependent-skills/sources.json) records each source repository and revision, source-relative path, destination, file size, and SHA-256 for every bundled resource. Its resource audit distinguishes bundled references from workspace files and runtime prerequisites. The source working-tree bytes are preserved without newline normalization (`.gitattributes` exempts this tree); do not regenerate these collections with the delta build.
+
+To update a collection, deliberately select the source revision and full skill directories, inspect external relative references and licensing, then update the copied files and provenance together. Never silently overwrite a pre-existing destination with different content. Verify the complete file inventory and raw-byte hashes, not only `SKILL.md`, and load the corresponding Suite after the update.
+
+Matt Pocock's MIT notice and permission text are retained in [dependent-skills/LICENSE](../dependent-skills/LICENSE). The separate [expert-translate repository](https://github.com/hugosol/expert-translate) contains no license grant at the recorded revision: its inclusion does not imply that this repository's MIT license applies to it. Confirm its redistribution permission before distributing that collection outside the authorized context.
+
 ## Generated files vs hand-written skills
 
 `deltas/manifest.json` holds only a `files` array of `<skill>/<file>` paths. Only those paths are read from `upstream/` and written to `skills/`; the generated skill directories are derived from the first path segment.
@@ -78,7 +88,7 @@ Parse failures — a missing or duplicate field, a target outside the whitelist,
 - Keep `find` to the change itself, not the context around it: a wide `find` does not change what the build does (the anchor is the gate), but it repeats that context into `content` and hides what the op owns.
 - Preserve upstream text verbatim in `anchor`/`find`. Keep Markdown tables column-aligned in their raw source, and column-align authored tables in `content:`/`insert:` and hand-written skills.
 - Name fork-only sequence choices by their purpose (for example `mode`) when a word such as `branch` could be mistaken for a Git operation.
-- Every file is LF: `.gitattributes` pins `* text=auto eol=lf`; the build fails on a bare CR and on a missing final newline.
+- Overlay files are LF: `.gitattributes` pins `* text=auto eol=lf`; the build fails on a bare CR and on a missing final newline. The separate `dependent-skills/` snapshots preserve source bytes through a `-text` exception and are outside this build.
 
 ## Commands
 
