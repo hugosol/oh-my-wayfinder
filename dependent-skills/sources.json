@@ -1,0 +1,492 @@
+{
+  "schemaVersion": 1,
+  "hashAlgorithm": "sha256",
+  "copyPolicy": "Verbatim regular-file bytes; no symlinks; expert-translate excludes .git only. Shared skills are independent copies in each collection.",
+  "sources": {
+    "mattpocock-skills": {
+      "repository": "https://github.com/mattpocock/skills",
+      "revision": "b0618bc436ad893b3c5e84e55fba86586d34a404",
+      "localRoot": "E:\\Developer\\myhub\\agent-skills\\matt-pocock\\skills",
+      "license": "MIT",
+      "licenseSourcePath": "LICENSE",
+      "licenseDestinationPath": "dependent-skills/LICENSE",
+      "worktreeNote": "Source checkout has an untracked .idea/ directory outside all selected skill trees.",
+      "licenseSha256": "4981c5f6a90eb3a969dacabb9350f5a75695ff3910b39b6534952908dfdc5ff7"
+    },
+    "expert-translate": {
+      "repository": "https://github.com/hugosol/expert-translate",
+      "revision": "61afdf2e9cf82f4725ee2f8ecf8ccb259dc8b064",
+      "localRoot": "E:\\Developer\\myhub\\expert-tranlate",
+      "license": null,
+      "licenseNote": "No LICENSE or copyright grant found in the source repository. This copy does not assert MIT licensing or grant redistribution rights for expert-translate.",
+      "worktreeNote": "Source checkout clean at collection time."
+    }
+  },
+  "collections": {
+    "codebase-exploration": [
+      {
+        "skill": "grill-with-docs",
+        "source": "mattpocock-skills",
+        "sourcePath": "skills/engineering/grill-with-docs",
+        "destinationPath": "dependent-skills/codebase-exploration/grill-with-docs",
+        "files": [
+          {
+            "sourcePath": "skills/engineering/grill-with-docs/agents/openai.yaml",
+            "path": "agents/openai.yaml",
+            "bytes": 150,
+            "sha256": "81e6af95559517a292767439da8f46a468b4d88a6773a3316d511a428eb16ff3"
+          },
+          {
+            "sourcePath": "skills/engineering/grill-with-docs/SKILL.md",
+            "path": "SKILL.md",
+            "bytes": 254,
+            "sha256": "abc0fa7948db18b5fb0e1cc1c522ac5ff47d874e2da1e5df60619d79be11f38b"
+          }
+        ]
+      },
+      {
+        "skill": "teach",
+        "source": "mattpocock-skills",
+        "sourcePath": "skills/productivity/teach",
+        "destinationPath": "dependent-skills/codebase-exploration/teach",
+        "files": [
+          {
+            "sourcePath": "skills/productivity/teach/agents/openai.yaml",
+            "path": "agents/openai.yaml",
+            "bytes": 144,
+            "sha256": "80e96a4d492ad8538e609672361e8543b69e7b22ce83be0efc2e5532472ede69"
+          },
+          {
+            "sourcePath": "skills/productivity/teach/GLOSSARY-FORMAT.md",
+            "path": "GLOSSARY-FORMAT.md",
+            "bytes": 2157,
+            "sha256": "22f851b265a3bec5a333937cc7ff1250136c9b6512787ae2eb51a2a14e35c341"
+          },
+          {
+            "sourcePath": "skills/productivity/teach/LEARNING-RECORD-FORMAT.md",
+            "path": "LEARNING-RECORD-FORMAT.md",
+            "bytes": 2793,
+            "sha256": "d49c754ea416a075534d0ba1428a0beba1327ae527c2d1af0333908d08e25d05"
+          },
+          {
+            "sourcePath": "skills/productivity/teach/MISSION-FORMAT.md",
+            "path": "MISSION-FORMAT.md",
+            "bytes": 1571,
+            "sha256": "44ea82d5f57a626086bde99c70cd229cdef67998e8502c1cbcd50504f57f989a"
+          },
+          {
+            "sourcePath": "skills/productivity/teach/RESOURCES-FORMAT.md",
+            "path": "RESOURCES-FORMAT.md",
+            "bytes": 1956,
+            "sha256": "377e70f83d41fdc2623037410600194655a2f7df41000925c24cc437da074ab5"
+          },
+          {
+            "sourcePath": "skills/productivity/teach/SKILL.md",
+            "path": "SKILL.md",
+            "bytes": 9873,
+            "sha256": "d9480a846c88bb1151947eb484bab1a8c9a84af4d9ddf1ea0f6fb7fe639cf9b3"
+          }
+        ]
+      },
+      {
+        "skill": "writing-for-agents",
+        "source": "mattpocock-skills",
+        "sourcePath": "skills/productivity/writing-for-agents",
+        "destinationPath": "dependent-skills/codebase-exploration/writing-for-agents",
+        "files": [
+          {
+            "sourcePath": "skills/productivity/writing-for-agents/agents/openai.yaml",
+            "path": "agents/openai.yaml",
+            "bytes": 105,
+            "sha256": "486c388ed1babac6ea25001147b41d3ff6c8892b0128ae1b0bef8feea6363428"
+          },
+          {
+            "sourcePath": "skills/productivity/writing-for-agents/SKILL-MECHANICS.md",
+            "path": "SKILL-MECHANICS.md",
+            "bytes": 2651,
+            "sha256": "86f112c08d785cc224c13dcda75c0724b74bd62622cc61d4b7ab3dbbaf37f6fc"
+          },
+          {
+            "sourcePath": "skills/productivity/writing-for-agents/SKILL.md",
+            "path": "SKILL.md",
+            "bytes": 10967,
+            "sha256": "1c0c4ebf2d221917591144f0ced4fe46dae13301cb3d6d93fc88ecf0dda6aed2"
+          }
+        ]
+      },
+      {
+        "skill": "improve-codebase-architecture",
+        "source": "mattpocock-skills",
+        "sourcePath": "skills/engineering/improve-codebase-architecture",
+        "destinationPath": "dependent-skills/codebase-exploration/improve-codebase-architecture",
+        "files": [
+          {
+            "sourcePath": "skills/engineering/improve-codebase-architecture/agents/openai.yaml",
+            "path": "agents/openai.yaml",
+            "bytes": 171,
+            "sha256": "6b69701fc3f4f31ec626c1ae5c090dc5c640fab147a63be81b575c2f9c5231fa"
+          },
+          {
+            "sourcePath": "skills/engineering/improve-codebase-architecture/HTML-REPORT.md",
+            "path": "HTML-REPORT.md",
+            "bytes": 6764,
+            "sha256": "870acb4262373ae536af7d1f4a9b56d33e7e7faa632bd425c09edb4f897fb828"
+          },
+          {
+            "sourcePath": "skills/engineering/improve-codebase-architecture/SKILL.md",
+            "path": "SKILL.md",
+            "bytes": 6071,
+            "sha256": "f053ff6d7a70f10bd0104e368f7e664b23ea6378898e305bf027e8864757822f"
+          }
+        ]
+      },
+      {
+        "skill": "grilling",
+        "source": "mattpocock-skills",
+        "sourcePath": "skills/productivity/grilling",
+        "destinationPath": "dependent-skills/codebase-exploration/grilling",
+        "files": [
+          {
+            "sourcePath": "skills/productivity/grilling/agents/openai.yaml",
+            "path": "agents/openai.yaml",
+            "bytes": 116,
+            "sha256": "ad75163922ff8263acdd25ebc37420e8fcf1fccb93483fd5742e9bd26f5c45f6"
+          },
+          {
+            "sourcePath": "skills/productivity/grilling/SKILL.md",
+            "path": "SKILL.md",
+            "bytes": 2079,
+            "sha256": "26d225ea8a36f4acacbe267e789cfb97d73964412f4243dd4b65b6cb806ddebc"
+          }
+        ]
+      },
+      {
+        "skill": "domain-modeling",
+        "source": "mattpocock-skills",
+        "sourcePath": "skills/engineering/domain-modeling",
+        "destinationPath": "dependent-skills/codebase-exploration/domain-modeling",
+        "files": [
+          {
+            "sourcePath": "skills/engineering/domain-modeling/ADR-FORMAT.md",
+            "path": "ADR-FORMAT.md",
+            "bytes": 2780,
+            "sha256": "b7021c31a1c2485b07356a8110fd1fd1ae4facbab3e210983789f425f867d95b"
+          },
+          {
+            "sourcePath": "skills/engineering/domain-modeling/agents/openai.yaml",
+            "path": "agents/openai.yaml",
+            "bytes": 104,
+            "sha256": "ce496c77c77a090877bff10f198c9770fb52e23088351350ea0826380f948ff8"
+          },
+          {
+            "sourcePath": "skills/engineering/domain-modeling/GLOSSARY-FORMAT.md",
+            "path": "GLOSSARY-FORMAT.md",
+            "bytes": 2360,
+            "sha256": "61fa9f6f9231070461dd4f7d4cfad377c33013c1e5668e1e6c0a8e4500944b3b"
+          },
+          {
+            "sourcePath": "skills/engineering/domain-modeling/SKILL.md",
+            "path": "SKILL.md",
+            "bytes": 3420,
+            "sha256": "b62d997256cc073e123d4303da8e9db00db0e28de9739660ca3e55ab76e09cdb"
+          }
+        ]
+      },
+      {
+        "skill": "codebase-design",
+        "source": "mattpocock-skills",
+        "sourcePath": "skills/engineering/codebase-design",
+        "destinationPath": "dependent-skills/codebase-exploration/codebase-design",
+        "files": [
+          {
+            "sourcePath": "skills/engineering/codebase-design/agents/openai.yaml",
+            "path": "agents/openai.yaml",
+            "bytes": 105,
+            "sha256": "967df5c80a2a00e8fea9ce0e7914fb57114c93d16baa3b7743347a4dfeed61fc"
+          },
+          {
+            "sourcePath": "skills/engineering/codebase-design/DEEPENING.md",
+            "path": "DEEPENING.md",
+            "bytes": 2590,
+            "sha256": "a67260cb384580b60430486edeb47a6e656ea5f8a42b7196b24461459031f00c"
+          },
+          {
+            "sourcePath": "skills/engineering/codebase-design/DESIGN-IT-TWICE.md",
+            "path": "DESIGN-IT-TWICE.md",
+            "bytes": 2709,
+            "sha256": "b6d23731a6feea1293cc97e08f983e9fdf48b99275d5d306c93738f06bcdce92"
+          },
+          {
+            "sourcePath": "skills/engineering/codebase-design/SKILL.md",
+            "path": "SKILL.md",
+            "bytes": 6560,
+            "sha256": "362b0bec828219d9f4b08ca7c466164e67253bdd817359258e60d2e9c5692a8f"
+          }
+        ]
+      },
+      {
+        "skill": "research",
+        "source": "mattpocock-skills",
+        "sourcePath": "skills/engineering/research",
+        "destinationPath": "dependent-skills/codebase-exploration/research",
+        "files": [
+          {
+            "sourcePath": "skills/engineering/research/agents/openai.yaml",
+            "path": "agents/openai.yaml",
+            "bytes": 97,
+            "sha256": "73840328dfa6b689d81ee645d8aaf8570a0cc44d64a32b119ea6091d2828d412"
+          },
+          {
+            "sourcePath": "skills/engineering/research/SKILL.md",
+            "path": "SKILL.md",
+            "bytes": 806,
+            "sha256": "524b404b1ca373a8b00f63a64667ec4b0a61c3c9cf4e8f246e639be859bb6979"
+          }
+        ]
+      },
+      {
+        "skill": "expert-translate",
+        "source": "expert-translate",
+        "sourcePath": ".",
+        "destinationPath": "dependent-skills/codebase-exploration/expert-translate",
+        "files": [
+          {
+            "sourcePath": "experts.md",
+            "path": "experts.md",
+            "bytes": 1373,
+            "sha256": "5dc84b0fdf2f273448bd794e57de68363efdb5eb054a2707f97db4d322575a01"
+          },
+          {
+            "sourcePath": "long-image.md",
+            "path": "long-image.md",
+            "bytes": 2376,
+            "sha256": "cc91a4f8ca877e8167a5e45d4a13f28c8179df9b0274958a2760fcdb868f42ab"
+          },
+          {
+            "sourcePath": "prompts/ao3.md",
+            "path": "prompts/ao3.md",
+            "bytes": 816,
+            "sha256": "5a5b2e03a832d55244450395361e851e93ec9aac22b2a8811cbe8f75114040b0"
+          },
+          {
+            "sourcePath": "prompts/bilingual-mix.md",
+            "path": "prompts/bilingual-mix.md",
+            "bytes": 866,
+            "sha256": "0343459080f4dacc1764c4f83dd668f8dc202f30cd50531365abf8cbfd6acf6a"
+          },
+          {
+            "sourcePath": "prompts/design.md",
+            "path": "prompts/design.md",
+            "bytes": 730,
+            "sha256": "e0d1fbf4b5ae724bbb07e904055442b1e3974f9a863a8494e61d046bfe7fbfe0"
+          },
+          {
+            "sourcePath": "prompts/ebook.md",
+            "path": "prompts/ebook.md",
+            "bytes": 588,
+            "sha256": "3993e610af3143121b2d01d22d54b2edf08d3aac97b8ff3f57e0c3767152c92d"
+          },
+          {
+            "sourcePath": "prompts/fiction.md",
+            "path": "prompts/fiction.md",
+            "bytes": 757,
+            "sha256": "b76b3d9949ac85b972658c227585ded2735a81f46306e132c3a92e1dda2f4212"
+          },
+          {
+            "sourcePath": "prompts/financial.md",
+            "path": "prompts/financial.md",
+            "bytes": 707,
+            "sha256": "bcc542eb7c1362db7f30e965cc8e3e07d7369a63734a067065c84f61fa22a21b"
+          },
+          {
+            "sourcePath": "prompts/game.md",
+            "path": "prompts/game.md",
+            "bytes": 749,
+            "sha256": "5fce6156a0e1fbaf120f04ba56b9c4432aaad4e13370c1df5d5738fc24ba13f4"
+          },
+          {
+            "sourcePath": "prompts/github.md",
+            "path": "prompts/github.md",
+            "bytes": 739,
+            "sha256": "44eb3eda8ea027bdae7956bc771c9d0139098deb3d025b16236effd21ff911a4"
+          },
+          {
+            "sourcePath": "prompts/legal.md",
+            "path": "prompts/legal.md",
+            "bytes": 684,
+            "sha256": "27f78998b0b98ebd0c860a3a349a1ce0e781631531bfadfd8eaf76c5fae37cf4"
+          },
+          {
+            "sourcePath": "prompts/medical.md",
+            "path": "prompts/medical.md",
+            "bytes": 666,
+            "sha256": "2092a831e15b7989d5875fe9f50f812e5e8b0f55b9f69d44a7e78e4dc2eda996"
+          },
+          {
+            "sourcePath": "prompts/music.md",
+            "path": "prompts/music.md",
+            "bytes": 770,
+            "sha256": "293a5676f9e87838c72549423b89b1a814e0f1b435419df882ecd973e2aa19eb"
+          },
+          {
+            "sourcePath": "prompts/news.md",
+            "path": "prompts/news.md",
+            "bytes": 676,
+            "sha256": "0975f6fa0e7c279462a1212ecccdb55686bb9912a2e0f89b72ebd5ad469e56b4"
+          },
+          {
+            "sourcePath": "prompts/reddit.md",
+            "path": "prompts/reddit.md",
+            "bytes": 831,
+            "sha256": "9de044af413ea04909a64e9e9b538f38235f9c23bd4a657ced0fe900845d9ab6"
+          },
+          {
+            "sourcePath": "prompts/tech.md",
+            "path": "prompts/tech.md",
+            "bytes": 748,
+            "sha256": "052f5667b4a09214ee12de62e854dffca34928cd5829a3bf4bfcfa2fc8860ae6"
+          },
+          {
+            "sourcePath": "prompts/twitter.md",
+            "path": "prompts/twitter.md",
+            "bytes": 692,
+            "sha256": "7696fcba6b653289edd28b140130e18a8788c4d263e76d2e5dbb4894385868c7"
+          },
+          {
+            "sourcePath": "prompts/web3.md",
+            "path": "prompts/web3.md",
+            "bytes": 717,
+            "sha256": "bd903234e751a70bbcb4143dbd96f2342c8e2b56c79fc4edc873d94939470ae8"
+          },
+          {
+            "sourcePath": "SKILL.md",
+            "path": "SKILL.md",
+            "bytes": 5538,
+            "sha256": "88eb177bbebae9902f37479abd3b69e5c2bb5268d7751f5e23dd9ee8be2465cf"
+          }
+        ]
+      }
+    ],
+    "code-implementation": [
+      {
+        "skill": "retro",
+        "source": "mattpocock-skills",
+        "sourcePath": "skills/engineering/retro",
+        "destinationPath": "dependent-skills/code-implementation/retro",
+        "files": [
+          {
+            "sourcePath": "skills/engineering/retro/agents/openai.yaml",
+            "path": "agents/openai.yaml",
+            "bytes": 151,
+            "sha256": "61afaa61443da49b3ff8fcc9d04735362bfec03e213791226134a3a21a9c6fd3"
+          },
+          {
+            "sourcePath": "skills/engineering/retro/SKILL.md",
+            "path": "SKILL.md",
+            "bytes": 4413,
+            "sha256": "42110f533f169026d037cf141b9f6c2752c6d914903be4758c38a68349e83e78"
+          }
+        ]
+      },
+      {
+        "skill": "writing-for-agents",
+        "source": "mattpocock-skills",
+        "sourcePath": "skills/productivity/writing-for-agents",
+        "destinationPath": "dependent-skills/code-implementation/writing-for-agents",
+        "files": [
+          {
+            "sourcePath": "skills/productivity/writing-for-agents/agents/openai.yaml",
+            "path": "agents/openai.yaml",
+            "bytes": 105,
+            "sha256": "486c388ed1babac6ea25001147b41d3ff6c8892b0128ae1b0bef8feea6363428"
+          },
+          {
+            "sourcePath": "skills/productivity/writing-for-agents/SKILL-MECHANICS.md",
+            "path": "SKILL-MECHANICS.md",
+            "bytes": 2651,
+            "sha256": "86f112c08d785cc224c13dcda75c0724b74bd62622cc61d4b7ab3dbbaf37f6fc"
+          },
+          {
+            "sourcePath": "skills/productivity/writing-for-agents/SKILL.md",
+            "path": "SKILL.md",
+            "bytes": 10967,
+            "sha256": "1c0c4ebf2d221917591144f0ced4fe46dae13301cb3d6d93fc88ecf0dda6aed2"
+          }
+        ]
+      },
+      {
+        "skill": "codebase-design",
+        "source": "mattpocock-skills",
+        "sourcePath": "skills/engineering/codebase-design",
+        "destinationPath": "dependent-skills/code-implementation/codebase-design",
+        "files": [
+          {
+            "sourcePath": "skills/engineering/codebase-design/agents/openai.yaml",
+            "path": "agents/openai.yaml",
+            "bytes": 105,
+            "sha256": "967df5c80a2a00e8fea9ce0e7914fb57114c93d16baa3b7743347a4dfeed61fc"
+          },
+          {
+            "sourcePath": "skills/engineering/codebase-design/DEEPENING.md",
+            "path": "DEEPENING.md",
+            "bytes": 2590,
+            "sha256": "a67260cb384580b60430486edeb47a6e656ea5f8a42b7196b24461459031f00c"
+          },
+          {
+            "sourcePath": "skills/engineering/codebase-design/DESIGN-IT-TWICE.md",
+            "path": "DESIGN-IT-TWICE.md",
+            "bytes": 2709,
+            "sha256": "b6d23731a6feea1293cc97e08f983e9fdf48b99275d5d306c93738f06bcdce92"
+          },
+          {
+            "sourcePath": "skills/engineering/codebase-design/SKILL.md",
+            "path": "SKILL.md",
+            "bytes": 6560,
+            "sha256": "362b0bec828219d9f4b08ca7c466164e67253bdd817359258e60d2e9c5692a8f"
+          }
+        ]
+      },
+      {
+        "skill": "domain-modeling",
+        "source": "mattpocock-skills",
+        "sourcePath": "skills/engineering/domain-modeling",
+        "destinationPath": "dependent-skills/code-implementation/domain-modeling",
+        "files": [
+          {
+            "sourcePath": "skills/engineering/domain-modeling/ADR-FORMAT.md",
+            "path": "ADR-FORMAT.md",
+            "bytes": 2780,
+            "sha256": "b7021c31a1c2485b07356a8110fd1fd1ae4facbab3e210983789f425f867d95b"
+          },
+          {
+            "sourcePath": "skills/engineering/domain-modeling/agents/openai.yaml",
+            "path": "agents/openai.yaml",
+            "bytes": 104,
+            "sha256": "ce496c77c77a090877bff10f198c9770fb52e23088351350ea0826380f948ff8"
+          },
+          {
+            "sourcePath": "skills/engineering/domain-modeling/GLOSSARY-FORMAT.md",
+            "path": "GLOSSARY-FORMAT.md",
+            "bytes": 2360,
+            "sha256": "61fa9f6f9231070461dd4f7d4cfad377c33013c1e5668e1e6c0a8e4500944b3b"
+          },
+          {
+            "sourcePath": "skills/engineering/domain-modeling/SKILL.md",
+            "path": "SKILL.md",
+            "bytes": 3420,
+            "sha256": "b62d997256cc073e123d4303da8e9db00db0e28de9739660ca3e55ab76e09cdb"
+          }
+        ]
+      }
+    ]
+  },
+  "resourceAudit": {
+    "externalRelativeBundledResources": [],
+    "notes": [
+      "Bundled Markdown references and provider metadata remain within each copied skill directory; no parent-directory resource references were found.",
+      "teach workspace paths and domain-modeling glossary/ADR example paths refer to invocation workspace files, not omitted package resources.",
+      "grill-with-docs invokes grilling and domain-modeling; improve-codebase-architecture invokes codebase-design. These skills are included in codebase-exploration.",
+      "Runtime capabilities are not bundled: skill invocation and subagents; research source/network access; architecture-report Tailwind and Mermaid CDNs and OS browser opener; optional expert-translate long-image rendering requires a headless browser and PowerShell System.Drawing."
+    ]
+  }
+}

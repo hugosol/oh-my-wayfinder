@@ -123,6 +123,10 @@ Skill 内的自动调用由 agent 执行指令，不是独立调度器；`/spec-
 
 **OMP 用户：** 按 [spec-to-code 使用指南](docs/spec-to-code.cn.md)安装并运行可选扩展。仅复制 skills 不会安装 `/spec-to-code`。
 
+## 场景依赖技能集合
+
+`dependent-skills/codebase-exploration/` 与 `dependent-skills/code-implementation/` 分别按需收录两个 Suite 所需的外部技能，与保持原样的 `skills/` 配合使用；它们不等于历史基线 `upstream/`。Suite 直接加载已提交的副本，不使用启动复制。来源 revision、每个资源的 SHA-256、更新规则与许可证注意事项见[维护指南](docs/maintenance.cn.md#场景依赖技能集合)及 [provenance](dependent-skills/sources.json)。
+
 ## 进一步阅读
 
 | 我想…… | 阅读入口 |
@@ -154,4 +158,4 @@ node deltas/check-upstream.mjs --local <dir>  # 与本地上游 checkout 比较
 
 ## License
 
-MIT，见 [LICENSE](./LICENSE)。上游版权声明原样保留：*Copyright (c) 2026 Matt Pocock*。
+MIT，见 [LICENSE](./LICENSE)。上游版权声明原样保留：*Copyright (c) 2026 Matt Pocock*。这不构成独立来源依赖 `expert-translate` 的许可授权；其来源在所记录 revision 没有许可证授权，详见[依赖许可说明](docs/maintenance.cn.md#场景依赖技能集合)。
