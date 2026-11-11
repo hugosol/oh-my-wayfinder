@@ -38,7 +38,8 @@ interface ExecutionAttempt {
 interface CleanupAttempt {
 	id: string;
 	at: string;
-	phase: "integrated" | "finish-worktrees" | "finish-branches";
+	phase: "implement-artifacts" | "integrate-artifacts" | "integrated" | "finish-worktrees" | "finish-branches";
+	session?: { role: HyperRole; id: string; result?: SingleResult };
 	ticket?: string;
 	resources: { repository: string; ticket: string; branch: string; cwd: string }[];
 	warnings: string[];
@@ -119,6 +120,7 @@ export class HyperWorkflow {
 	readonly tickets = new Map<string, TicketState>();
 	readonly #running = new Map<string, Promise<void>>();
 	readonly #integrating = new Map<string, Promise<void>>();
+	readonly #cleaning = new Set<Promise<void>>();
 	#checkPending = false;
 	#collection?: Promise<object>;
 	#wakeCollection?: () => void;
@@ -322,7 +324,7 @@ export class HyperWorkflow {
 				reportSuccessful: report && succeeded(report.result),
 			})),
 			finished: this.#finished,
-			cleanup: { attempts: this.#cleanupAttempts, warnings: this.#cleanupWarnings },
+			cleanup: { pending: this.#cleaning.size, attempts: this.#cleanupAttempts, warnings: this.#cleanupWarnings },
 			lastReport: this.#reports[this.#reports.length - 1],
 		};
 	}
@@ -356,7 +358,7 @@ export class HyperWorkflow {
 
 	/**
 	 * Close admission synchronously, drain every already-admitted implementation,
-	 * integration and retro, then persist the paused state. Resolves with the
+	 * integration, retro and cleanup, then persist the paused state. Resolves with the
 	 * paused status. A checkpoint that cannot be written never claims a pause:
 	 * the run stays usable and the pause can be retried.
 	 */
@@ -593,6 +595,7 @@ export class HyperWorkflow {
 		while (this.#running.size || this.#integrating.size)
 			await Promise.allSettled([...this.#running.values(), ...this.#integrating.values()]);
 		await this.retro.drain();
+		await this.#drainCleanup();
 	}
 
 	#retryIntegration(names: string[]): void {
@@ -614,8 +617,7 @@ export class HyperWorkflow {
 		const job = integration.run(ticket.ticket, ticket.report!.path, previousError).then(async () => {
 			ticket.status = "integrated";
 			this.#notifyProgress();
-			for (const { repository, git } of this.#ticketRepositories(ticket))
-				await this.#cleanup("integrated", repository, () => git.cleanupWorktree(ticket.ticket), ticket.ticket);
+			this.#startCleanup(ticket);
 		}).catch(async (error) => {
 			ticket.status = "failed";
 			ticket.error = error instanceof Error ? error.message : String(error);
@@ -645,12 +647,57 @@ export class HyperWorkflow {
 		this.#reports.push(file);
 		return { path: file, result, heads };
 	}
+	/** Scheduling never waits for cleanup; pause and finish own the lifetime barrier. */
+	#startCleanup(ticket: TicketState): void {
+		const job = this.#cleanupTicket(ticket).catch((error) => {
+			this.#cleanupWarnings.push(`票据 ${ticket.ticket} 后台清理失败：${error instanceof Error ? error.message : String(error)}`);
+		}).finally(() => {
+			this.#cleaning.delete(job);
+			this.#requestCheck();
+		});
+		this.#cleaning.add(job);
+	}
+
+	async #drainCleanup(): Promise<void> {
+		while (this.#cleaning.size) await Promise.allSettled([...this.#cleaning]);
+	}
+
+	async #cleanupTicket(ticket: TicketState): Promise<void> {
+		const repositories = this.#ticketRepositories(ticket);
+		const task = `本票 ${ticket.ticket} 已完成集成，现在只清理现场，不再实现、测试、构建或复盘。\n本票工作区：\n${JSON.stringify(repositories.map(({ repository, worktree }) => ({ repository, ...worktree })), null, 2)}\n依据本会话历史中的命令、配置和实际路径，清理你执行阶段为本票生成且可从代码重建的专属产物，包括 worktree 外的 build/target 等构建输出和临时文件。只处理本轮本票产物，不扫描历史残留，不清理其他票据、共享缓存或归属不明的目录。不创建产物登记规则。先停止本会话启动且仍占用这些产物的本票后台构建或服务，不影响其他进程。不要修改或删除源代码、未提交修改、Git 元数据、worktree 本身、交付报告、复盘文档或会话记录；worktree 由宿主随后安全删除。已不存在的产物视为已清理。清理失败直接跳过，不重试、不阻塞后续步骤。报告实际删除的路径、跳过项和失败；无法确认的内容不得声称已清理。`;
+		for (const role of ["implement", "integrate"] as const) {
+			const id = role === "implement" ? ticket.report?.result.id : ticket.integration?.snapshot.integrationAgentId;
+			const session: NonNullable<CleanupAttempt["session"]> = { role, id: id ?? "" };
+			await this.#cleanup(`${role}-artifacts`, undefined, async () => {
+				if (role === "implement") {
+					// Integration can finish while settle is still registering this attempt's retro.
+					await this.#running.get(ticket.ticket);
+					let attempt: ExecutionAttempt | undefined;
+					for (let index = this.#attempts.length - 1; index >= 0; index--) {
+						if (this.#attempts[index].ticket === ticket.ticket) { attempt = this.#attempts[index]; break; }
+					}
+					if (!attempt) throw new Error("找不到本票实现执行记录，跳过原会话清理。");
+					await this.retro.waitForRetro(attempt.id);
+				}
+				if (!id) throw new Error("原会话身份不可用，跳过清理，不创建替代会话。");
+				const result = await this.host.resume({ role, id, cwd: repositories[0].worktree.cwd,
+					name: `cleanup-${role}-${ticket.ticket}`, task });
+				session.result = result;
+				return succeeded(result) ? [] : [`${role} 产物清理未正常完成：${result.error || result.stderr || "执行失败、取消或输出截断"}`];
+			}, ticket.ticket, session);
+		}
+		for (const { repository, git } of repositories)
+			await this.#cleanup("integrated", repository, () => git.cleanupWorktree(ticket.ticket), ticket.ticket);
+	}
+
 	/** Resource reclamation and its audit storage never change an integration outcome. */
-	async #cleanup(phase: CleanupAttempt["phase"], repository: string, run: () => Promise<string[]>, ticket?: string): Promise<void> {
+	async #cleanup(phase: CleanupAttempt["phase"], repository: string | undefined, run: () => Promise<string[]>, ticket?: string,
+		session?: CleanupAttempt["session"]): Promise<void> {
 		const attempt: CleanupAttempt = {
-			id: randomUUID(), at: new Date().toISOString(), phase, ticket,
-			resources: [...this.repositories.get(repository)!.worktrees].filter(([name]) => !ticket || name === ticket)
-				.map(([name, tree]) => ({ repository, ticket: name, ...tree })),
+			id: randomUUID(), at: new Date().toISOString(), phase, ticket, session,
+			resources: [...this.repositories].filter(([id]) => repository === undefined || id === repository)
+				.flatMap(([id, git]) => [...git.worktrees].filter(([name]) => !ticket || name === ticket)
+					.map(([name, tree]) => ({ repository: id, ticket: name, ...tree }))),
 			warnings: [],
 		};
 		try { attempt.warnings.push(...await run()); }
@@ -669,6 +716,7 @@ export class HyperWorkflow {
 	async #finish(): Promise<object> {
 		this.#allIntegrated();
 		await this.retro.finish();
+		await this.#drainCleanup();
 		const files = await this.retro.publish(path.join(this.git.root, ".scratch", this.slug, "retro"));
 		const directory = path.join(this.git.root, ".scratch", this.slug, "execution", path.basename(this.temporaryDir));
 		await fs.mkdir(directory, { recursive: true });

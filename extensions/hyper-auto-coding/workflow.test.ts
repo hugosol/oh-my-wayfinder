@@ -6,7 +6,7 @@ import type { SingleResult } from "@oh-my-pi/pi-coding-agent";
 import type { TicketProgress } from "../implementation-node/tdd-execution";
 import { HyperGit } from "./git";
 import type { HyperHost, HyperRole, HyperRun } from "./subagent-host";
-import { cleanupFixtures, git, initRepo, ticketFile, write } from "./test-support";
+import { cleanupFixtures, git, initRepo, tempDir, ticketFile, write } from "./test-support";
 import { HyperWorkflow } from "./workflow";
 
 interface TicketSnapshot {
@@ -80,6 +80,7 @@ afterEach(async () => {
 	for (const workflow of workflows.splice(0)) {
 		await drain(workflow);
 		await workflow.retro.finish();
+		if (!workflow.finished && !workflow.paused) await workflow.pause();
 		for (const tree of workflow.git.worktrees.values()) {
 			if (await fs.stat(tree.cwd).catch(() => null))
 				await git(workflow.git.root, "worktree", "remove", "--force", tree.cwd);
@@ -121,10 +122,12 @@ async function fixture(options: {
 	cap?: number;
 	implementationGate?: Promise<void>;
 	retroGate?: Promise<void>;
+	retroWork?: (ticket: string) => Promise<void>;
 	throwImplementation?: () => boolean;
 	implementationWork?: (request: HyperRun) => Promise<void>;
 	integrationWork?: (request: HyperRun) => Promise<void | Partial<SingleResult>>;
 	resumeWork?: (request: HyperRun & { id: string }) => Promise<void>;
+	cleanupWork?: (request: HyperRun & { id: string }) => Promise<void | Partial<SingleResult>>;
 	failRetro?: (ticket: string) => boolean;
 } = {}) {
 	const repo = await initRepo({ slug: "feature", branch: "feature/delivery", prefix: "hyper-workflow-test-",
@@ -158,6 +161,8 @@ async function fixture(options: {
 			return execution;
 		},
 		async resume(request) {
+			if (request.name.startsWith("cleanup-"))
+				return result(request, { id: request.id, ...await options.cleanupWork?.(request) });
 			runs.push({ role: request.role, id: request.id, cwd: request.cwd, resumed: true });
 			await options.resumeWork?.(request);
 			return result(request, { id: request.id });
@@ -171,6 +176,7 @@ async function fixture(options: {
 			async analyze(record, execution) {
 				retroIds.push(execution.id);
 				await options.retroGate;
+				await options.retroWork?.(record.ticket);
 				events.push(`retro:${record.ticket}:publication=${JSON.stringify(await published())}`);
 				if (options.failRetro?.(record.ticket))
 					return { ...execution, exitCode: 1, output: "", error: "retro turn returned no transcript" };
@@ -380,7 +386,6 @@ test("failed implementation retries reuse the original branch and worktree witho
 	await workflow.retro.drain();
 	expect(snapshots).toHaveLength(notificationCount);
 	expect(ticketSnapshot(await status(workflow), "a.md").worktrees).toEqual(first.worktrees);
-	expect(await fs.stat(first.worktrees!.coordinator.cwd).catch(() => null)).toBeNull();
 	expect(await fs.readFile(path.join(workflow.git.root, "a.txt"), "utf8")).toBe("delivered a\n");
 });
 
@@ -551,7 +556,6 @@ test("post-test merge conflicts resume the same integration session in the origi
 	expect([...workflow.git.worktrees.values()].map((tree) => tree.cwd).sort()).toEqual(
 		(await status(workflow)).tickets.filter((ticket) => ticket.worktrees).map((ticket) => ticket.worktrees!.coordinator.cwd).sort(),
 	);
-	expect((await git(root, "worktree", "list", "--porcelain")).match(/^worktree /gm)?.length).toBe(1);
 });
 
 test("first-merge conflict starts one integration child; its successful merge does not run validation again", async () => {
@@ -664,9 +668,6 @@ test("integrated tickets can be published without independent final verification
 	expect(summary.retainedBranches).toEqual([]);
 	expect(summary.retainedWorktrees).toEqual([]);
 	const cleanup = JSON.parse(await fs.readFile(summary.cleanupReport, "utf8"));
-	expect(cleanup.attempts.map((attempt: { phase: string }) => attempt.phase)).toEqual([
-		"integrated", "integrated", "integrated", "finish-worktrees", "finish-branches",
-	]);
 	expect(cleanup.retainedBranches).toEqual([]);
 	expect(cleanup.retainedWorktrees).toEqual([]);
 	expect(cleanup.residualsConfirmed).toBe(true);
@@ -700,32 +701,91 @@ test("integrated tickets can be published without independent final verification
 	expect(await fs.stat(before.temporaryDir).catch(() => null)).toBeNull();
 }, 30000);
 
-test("integration reclaims its worktree before retro completes and keeps branch identity", async () => {
-	const retro = gate();
-	const { workflow, root } = await fixture({ retroGate: retro.promise });
+test("ticket cleanup waits only its retro, reuses both sessions in order and never occupies a scheduling slot", async () => {
+	const retroA = gate(), retroB = gate(), implementationCleanup = gate(), cleanupStarted = gate();
+	const removing = gate(), removeStarted = gate();
+	const external = await tempDir("hyper-external-build-");
+	const order: string[] = [];
+	const { workflow, runs } = await fixture({
+		cap: 1,
+		retroWork: (ticket) => ticket === "a.md" ? retroA.promise : ticket === "b.md" ? retroB.promise : Promise.resolve(),
+		implementationWork: async (request) => { await write(path.join(external, path.basename(request.cwd), "implement", "target.bin"), "build"); },
+		integrationWork: async (request) => { await write(path.join(external, path.basename(request.cwd), "integrate", "target.bin"), "build"); },
+		cleanupWork: async (request) => {
+			const original = runs.find((run) => !run.resumed && run.role === request.role && run.cwd === request.cwd)!;
+			expect(request.id).toBe(original.id);
+			if (request.name.endsWith("a.md")) {
+				order.push(request.role);
+				if (request.role === "implement") { cleanupStarted.release(); await implementationCleanup.promise; }
+			}
+			await fs.rm(path.join(external, path.basename(request.cwd), request.role), { recursive: true });
+		},
+	});
+	const remove = workflow.git.cleanupWorktree.bind(workflow.git);
+	workflow.git.cleanupWorktree = async (ticket) => {
+		if (ticket === "a.md") { order.push("worktree"); removeStarted.release(); await removing.promise; }
+		return remove(ticket);
+	};
 	await complete(workflow, "a.md");
 	const tree = workflow.git.worktrees.get("a.md")!;
+	expect(order).toEqual([]);
+	expect((await fs.stat(tree.cwd)).isDirectory()).toBe(true);
+	await complete(workflow, "b.md");
+	retroA.release();
+	await cleanupStarted.promise;
+	expect(order).toEqual(["implement"]);
+	expect(await fs.readFile(path.join(external, path.basename(tree.cwd), "integrate", "target.bin"), "utf8")).toBe("build");
+	implementationCleanup.release();
+	await removeStarted.promise;
+	expect(order).toEqual(["implement", "integrate", "worktree"]);
+	expect(await fs.stat(path.join(external, path.basename(tree.cwd), "implement")).catch(() => null)).toBeNull();
+	expect(await fs.stat(path.join(external, path.basename(tree.cwd), "integrate")).catch(() => null)).toBeNull();
+	// Even deletion itself can be slow without holding the sole ticket slot.
+	await complete(workflow, "c.md");
+	const pausing = workflow.pause();
+	expect(workflow.paused).toBe(false);
+	removing.release();
+	retroB.release();
+	await pausing;
 	expect(await fs.stat(tree.cwd).catch(() => null)).toBeNull();
-	expect(await git(root, "branch", "--list", tree.branch)).not.toBe("");
-	expect(workflow.retro.records[0].retro_status).not.toBe("completed");
-	const directory = path.join(workflow.temporaryDir, "cleanup");
-	const records = await fs.readdir(directory);
-	expect(records).toHaveLength(1);
-	expect(JSON.parse(await fs.readFile(path.join(directory, records[0]), "utf8"))).toMatchObject({
-		phase: "integrated", ticket: "a.md", resources: [{ ticket: "a.md", ...tree }], warnings: [],
+	expect(workflow.paused).toBe(true);
+}, 30000);
+
+test("finish drains cleanup before closing sessions and cleanup failures skip to later steps", async () => {
+	const held = gate(), entered = gate();
+	const { workflow, events } = await fixture({
+		cleanupWork: async (request) => {
+			if (request.name === "cleanup-implement-a.md") throw new Error("implementation session unavailable");
+			if (request.name === "cleanup-integrate-b.md") return { exitCode: 1, error: "build directory locked" };
+			if (request.name === "cleanup-integrate-c.md") { entered.release(); await held.promise; }
+		},
 	});
-	retro.release();
-});
+	for (const name of ["a.md", "b.md", "c.md"]) await complete(workflow, name);
+	await entered.promise;
+	const finishing = workflow.execute({ action: "finish" });
+	expect(workflow.finished).toBe(false);
+	expect(events.some((event) => event.startsWith("close:"))).toBe(false);
+	const lastTree = workflow.git.worktrees.get("c.md")!;
+	expect((await fs.stat(lastTree.cwd)).isDirectory()).toBe(true);
+	held.release();
+	const summary = await finishing as FinishSummary;
+	expect(summary.retainedWorktrees).toEqual([]);
+	expect(summary.warnings.some((warning) => warning.includes("implementation session unavailable"))).toBe(true);
+	expect(summary.warnings.some((warning) => warning.includes("build directory locked"))).toBe(true);
+	const audit = JSON.parse(await fs.readFile(summary.cleanupReport, "utf8"));
+	expect(audit.attempts.find((attempt: { ticket: string; phase: string }) => attempt.ticket === "a.md" && attempt.phase === "integrate-artifacts").session.result.exitCode).toBe(0);
+	expect(workflow.finished).toBe(true);
+}, 30000);
 
 test("failed early cleanup is checkpointed, restored and retried after report publication", async () => {
 	const { workflow, host, root } = await fixture();
 	const remove = workflow.git.cleanupWorktree.bind(workflow.git);
 	workflow.git.cleanupWorktree = async () => { throw new Error("worktree busy"); };
 	await complete(workflow, "a.md");
-	workflow.git.cleanupWorktree = remove;
 	const paused = await workflow.pause() as StatusSnapshot;
+	workflow.git.cleanupWorktree = remove;
 	const state = JSON.parse(await fs.readFile(paused.checkpoint, "utf8")) as CheckpointSnapshot;
-	expect(state.cleanup?.attempts[0]).toMatchObject({ phase: "integrated", warnings: [expect.stringContaining("worktree busy")] });
+	expect(state.cleanup?.attempts.find((attempt) => attempt.phase === "integrated")).toMatchObject({ warnings: [expect.stringContaining("worktree busy")] });
 	const restored = await HyperWorkflow.restore(paused.checkpoint, host, "parent", "Main", null);
 	workflows.push(restored);
 	await restored.resume();
@@ -757,6 +817,8 @@ test("dirty ticket worktrees and their branches survive final cleanup with preci
 		return remove(ticket);
 	};
 	for (const name of ["a.md", "b.md", "c.md"]) await complete(workflow, name);
+	await workflow.pause();
+	await workflow.resume();
 	workflow.git.cleanupWorktree = remove;
 	const tree = workflow.git.worktrees.get("a.md")!;
 	const summary = await workflow.execute({ action: "finish" }) as FinishSummary;
@@ -768,7 +830,7 @@ test("dirty ticket worktrees and their branches survive final cleanup with preci
 	expect(await git(root, "status", "--porcelain")).toBe("");
 	const report = JSON.parse(await fs.readFile(summary.cleanupReport, "utf8"));
 	expect(report.retainedWorktrees).toEqual([{ repository: "coordinator", ...tree }]);
-	expect(report.attempts[0].warnings.length).toBeGreaterThan(0);
+	expect(report.attempts.some((attempt: { warnings: string[] }) => attempt.warnings.some((warning) => warning.includes("a.md")))).toBe(true);
 	expect(report.attempts.at(-2).warnings.length).toBeGreaterThan(0);
 });
 
@@ -778,7 +840,6 @@ test("cleanup audit storage failure cannot fail an integrated ticket", async () 
 	await complete(workflow, "a.md");
 	const paused = await workflow.pause() as StatusSnapshot;
 	const state = JSON.parse(await fs.readFile(paused.checkpoint, "utf8")) as CheckpointSnapshot;
-	expect(state.cleanup?.attempts).toHaveLength(1);
 	expect(state.cleanup?.warnings.some((warning) => warning.includes("未能持久化"))).toBe(true);
 });
 
