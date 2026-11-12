@@ -68,7 +68,7 @@ export class TddWorkFlow {
 	readonly #latest = new Map<string, ExecutionRecord>();
 	readonly #progressListeners = new Set<() => void>();
 	#finished = false;
-	readonly #pending = new Set<Promise<void>>();
+	readonly #pending = new Map<string, Promise<void>>();
 	readonly #abort = new AbortController();
 	readonly #activeCalls = new Set<string>();
 	#closing = false;
@@ -168,8 +168,8 @@ export class TddWorkFlow {
 			this.ports.warn(`Retro 未交付：${record.ticket} / ${record.run_id}：${record.retro_error}`);
 			await this.#persist(record);
 		});
-		this.#pending.add(job);
-		void job.finally(() => this.#pending.delete(job));
+		this.#pending.set(toolCallId, job);
+		void job.finally(() => this.#pending.delete(toolCallId));
 	}
 
 	async #retro(record: ExecutionRecord, result: SingleResult | undefined): Promise<void> {
@@ -232,13 +232,16 @@ export class TddWorkFlow {
 		}
 	}
 
-	/**
-	 * Await every background retro that is still in flight, including ones
-	 * started while draining, without closing the workflow to later attempts.
-	 * `finish()` is the closing counterpart; a pause must not call it.
-	 */
+	/** Await one settled implementation attempt’s retro without waiting for other tickets. */
+	async waitForRetro(toolCallId: string): Promise<void> {
+		const record = this.#calls.get(toolCallId);
+		if (!record || record.tdd_status === "running") throw new Error(`TDD 执行尚未结算：${toolCallId}`);
+		await this.#pending.get(toolCallId);
+	}
+
+	/** Drain all retros without closing admission; used by pause rather than finish. */
 	async drain(): Promise<void> {
-		while (this.#pending.size) await Promise.allSettled([...this.#pending]);
+		while (this.#pending.size) await Promise.allSettled([...this.#pending.values()]);
 	}
 
 	/**
@@ -263,7 +266,7 @@ export class TddWorkFlow {
 		if (this.#finish) return this.#finish;
 		this.#closing = true;
 		this.#finish = (async () => {
-			await Promise.all([...this.#pending]);
+			await Promise.all([...this.#pending.values()]);
 			this.#finished = true;
 			this.#notifyProgress();
 			return this.summary();
@@ -295,7 +298,7 @@ export class TddWorkFlow {
 	async cancel(): Promise<void> {
 		this.#closing = true;
 		this.#abort.abort(new Error("主 session 已退出或切换；后台 retro 已取消，不会自动恢复。"));
-		await Promise.all([...this.#pending]);
+		await Promise.all([...this.#pending.values()]);
 	}
 
 	summary(): string {

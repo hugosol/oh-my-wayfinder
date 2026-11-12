@@ -13,6 +13,7 @@ afterEach(async () => {
 	for (const workflow of workflows.splice(0)) {
 		await drain(workflow);
 		await workflow.retro.finish();
+		if (!workflow.finished && !workflow.paused) await workflow.pause();
 		for (const repository of workflow.repositories.values()) {
 			for (const tree of repository.worktrees.values()) {
 				if (await fs.stat(tree.cwd).catch(() => null)) await git(repository.root, "worktree", "remove", "--force", tree.cwd);
@@ -62,7 +63,7 @@ async function multiFixture(options: {
 			} else await options.integrate?.(request);
 			return { index: 0, id, agent: request.role, agentSource: "project", task: request.task, exitCode: 0, output: "Verified", stderr: "", truncated: false, durationMs: 1, tokens: 1, requests: 1 } as SingleResult;
 		},
-		async resume(request) { runs.push(request); await options.resume?.(request); return { index: 0, id: request.id, agent: request.role, agentSource: "project", task: request.task, exitCode: 0, output: "Verified", stderr: "", truncated: false, durationMs: 1, tokens: 1, requests: 1 } as SingleResult; },
+		async resume(request) { if (!request.name.startsWith("cleanup-")) { runs.push(request); await options.resume?.(request); } return { index: 0, id: request.id, agent: request.role, agentSource: "project", task: request.task, exitCode: 0, output: "Verified", stderr: "", truncated: false, durationMs: 1, tokens: 1, requests: 1 } as SingleResult; },
 		async close() {},
 		retro: { identify: async (value) => ({ agent: value.agent, agent_id: value.id, session_id: value.id, session_file: null, execution_cwd: front.root }), analyze: async (_record, value) => value, warn() {} },
 	};
@@ -229,8 +230,8 @@ test("pause restore preserves all repository baselines and publishes reports and
 	await workflow.execute({ action: "dispatch", tickets: ["a.md"] });
 	await drain(workflow);
 	const before = workflow.status() as MultiStatus;
-	for (const tree of Object.values(before.tickets[0].worktrees!)) expect(await fs.stat(tree.cwd).catch(() => null)).toBeNull();
 	const paused = await workflow.pause() as { checkpoint: string };
+	for (const tree of Object.values(before.tickets[0].worktrees!)) expect(await fs.stat(tree.cwd).catch(() => null)).toBeNull();
 	const checkpoint = JSON.parse(await fs.readFile(paused.checkpoint, "utf8"));
 	expect(checkpoint.version).toBe(2);
 	expect(Object.keys(checkpoint.repositories).sort()).toEqual(["backend", "frontend"]);

@@ -53,10 +53,10 @@ _Avoid_: review, acceptance verification
 Every dispatched execution attempt and its retrospective has reached a known outcome, including failures or undelivered retrospectives. Settlement does not mean every ticket passed acceptance.
 
 **Workflow pausing**:
-New implementation attempts are no longer admitted, while already-started attempts, their retrospectives, and their ticket integrations are allowed to reach known outcomes.
+New implementation attempts are no longer admitted, while already-started attempts, their retrospectives, their ticket integrations, and background ticket cleanup are allowed to reach known outcomes.
 
 **Workflow paused**:
-No implementation attempt, retrospective, or ticket integration remains in flight, and new implementation attempts remain suspended until explicitly resumed. A paused workflow is not necessarily delivery complete or successful.
+No implementation attempt, retrospective, ticket integration, or background ticket cleanup remains in flight, and new implementation attempts remain suspended until explicitly resumed. A paused workflow is not necessarily delivery complete or successful.
 
 **Coordinator repository**:
 The repository from which a local multi-repository workflow is started and where its planning artifacts, global ticket set, reports, retrospectives, and cleanup records are published.
@@ -83,6 +83,9 @@ An implementation ticket whose work has first reached the integration branch in 
 
 **Integrated ticket**:
 A merged implementation ticket whose integration testing and any resulting repairs and conflict resolution are complete, with all resulting changes merged into the corresponding integration branches. This does not certify later combinations of changes.
+
+**Ticket-owned rebuildable artifacts**:
+Disposable outputs belonging exclusively to one implementation ticket that can be recreated without losing source work or delivery evidence. They may reside outside that ticket's worktrees; shared resources are not ticket-owned.
 
 **Implementation frontier**:
 The implementation tickets available to start because all their blocking tickets have been merged; those blockers need not yet be integrated.

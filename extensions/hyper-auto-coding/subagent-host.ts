@@ -12,10 +12,10 @@
  * into every child session, so a project-only `.omp/agents` install survives a
  * worktree spawn. `implement` and `integrate` are the two roles kept addressable
  * (`keepAlive` plus retained artifacts): the retro callbacks continue the exact
- * original implementation session, and `resume` continues the exact original
- * integration session across its conflict/repair rounds instead of spawning a
- * replacement. The integration helper runs an inline definition that never
- * autoloads the `tdd` skill. Isolation is never requested: worktrees are the
+ * original implementation session, and `resume` continues either role's exact
+ * original session for cleanup or integration conflict/repair rounds instead of
+ * spawning a replacement. The integration helper runs an inline definition that
+ * never autoloads the `tdd` skill. Isolation is never requested: worktrees are the
  * caller's concern and the retro continuation rejects isolated sessions.
  */
 import {
@@ -77,10 +77,12 @@ export interface HyperHost {
 	 */
 	run(request: HyperRun): Promise<SingleResult>;
 	/**
-	 * Continue the exact child session an earlier `integrate` run created, with
-	 * one more turn on its retained conversation history, and resolve with that
-	 * turn's `SingleResult`. `id` is the `id` of the original run's result;
-	 * `task` is the follow-up assignment.
+	 * Continue the exact child session an earlier `implement` or `integrate` run
+	 * created, with one more turn on its retained conversation history, and
+	 * resolve with that turn's `SingleResult`. `id` is the original run result's
+	 * `id`; `role` must match that run, and `task` is the follow-up assignment.
+	 * Implement continuations use the captured integration-root `tdd` agent;
+	 * integration continuations keep the inline integration helper definition.
 	 *
 	 * The continuation never spawns a replacement session: an `id` this host did
 	 * not keep alive (or whose session was released) fails instead of silently
@@ -98,11 +100,11 @@ export interface HyperHost {
 	/**
 	 * Release artifact directories retained for `implement` and `integrate` runs
 	 * whose lease was temporary. Call once the workflow is finished — after every
-	 * retro, the last integration round, and the final report commit — because a
-	 * retained directory holds the original session a later retro or integration
-	 * continuation must revive. A persisted calling session owns its artifacts
-	 * directory outright, so nothing is retained and this is a no-op; the calling
-	 * session's history is never touched.
+	 * retro, the last integration round, all cleanup continuations, and the final
+	 * report commit — because a retained directory holds the original session a
+	 * later retro or role continuation must revive. A persisted calling session
+	 * owns its artifacts directory outright, so nothing is retained and this is a
+	 * no-op; the calling session's history is never touched.
 	 */
 	close(): Promise<void>;
 }
@@ -308,27 +310,30 @@ export async function createHyperHost(pi: ExtensionAPI, ctx: ExtensionContext): 
 	}
 
 	/**
-	 * Continue the exact integration session `id` names. The turn runs on the
-	 * retained conversation history through the SDK's own follow-up entry point,
-	 * so no replacement session is ever created; an unknown or released id
-	 * rejects with the SDK's own error. `cwd` and `name` are ignored: the
-	 * continued session keeps the working directory and id it was spawned with.
+	 * Continue the exact retained session `id` names using its role's original
+	 * agent definition. The turn runs on the retained conversation history
+	 * through the SDK's own follow-up entry point, so no replacement session is
+	 * ever created; an unknown or released id rejects with the SDK's own error.
+	 * `cwd` and `name` are ignored: the continued session keeps the working
+	 * directory and id it was spawned with.
 	 */
 	async function resume(request: HyperRun & { id: string }): Promise<SingleResult> {
-		if (request.role !== "integrate") {
-			throw new Error(`hyper resume only continues "integrate" sessions, not "${String(request.role)}".`);
+		if (!ROLES.includes(request.role)) {
+			throw new Error(`Unknown hyper role "${String(request.role)}". Expected one of: ${ROLES.join(", ")}.`);
 		}
 		const id = request.id.trim();
-		if (!id) throw new Error("hyper integrate resume needs the id of the run to continue.");
+		if (!id) throw new Error(`hyper ${request.role} resume needs the id of the run to continue.`);
 		const assignment = request.task.trim();
-		if (!assignment) throw new Error("hyper integrate resume needs a non-empty task.");
-		const agent = helpers.find((candidate) => candidate.name === "hyper-integrate");
+		if (!assignment) throw new Error(`hyper ${request.role} resume needs a non-empty task.`);
+		const agent = request.role === "implement"
+			? implement
+			: helpers.find((candidate) => candidate.name === "hyper-integrate");
 		if (!agent) throw new Error('hyper-auto-coding has no "hyper-integrate" agent definition.');
 		return runSubagentFollowUpTurn({
 			id,
 			agent,
 			message: assignment,
-			parentToolCallId: `hyper:integrate:${id}`,
+			parentToolCallId: `hyper:${request.role}:${id}`,
 			eventBus: pi.events,
 		});
 	}
