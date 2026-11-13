@@ -25,6 +25,26 @@
   "collections": {
     "codebase-exploration": [
       {
+        "skill": "retro",
+        "source": "mattpocock-skills",
+        "sourcePath": "skills/engineering/retro",
+        "destinationPath": "dependent-skills/codebase-exploration/retro",
+        "files": [
+          {
+            "sourcePath": "skills/engineering/retro/agents/openai.yaml",
+            "path": "agents/openai.yaml",
+            "bytes": 151,
+            "sha256": "61afaa61443da49b3ff8fcc9d04735362bfec03e213791226134a3a21a9c6fd3"
+          },
+          {
+            "sourcePath": "skills/engineering/retro/SKILL.md",
+            "path": "SKILL.md",
+            "bytes": 4413,
+            "sha256": "42110f533f169026d037cf141b9f6c2752c6d914903be4758c38a68349e83e78"
+          }
+        ]
+      },
+      {
         "skill": "grill-with-docs",
         "source": "mattpocock-skills",
         "sourcePath": "skills/engineering/grill-with-docs",
@@ -486,6 +506,7 @@
       "Bundled Markdown references and provider metadata remain within each copied skill directory; no parent-directory resource references were found.",
       "teach workspace paths and domain-modeling glossary/ADR example paths refer to invocation workspace files, not omitted package resources.",
       "grill-with-docs invokes grilling and domain-modeling; improve-codebase-architecture invokes codebase-design. These skills are included in codebase-exploration.",
+      "retro invokes writing-for-agents; both skills are included as independent snapshots in codebase-exploration and code-implementation.",
       "Runtime capabilities are not bundled: skill invocation and subagents; research source/network access; architecture-report Tailwind and Mermaid CDNs and OS browser opener; optional expert-translate long-image rendering requires a headless browser and PowerShell System.Drawing."
     ]
   }
