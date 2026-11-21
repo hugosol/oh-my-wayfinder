@@ -109,7 +109,22 @@ node deltas/check-upstream.mjs --local <dir>  # compare against a local upstream
 
 ## Updating the upstream snapshot
 
-The current snapshot corresponds to `mattpocock/skills` commit `f3fc5632f401156837ee3872f14fe33ccf1024ea`. This is the single place the provenance is recorded; update it when the snapshot moves (the check output names the revision it compared against).
+[upstream/revision.json](../upstream/revision.json) is the single version record for these eight skill snapshots: `repository` identifies the upstream repository, `revision` is the full Git commit SHA, and `sourceRoot` is the upstream parent directory of the skills. It is not a build input and does not describe `dependent-skills/`, which has its own `sources.json`. Advance the revision only when all eight complete directories match the selected commit (allowing CRLF/LF normalization), and commit it with the snapshots and generated outputs; pulling upstream alone does not advance this record.
+
+Run these Bash commands from this repository root, setting `UPSTREAM` to the actual upstream checkout. Inspect changes before updating the snapshots and version record:
+
+```bash
+UPSTREAM=../mattpocock-skills
+BASE=$(node -p "require('./upstream/revision.json').revision")
+git -C "$UPSTREAM" show --no-patch --format=fuller "$BASE"
+git -C "$UPSTREAM" log --oneline "$BASE"..HEAD -- skills/engineering
+git -C "$UPSTREAM" diff --stat "$BASE" HEAD -- skills/engineering
+git -C "$UPSTREAM" diff "$BASE" HEAD -- skills/engineering/wayfinder
+```
+
+Replace the final path with any skill under review; directory-level diffs include resource changes outside the manifest whitelist. `HEAD` is the local upstream checkout's commit, not the live remote version. If the baseline commit is unavailable, fetch the relevant history in that checkout first. Empty log/diff output is expected when the updated baseline equals HEAD.
+
+This sync includes fresh sub-agent contexts, tracker setup checks, and GitHub/GitLab operation fixes. Existing `docs/agents/` configuration does not refresh automatically. Before adopting the new `/links`-based frontier query for an existing GitLab map, link any child tickets that only have a `Part of` body reference to the map, or they will be missed.
 
 1. Copy all eight complete skill directories from the selected upstream checkout into `upstream/`, replacing the previous snapshot. Copying extra files is fine: the build ignores anything not in the manifest.
 2. Adapt every mapping anchor and edit against the new baseline, preserving both upstream's fixes and the fork's approved semantics. Expect some ops to fail the build with a named anchor — that is the review point, not an accident.

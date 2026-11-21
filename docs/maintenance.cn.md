@@ -109,7 +109,22 @@ node deltas/check-upstream.mjs --local <dir>  # 与本地上游检出对比
 
 ## 更新上游快照
 
-当前快照对应 `mattpocock/skills` 的提交 `f3fc5632f401156837ee3872f14fe33ccf1024ea`。来源信息只记录在这里；快照更新时请一并更新这一行（检查输出会标注它所比较的版本）。
+[upstream/revision.json](../upstream/revision.json) 是这八个 skill 快照来源的唯一版本记录：`repository` 是上游仓库，`revision` 是完整 Git commit SHA，`sourceRoot` 是上游 skill 的父目录。它不参与生成，也不代表 `dependent-skills/` 的版本；后者由自己的 `sources.json` 记录。只有八个完整目录都与选定提交一致（允许 CRLF/LF 归一化）时才推进 revision，并与快照、生成产物一起提交；不要只因上游执行了 pull 就更新记录。
+
+在本仓库根目录运行以下 Bash 命令，`UPSTREAM` 改为实际的上游检出目录。先查看变更，再更新快照与版本记录：
+
+```bash
+UPSTREAM=../mattpocock-skills
+BASE=$(node -p "require('./upstream/revision.json').revision")
+git -C "$UPSTREAM" show --no-patch --format=fuller "$BASE"
+git -C "$UPSTREAM" log --oneline "$BASE"..HEAD -- skills/engineering
+git -C "$UPSTREAM" diff --stat "$BASE" HEAD -- skills/engineering
+git -C "$UPSTREAM" diff "$BASE" HEAD -- skills/engineering/wayfinder
+```
+
+最后一条可换成任意待查 skill 路径；目录级 diff 会包含 manifest 白名单之外的资源变化。`HEAD` 指本地上游检出的提交，不是实时远端版本；若找不到基线 commit，先在该检出中获取对应历史。更新后的基线与 HEAD 相同时，log/diff 为空是预期结果。
+
+本次同步包含全新子代理上下文、tracker 配置检查及 GitHub/GitLab 操作修复。已有 `docs/agents/` 配置不会自动刷新；旧 GitLab map 的子票若仅有 `Part of` 正文，需先补齐 map 链接，再采用新版基于 `/links` 的 frontier 查询，避免漏票。
 
 1. 从选定的上游检出中把八个完整 skill 目录复制进 `upstream/`，替换旧快照。多复制文件没有问题：构建会忽略未列入 manifest 的一切。
 2. 针对新基线逐条适配映射的锚点与编辑，同时保留上游的修复和 fork 已确认的语义。预期会有 op 因锚点被点名而构建失败——这正是评审点，不是意外。

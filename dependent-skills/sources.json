@@ -5,7 +5,7 @@
   "sources": {
     "mattpocock-skills": {
       "repository": "https://github.com/mattpocock/skills",
-      "revision": "b0618bc436ad893b3c5e84e55fba86586d34a404",
+      "revision": "abeeaf95660ba9e8b7c753eb38f441ca707a8823",
       "localRoot": "E:\\Developer\\myhub\\agent-skills\\matt-pocock\\skills",
       "license": "MIT",
       "licenseSourcePath": "LICENSE",
@@ -155,8 +155,8 @@
           {
             "sourcePath": "skills/engineering/improve-codebase-architecture/SKILL.md",
             "path": "SKILL.md",
-            "bytes": 6071,
-            "sha256": "f053ff6d7a70f10bd0104e368f7e664b23ea6378898e305bf027e8864757822f"
+            "bytes": 6099,
+            "sha256": "ab526ca26246137fe96048b072d93aeff45f763da5e6c0eca5e51012dfd34433"
           }
         ]
       },
@@ -175,8 +175,8 @@
           {
             "sourcePath": "skills/productivity/grilling/SKILL.md",
             "path": "SKILL.md",
-            "bytes": 2079,
-            "sha256": "26d225ea8a36f4acacbe267e789cfb97d73964412f4243dd4b65b6cb806ddebc"
+            "bytes": 2107,
+            "sha256": "ec91c3f684a0a6323eaf30faa26d3aac5b95f28811eca6d4f108138934063c5c"
           }
         ]
       },
@@ -233,8 +233,8 @@
           {
             "sourcePath": "skills/engineering/codebase-design/DESIGN-IT-TWICE.md",
             "path": "DESIGN-IT-TWICE.md",
-            "bytes": 2709,
-            "sha256": "b6d23731a6feea1293cc97e08f983e9fdf48b99275d5d306c93738f06bcdce92"
+            "bytes": 2743,
+            "sha256": "43e788220bde5ce60c5f8932b6bde7a758ed63e22ddc0d658dbf6460d8950a6c"
           },
           {
             "sourcePath": "skills/engineering/codebase-design/SKILL.md",
@@ -259,8 +259,8 @@
           {
             "sourcePath": "skills/engineering/research/SKILL.md",
             "path": "SKILL.md",
-            "bytes": 806,
-            "sha256": "524b404b1ca373a8b00f63a64667ec4b0a61c3c9cf4e8f246e639be859bb6979"
+            "bytes": 844,
+            "sha256": "4422d07f1375712f0ecfadc05e6210bad2880f1d36eab32f62760eed344f935a"
           }
         ]
       },
@@ -455,8 +455,8 @@
           {
             "sourcePath": "skills/engineering/codebase-design/DESIGN-IT-TWICE.md",
             "path": "DESIGN-IT-TWICE.md",
-            "bytes": 2709,
-            "sha256": "b6d23731a6feea1293cc97e08f983e9fdf48b99275d5d306c93738f06bcdce92"
+            "bytes": 2743,
+            "sha256": "43e788220bde5ce60c5f8932b6bde7a758ed63e22ddc0d658dbf6460d8950a6c"
           },
           {
             "sourcePath": "skills/engineering/codebase-design/SKILL.md",
