@@ -6,7 +6,6 @@
     "mattpocock-skills": {
       "repository": "https://github.com/mattpocock/skills",
       "revision": "abeeaf95660ba9e8b7c753eb38f441ca707a8823",
-      "localRoot": "E:\\Developer\\myhub\\agent-skills\\matt-pocock\\skills",
       "license": "MIT",
       "licenseSourcePath": "LICENSE",
       "licenseDestinationPath": "dependent-skills/LICENSE",
@@ -16,7 +15,6 @@
     "expert-translate": {
       "repository": "https://github.com/hugosol/expert-translate",
       "revision": "61afdf2e9cf82f4725ee2f8ecf8ccb259dc8b064",
-      "localRoot": "E:\\Developer\\myhub\\expert-tranlate",
       "license": null,
       "licenseNote": "No LICENSE or copyright grant found in the source repository. This copy does not assert MIT licensing or grant redistribution rights for expert-translate.",
       "worktreeNote": "Source checkout clean at collection time."

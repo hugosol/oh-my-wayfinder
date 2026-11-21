@@ -147,7 +147,8 @@ node deltas/build.mjs --check                 # 只检查生成一致性，不�
 node deltas/preview.mjs                       # 仅刷新 preview
 node deltas/check-upstream.mjs                # 比较快照与上游 HEAD
 node deltas/check-upstream.mjs --verbose      # 同时列出具体差异文件
-node deltas/check-upstream.mjs --local <dir>  # 与本地上游 checkout 比较
+node deltas/check-upstream.mjs --local        # 使用 paths.local.json 中的检出目录
+node deltas/check-upstream.mjs --local <dir>  # 临时覆盖配置中的检出目录
 ```
 
 修改生成技能时应编辑 mapping，而不是生成文件。源码归属、mapping 语法和上游同步步骤见[维护指南](docs/maintenance.cn.md)。

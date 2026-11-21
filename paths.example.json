@@ -1,0 +1,6 @@
+{
+  "sources": {
+    "mattpocock-skills": "../agent-skills/matt-pocock/skills",
+    "expert-translate": "../expert-tranlate"
+  }
+}

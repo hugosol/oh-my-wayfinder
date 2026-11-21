@@ -90,6 +90,14 @@ Parse failures — a missing or duplicate field, a target outside the whitelist,
 - Name fork-only sequence choices by their purpose (for example `mode`) when a word such as `branch` could be mistaken for a Git operation.
 - Overlay files are LF: `.gitattributes` pins `* text=auto eol=lf`; the build fails on a bare CR and on a missing final newline. The separate `dependent-skills/` snapshots preserve source bytes through a `-text` exception and are outside this build.
 
+## Local checkout paths
+
+Copy [paths.example.json](../paths.example.json) to `paths.local.json` at the repository root and adjust its `sources` entries once per upstream repository. The local file is gitignored; absolute paths are supported, and relative paths resolve from this repository root, not the caller's working directory. The example uses sibling checkouts; use your actual directory names.
+
+The keys match `dependent-skills/sources.json` source IDs. For each dependency, its checkout is `paths.local.json.sources[entry.source]` and its directory is the checkout plus `entry.sourcePath`; individual files use the checkout plus `file.sourcePath`. All eight overlay skills share `sources.mattpocock-skills` and the `sourceRoot` in `upstream/revision.json`. Configure roots once, not an absolute path per skill or file. Revision and hash provenance remains in the committed metadata; machine paths do not.
+
+`node deltas/check-upstream.mjs --local` reads the configured Matt checkout. Missing or invalid configuration fails with a setup message; it does not silently use the network. `--local <dir>` overrides the configuration and retains command-line paths relative to the caller's working directory. Without `--local`, the command still compares against GitHub HEAD.
+
 ## Commands
 
 ```bash
@@ -98,7 +106,8 @@ node deltas/build.mjs --check                 # verify committed skills/; writes
 node deltas/preview.mjs                       # refresh only deltas/preview.html
 node deltas/check-upstream.mjs                # list skills that differ from upstream HEAD
 node deltas/check-upstream.mjs --verbose      # also list the differing files
-node deltas/check-upstream.mjs --local <dir>  # compare against a local upstream checkout
+node deltas/check-upstream.mjs --local        # use the checkout in paths.local.json
+node deltas/check-upstream.mjs --local <dir>  # override the configured checkout
 ```
 
 **Build (`build.mjs`)** is pure text processing: no shell, no git, no network. A writing run also regenerates the preview, and a preview failure fails the build; `--check` stays read-only and reports the first differing line per file. The build normalizes CRLF from `upstream/` (with a note) and requires every other file, including the mappings, to be LF and to end with a newline.
@@ -111,10 +120,10 @@ node deltas/check-upstream.mjs --local <dir>  # compare against a local upstream
 
 [upstream/revision.json](../upstream/revision.json) is the single version record for these eight skill snapshots: `repository` identifies the upstream repository, `revision` is the full Git commit SHA, and `sourceRoot` is the upstream parent directory of the skills. It is not a build input and does not describe `dependent-skills/`, which has its own `sources.json`. Advance the revision only when all eight complete directories match the selected commit (allowing CRLF/LF normalization), and commit it with the snapshots and generated outputs; pulling upstream alone does not advance this record.
 
-Run these Bash commands from this repository root, setting `UPSTREAM` to the actual upstream checkout. Inspect changes before updating the snapshots and version record:
+Run these Bash commands from this repository root after configuring `paths.local.json`. Inspect changes before updating the snapshots and version record:
 
 ```bash
-UPSTREAM=../mattpocock-skills
+UPSTREAM=$(node -p "require('./paths.local.json').sources['mattpocock-skills']")
 BASE=$(node -p "require('./upstream/revision.json').revision")
 git -C "$UPSTREAM" show --no-patch --format=fuller "$BASE"
 git -C "$UPSTREAM" log --oneline "$BASE"..HEAD -- skills/engineering

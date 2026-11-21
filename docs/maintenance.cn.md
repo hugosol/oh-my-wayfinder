@@ -90,6 +90,14 @@ insert: |-
 - fork 新增的选择项按用途命名（例如 `mode`），避免 `branch` 这类容易被误认成 Git 操作的词。
 - 叠加层文件都是 LF：`.gitattributes` 固定 `* text=auto eol=lf`；出现裸 CR 或缺少结尾换行都会让构建失败。独立的 `dependent-skills/` 快照使用 `-text` 例外保留来源字节，不参与此构建。
 
+## 本地检出路径
+
+将 [paths.example.json](../paths.example.json) 复制为仓库根目录的 `paths.local.json`，每个上游仓库只需调整一次 `sources` 条目。本地配置已 gitignore；支持绝对路径，相对路径统一以本仓库根目录为基准，不随命令调用目录改变。示例使用相邻检出目录，请按实际目录名调整。
+
+配置键与 `dependent-skills/sources.json` 的来源 ID 一致。依赖技能的检出目录取 `paths.local.json.sources[entry.source]`，技能目录为该检出目录加 `entry.sourcePath`；单个文件则加 `file.sourcePath`。八个叠加层技能共用 `sources.mattpocock-skills` 和 `upstream/revision.json` 的 `sourceRoot`。只配置仓库根路径，不为每个 skill 或文件配置绝对路径。版本与哈希仍由已提交的来源记录维护，本机路径不写入来源记录。
+
+`node deltas/check-upstream.mjs --local` 自动读取 Matt 检出目录。配置缺失或无效时明确报错，不会静默访问网络。`--local <dir>` 临时覆盖配置，其中命令行相对路径仍相对于调用目录解析。不传 `--local` 时保持通过 GitHub HEAD 比较的行为。
+
 ## 命令
 
 ```bash
@@ -98,7 +106,8 @@ node deltas/build.mjs --check                 # 校验已提交的 skills/，不
 node deltas/preview.mjs                       # 只刷新 deltas/preview.html
 node deltas/check-upstream.mjs                # 列出与上游 HEAD 有差异的 skill
 node deltas/check-upstream.mjs --verbose      # 同时列出有差异的文件
-node deltas/check-upstream.mjs --local <dir>  # 与本地上游检出对比
+node deltas/check-upstream.mjs --local        # 使用 paths.local.json 中的检出目录
+node deltas/check-upstream.mjs --local <dir>  # 临时覆盖配置中的检出目录
 ```
 
 **构建（`build.mjs`）**是纯文本处理：不调用 shell、git 或网络。写入式运行还会重新生成预览，预览失败会导致构建失败；`--check` 始终只读，并报告每个文件第一处差异所在的行。构建会归一化 `upstream/` 中的 CRLF（并打印提示），并要求其他所有文件（包括映射）使用 LF 且以换行结尾。
@@ -111,10 +120,10 @@ node deltas/check-upstream.mjs --local <dir>  # 与本地上游检出对比
 
 [upstream/revision.json](../upstream/revision.json) 是这八个 skill 快照来源的唯一版本记录：`repository` 是上游仓库，`revision` 是完整 Git commit SHA，`sourceRoot` 是上游 skill 的父目录。它不参与生成，也不代表 `dependent-skills/` 的版本；后者由自己的 `sources.json` 记录。只有八个完整目录都与选定提交一致（允许 CRLF/LF 归一化）时才推进 revision，并与快照、生成产物一起提交；不要只因上游执行了 pull 就更新记录。
 
-在本仓库根目录运行以下 Bash 命令，`UPSTREAM` 改为实际的上游检出目录。先查看变更，再更新快照与版本记录：
+配置好 `paths.local.json` 后，在本仓库根目录运行以下 Bash 命令。先查看变更，再更新快照与版本记录：
 
 ```bash
-UPSTREAM=../mattpocock-skills
+UPSTREAM=$(node -p "require('./paths.local.json').sources['mattpocock-skills']")
 BASE=$(node -p "require('./upstream/revision.json').revision")
 git -C "$UPSTREAM" show --no-patch --format=fuller "$BASE"
 git -C "$UPSTREAM" log --oneline "$BASE"..HEAD -- skills/engineering

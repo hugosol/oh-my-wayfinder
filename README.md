@@ -147,7 +147,8 @@ node deltas/build.mjs --check                 # Check generated consistency with
 node deltas/preview.mjs                       # Refresh preview only
 node deltas/check-upstream.mjs                # Compare the snapshot with upstream HEAD
 node deltas/check-upstream.mjs --verbose      # Include individual changed files
-node deltas/check-upstream.mjs --local <dir>  # Compare with a local upstream checkout
+node deltas/check-upstream.mjs --local        # Use the checkout in paths.local.json
+node deltas/check-upstream.mjs --local <dir>  # Override the configured checkout
 ```
 
 Edit mappings rather than generated skill files. Source ownership, mapping syntax, and upstream-update procedures belong in the [maintenance guide](docs/maintenance.md).
