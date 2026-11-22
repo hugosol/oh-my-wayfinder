@@ -118,6 +118,12 @@ node deltas/check-upstream.mjs --local <dir>  # 临时覆盖配置中的检出�
 
 ## 更新上游快照
 
+`node deltas/update-upstream.mjs` 读取 `paths.local.json` 的全部来源路径，相对路径以本仓库根目录为基准。每个来源固定一次本地 HEAD，再从该提交读取原始文件字节；不 fetch/pull，不读取未提交或未跟踪文件，也不修改来源仓库。运行命令即授权覆盖已登记快照中的本地改动，并删除来源提交中已移除的文件。完整同步目录内的新资源，但不自动收录新技能。重复运行相同提交且快照未漂移时不写文件。
+
+脚本更新 `upstream/revision.json`、依赖来源 revision、文件清单、字节数、SHA-256 和已配置许可证文件的摘要；同一 Matt 提交用于两套快照。保留来源身份、路径与许可证配置；不维护人工工作区备注、授权说明或 `resourceAudit`。实际许可证文件保留并同步，成功不表示已验证授权或技能语义。`expert-translate` 的 `sourcePath: "."` 表示提交中的整个仓库树，不包含 Git 管理目录或未跟踪文件。
+
+所有源内容与目标路径在首次写入前检查；缺失或空源目录、符号链接、子模块、非普通文件和不可移植路径会报错。文件替换逐个发布，版本记录最后写入，**不是整次同步事务**。写入中断时退出码为 `2`，报告已完成的文件改动，不回滚；旧记录不能证明目录一致，修复后保持相同来源 HEAD 重跑。成功退出码为 `0`。不要并发更新或构建；命令不修改映射、不生成 `skills/` 或预览，也不提交 Git。`--help` 显示用法。
+
 [upstream/revision.json](../upstream/revision.json) 是这八个 skill 快照来源的唯一版本记录：`repository` 是上游仓库，`revision` 是完整 Git commit SHA，`sourceRoot` 是上游 skill 的父目录。它不参与生成，也不代表 `dependent-skills/` 的版本；后者由自己的 `sources.json` 记录。只有八个完整目录都与选定提交一致（允许 CRLF/LF 归一化）时才推进 revision，并与快照、生成产物一起提交；不要只因上游执行了 pull 就更新记录。
 
 配置好 `paths.local.json` 后，在本仓库根目录运行以下 Bash 命令。先查看变更，再更新快照与版本记录：
@@ -135,7 +141,7 @@ git -C "$UPSTREAM" diff "$BASE" HEAD -- skills/engineering/wayfinder
 
 本次同步包含全新子代理上下文、tracker 配置检查及 GitHub/GitLab 操作修复。已有 `docs/agents/` 配置不会自动刷新；旧 GitLab map 的子票若仅有 `Part of` 正文，需先补齐 map 链接，再采用新版基于 `/links` 的 frontier 查询，避免漏票。
 
-1. 从选定的上游检出中把八个完整 skill 目录复制进 `upstream/`，替换旧快照。多复制文件没有问题：构建会忽略未列入 manifest 的一切。
+1. 运行 `node deltas/update-upstream.mjs`，同步八个完整的 `upstream/` skill 目录和 `dependent-skills/sources.json` 登记的全部依赖技能（包括 expert-translate），并更新两处版本记录。构建仍只消费 manifest 白名单文件。
 2. 针对新基线逐条适配映射的锚点与编辑，同时保留上游的修复和 fork 已确认的语义。预期会有 op 因锚点被点名而构建失败——这正是评审点，不是意外。
 3. 运行 `node deltas/build.mjs`，然后检查重新生成的差异（预览页面，或 `git diff skills/`）。
 4. 运行 `node deltas/build.mjs --check`。

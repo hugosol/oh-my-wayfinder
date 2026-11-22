@@ -9,15 +9,12 @@
       "license": "MIT",
       "licenseSourcePath": "LICENSE",
       "licenseDestinationPath": "dependent-skills/LICENSE",
-      "worktreeNote": "Source checkout has an untracked .idea/ directory outside all selected skill trees.",
       "licenseSha256": "4981c5f6a90eb3a969dacabb9350f5a75695ff3910b39b6534952908dfdc5ff7"
     },
     "expert-translate": {
       "repository": "https://github.com/hugosol/expert-translate",
       "revision": "61afdf2e9cf82f4725ee2f8ecf8ccb259dc8b064",
-      "license": null,
-      "licenseNote": "No LICENSE or copyright grant found in the source repository. This copy does not assert MIT licensing or grant redistribution rights for expert-translate.",
-      "worktreeNote": "Source checkout clean at collection time."
+      "license": null
     }
   },
   "collections": {
@@ -496,16 +493,6 @@
           }
         ]
       }
-    ]
-  },
-  "resourceAudit": {
-    "externalRelativeBundledResources": [],
-    "notes": [
-      "Bundled Markdown references and provider metadata remain within each copied skill directory; no parent-directory resource references were found.",
-      "teach workspace paths and domain-modeling glossary/ADR example paths refer to invocation workspace files, not omitted package resources.",
-      "grill-with-docs invokes grilling and domain-modeling; improve-codebase-architecture invokes codebase-design. These skills are included in codebase-exploration.",
-      "retro invokes writing-for-agents; both skills are included as independent snapshots in codebase-exploration and code-implementation.",
-      "Runtime capabilities are not bundled: skill invocation and subagents; research source/network access; architecture-report Tailwind and Mermaid CDNs and OS browser opener; optional expert-translate long-image rendering requires a headless browser and PowerShell System.Drawing."
     ]
   }
 }
