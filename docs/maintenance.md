@@ -90,6 +90,14 @@ Parse failures — a missing or duplicate field, a target outside the whitelist,
 - Name fork-only sequence choices by their purpose (for example `mode`) when a word such as `branch` could be mistaken for a Git operation.
 - Overlay files are LF: `.gitattributes` pins `* text=auto eol=lf`; the build fails on a bare CR and on a missing final newline. The separate `dependent-skills/` snapshots preserve source bytes through a `-text` exception and are outside this build.
 
+## Local checkout paths
+
+Copy [paths.example.json](../paths.example.json) to `paths.local.json` at the repository root and adjust its `sources` entries once per upstream repository. The local file is gitignored; absolute paths are supported, and relative paths resolve from this repository root, not the caller's working directory. The example uses sibling checkouts; use your actual directory names.
+
+The keys match `dependent-skills/sources.json` source IDs. For each dependency, its checkout is `paths.local.json.sources[entry.source]` and its directory is the checkout plus `entry.sourcePath`; individual files use the checkout plus `file.sourcePath`. All eight overlay skills share `sources.mattpocock-skills` and the `sourceRoot` in `upstream/revision.json`. Configure roots once, not an absolute path per skill or file. Revision and hash provenance remains in the committed metadata; machine paths do not.
+
+`node deltas/check-upstream.mjs --local` reads the configured Matt checkout. Missing or invalid configuration fails with a setup message; it does not silently use the network. `--local <dir>` overrides the configuration and retains command-line paths relative to the caller's working directory. Without `--local`, the command still compares against GitHub HEAD.
+
 ## Commands
 
 ```bash
@@ -98,7 +106,8 @@ node deltas/build.mjs --check                 # verify committed skills/; writes
 node deltas/preview.mjs                       # refresh only deltas/preview.html
 node deltas/check-upstream.mjs                # list skills that differ from upstream HEAD
 node deltas/check-upstream.mjs --verbose      # also list the differing files
-node deltas/check-upstream.mjs --local <dir>  # compare against a local upstream checkout
+node deltas/check-upstream.mjs --local        # use the checkout in paths.local.json
+node deltas/check-upstream.mjs --local <dir>  # override the configured checkout
 ```
 
 **Build (`build.mjs`)** is pure text processing: no shell, no git, no network. A writing run also regenerates the preview, and a preview failure fails the build; `--check` stays read-only and reports the first differing line per file. The build normalizes CRLF from `upstream/` (with a note) and requires every other file, including the mappings, to be LF and to end with a newline.
@@ -109,9 +118,30 @@ node deltas/check-upstream.mjs --local <dir>  # compare against a local upstream
 
 ## Updating the upstream snapshot
 
-The current snapshot corresponds to `mattpocock/skills` commit `f3fc5632f401156837ee3872f14fe33ccf1024ea`. This is the single place the provenance is recorded; update it when the snapshot moves (the check output names the revision it compared against).
+`node deltas/update-upstream.mjs` reads all source paths from `paths.local.json`, resolving relative paths from this repository root. It pins each local HEAD once and reads original file bytes from that commit: no fetch/pull, no uncommitted or untracked files, and no source checkout changes. Running it authorizes overwriting local edits within registered snapshots and removing files absent from the source commit. New resources inside selected directories are included; new skills are not enrolled automatically. Repeating the same commit with unchanged snapshots writes nothing.
 
-1. Copy all eight complete skill directories from the selected upstream checkout into `upstream/`, replacing the previous snapshot. Copying extra files is fine: the build ignores anything not in the manifest.
+The updater refreshes `upstream/revision.json`, dependency revisions, file inventories, byte counts, SHA-256 hashes, and the configured license file hash; both Matt snapshot sets use the same commit. Source identity, paths, and license configuration remain; manual worktree notes, licensing commentary, and `resourceAudit` are not maintained. Actual license files are retained and synced; success does not certify licensing or skill semantics. The expert-translate `sourcePath: "."` selects its entire committed repository tree, excluding Git administrative data and untracked files.
+
+All source content and destination paths are checked before the first write. Missing or empty source directories, symlinks, submodules, non-regular files, and non-portable paths fail. Files are replaced individually and version records are written last; **the entire sync is not transactional**. A publication failure exits `2`, reports completed file effects, and does not roll back. Old records no longer prove directory consistency; fix the obstruction and rerun with the same source HEADs. Success exits `0`. Do not update or build concurrently. The command does not modify mappings, generate `skills/` or previews, or commit Git changes. Use `--help` for usage.
+
+[upstream/revision.json](../upstream/revision.json) is the single version record for these eight skill snapshots: `repository` identifies the upstream repository, `revision` is the full Git commit SHA, and `sourceRoot` is the upstream parent directory of the skills. It is not a build input and does not describe `dependent-skills/`, which has its own `sources.json`. Advance the revision only when all eight complete directories match the selected commit (allowing CRLF/LF normalization), and commit it with the snapshots and generated outputs; pulling upstream alone does not advance this record.
+
+Run these Bash commands from this repository root after configuring `paths.local.json`. Inspect changes before updating the snapshots and version record:
+
+```bash
+UPSTREAM=$(node -p "require('./paths.local.json').sources['mattpocock-skills']")
+BASE=$(node -p "require('./upstream/revision.json').revision")
+git -C "$UPSTREAM" show --no-patch --format=fuller "$BASE"
+git -C "$UPSTREAM" log --oneline "$BASE"..HEAD -- skills/engineering
+git -C "$UPSTREAM" diff --stat "$BASE" HEAD -- skills/engineering
+git -C "$UPSTREAM" diff "$BASE" HEAD -- skills/engineering/wayfinder
+```
+
+Replace the final path with any skill under review; directory-level diffs include resource changes outside the manifest whitelist. `HEAD` is the local upstream checkout's commit, not the live remote version. If the baseline commit is unavailable, fetch the relevant history in that checkout first. Empty log/diff output is expected when the updated baseline equals HEAD.
+
+This sync includes fresh sub-agent contexts, tracker setup checks, and GitHub/GitLab operation fixes. Existing `docs/agents/` configuration does not refresh automatically. Before adopting the new `/links`-based frontier query for an existing GitLab map, link any child tickets that only have a `Part of` body reference to the map, or they will be missed.
+
+1. Run `node deltas/update-upstream.mjs` to sync the eight complete `upstream/` skill directories and all dependencies registered in `dependent-skills/sources.json` (including expert-translate), updating both revision records. The build still consumes only its manifest whitelist.
 2. Adapt every mapping anchor and edit against the new baseline, preserving both upstream's fixes and the fork's approved semantics. Expect some ops to fail the build with a named anchor — that is the review point, not an accident.
 3. Run `node deltas/build.mjs`, then inspect the regenerated diff (the preview page, or `git diff skills/`).
 4. Run `node deltas/build.mjs --check`.

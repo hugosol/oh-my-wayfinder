@@ -3,7 +3,8 @@
 //
 //   node deltas/check-upstream.mjs                compare against upstream HEAD over the GitHub API
 //   node deltas/check-upstream.mjs --verbose      also list the differing files
-//   node deltas/check-upstream.mjs --local <dir>  compare against a local upstream checkout
+//   node deltas/check-upstream.mjs --local        use paths.local.json
+//   node deltas/check-upstream.mjs --local <dir>  override the configured checkout
 //
 // Only the files listed in deltas/manifest.json are compared; anything else under a skill
 // directory (for example agents/openai.yaml) is ignored. The snapshot side is normalized
@@ -25,7 +26,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const upstreamRepo = 'mattpocock/skills';
 const upstreamLabel = `github.com/${upstreamRepo}`;
 const apiBase = `https://api.github.com/repos/${upstreamRepo}`;
-const usage = 'usage: node deltas/check-upstream.mjs [--verbose] [--local <dir>]';
+const usage = 'usage: node deltas/check-upstream.mjs [--verbose] [--local [<dir>]]';
 
 class Failure extends Error {
   constructor(message, code) {
@@ -93,9 +94,12 @@ function parseArgs(args) {
     }
     if (arg === '--local') {
       const value = args[i + 1];
-      if (value === undefined || value.startsWith('--')) fail(`--local requires a directory (${usage})`);
-      local = value;
-      i += 1;
+      if (value === undefined || value.startsWith('--')) {
+        local = true;
+      } else {
+        local = value;
+        i += 1;
+      }
       continue;
     }
     fail(`unknown argument "${arg}" (${usage})`);
@@ -184,6 +188,21 @@ function describeCheckout(dir) {
   return { sha: sha.stdout.trim(), date: date.error || date.status !== 0 ? '' : date.stdout.trim() };
 }
 
+function configuredLocalRoot() {
+  const path = join(root, 'paths.local.json');
+  let config;
+  try {
+    config = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    fail(`cannot read ${display(path)}: ${error.message}; copy paths.example.json to paths.local.json and set sources.mattpocock-skills, or pass --local <dir>`);
+  }
+  const value = config?.sources?.['mattpocock-skills'];
+  if (typeof value !== 'string' || value.trim() === '') {
+    fail('paths.local.json must set sources.mattpocock-skills to a non-empty checkout path');
+  }
+  return resolve(root, value);
+}
+
 function makeLocalBackend(upstreamRoot, skills) {
   const dirsBySkill = indexSkillDirs(upstreamRoot, skills);
   const head = describeCheckout(upstreamRoot);
@@ -212,7 +231,7 @@ async function main() {
   if (local === undefined) {
     backend = await makeRemoteBackend();
   } else {
-    const upstreamRoot = resolve(local);
+    const upstreamRoot = local === true ? configuredLocalRoot() : resolve(local);
     if (!existsSync(upstreamRoot) || !statSync(upstreamRoot).isDirectory()) fail(`--local directory not found: ${display(upstreamRoot)}`);
     backend = makeLocalBackend(upstreamRoot, skills);
   }

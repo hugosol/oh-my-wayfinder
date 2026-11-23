@@ -1,3 +1,17 @@
+# Skill Maintenance
+
+## Language
+
+**Upstream snapshot**:
+An unadapted copy of a selected upstream skill at a recorded source revision. Local adaptations are separate from the snapshot.
+
+**Dependent skill snapshot**:
+An independently maintained copy of a selected supporting skill in a collection. The same skill may have separate copies in multiple collections.
+
+**Snapshot baseline**:
+The exact upstream commit from which a set of skill snapshots was copied. It identifies source content, not the correctness of local adaptations or completion of delivery review.
+_Avoid_: latest version, release version
+
 # Automated Implementation
 
 The OMP-only `/spec-to-code` and `/hyper-auto-coding` workflows turn approved specs into implementation tickets and execute them serially or around a local integration branch. They share vocabulary with the planning pipeline (`wayfinder` → `to-spec` → `to-contract` → `to-tickets`).

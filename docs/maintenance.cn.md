@@ -90,6 +90,14 @@ insert: |-
 - fork 新增的选择项按用途命名（例如 `mode`），避免 `branch` 这类容易被误认成 Git 操作的词。
 - 叠加层文件都是 LF：`.gitattributes` 固定 `* text=auto eol=lf`；出现裸 CR 或缺少结尾换行都会让构建失败。独立的 `dependent-skills/` 快照使用 `-text` 例外保留来源字节，不参与此构建。
 
+## 本地检出路径
+
+将 [paths.example.json](../paths.example.json) 复制为仓库根目录的 `paths.local.json`，每个上游仓库只需调整一次 `sources` 条目。本地配置已 gitignore；支持绝对路径，相对路径统一以本仓库根目录为基准，不随命令调用目录改变。示例使用相邻检出目录，请按实际目录名调整。
+
+配置键与 `dependent-skills/sources.json` 的来源 ID 一致。依赖技能的检出目录取 `paths.local.json.sources[entry.source]`，技能目录为该检出目录加 `entry.sourcePath`；单个文件则加 `file.sourcePath`。八个叠加层技能共用 `sources.mattpocock-skills` 和 `upstream/revision.json` 的 `sourceRoot`。只配置仓库根路径，不为每个 skill 或文件配置绝对路径。版本与哈希仍由已提交的来源记录维护，本机路径不写入来源记录。
+
+`node deltas/check-upstream.mjs --local` 自动读取 Matt 检出目录。配置缺失或无效时明确报错，不会静默访问网络。`--local <dir>` 临时覆盖配置，其中命令行相对路径仍相对于调用目录解析。不传 `--local` 时保持通过 GitHub HEAD 比较的行为。
+
 ## 命令
 
 ```bash
@@ -98,7 +106,8 @@ node deltas/build.mjs --check                 # 校验已提交的 skills/，不
 node deltas/preview.mjs                       # 只刷新 deltas/preview.html
 node deltas/check-upstream.mjs                # 列出与上游 HEAD 有差异的 skill
 node deltas/check-upstream.mjs --verbose      # 同时列出有差异的文件
-node deltas/check-upstream.mjs --local <dir>  # 与本地上游检出对比
+node deltas/check-upstream.mjs --local        # 使用 paths.local.json 中的检出目录
+node deltas/check-upstream.mjs --local <dir>  # 临时覆盖配置中的检出目录
 ```
 
 **构建（`build.mjs`）**是纯文本处理：不调用 shell、git 或网络。写入式运行还会重新生成预览，预览失败会导致构建失败；`--check` 始终只读，并报告每个文件第一处差异所在的行。构建会归一化 `upstream/` 中的 CRLF（并打印提示），并要求其他所有文件（包括映射）使用 LF 且以换行结尾。
@@ -109,9 +118,30 @@ node deltas/check-upstream.mjs --local <dir>  # 与本地上游检出对比
 
 ## 更新上游快照
 
-当前快照对应 `mattpocock/skills` 的提交 `f3fc5632f401156837ee3872f14fe33ccf1024ea`。来源信息只记录在这里；快照更新时请一并更新这一行（检查输出会标注它所比较的版本）。
+`node deltas/update-upstream.mjs` 读取 `paths.local.json` 的全部来源路径，相对路径以本仓库根目录为基准。每个来源固定一次本地 HEAD，再从该提交读取原始文件字节；不 fetch/pull，不读取未提交或未跟踪文件，也不修改来源仓库。运行命令即授权覆盖已登记快照中的本地改动，并删除来源提交中已移除的文件。完整同步目录内的新资源，但不自动收录新技能。重复运行相同提交且快照未漂移时不写文件。
 
-1. 从选定的上游检出中把八个完整 skill 目录复制进 `upstream/`，替换旧快照。多复制文件没有问题：构建会忽略未列入 manifest 的一切。
+脚本更新 `upstream/revision.json`、依赖来源 revision、文件清单、字节数、SHA-256 和已配置许可证文件的摘要；同一 Matt 提交用于两套快照。保留来源身份、路径与许可证配置；不维护人工工作区备注、授权说明或 `resourceAudit`。实际许可证文件保留并同步，成功不表示已验证授权或技能语义。`expert-translate` 的 `sourcePath: "."` 表示提交中的整个仓库树，不包含 Git 管理目录或未跟踪文件。
+
+所有源内容与目标路径在首次写入前检查；缺失或空源目录、符号链接、子模块、非普通文件和不可移植路径会报错。文件替换逐个发布，版本记录最后写入，**不是整次同步事务**。写入中断时退出码为 `2`，报告已完成的文件改动，不回滚；旧记录不能证明目录一致，修复后保持相同来源 HEAD 重跑。成功退出码为 `0`。不要并发更新或构建；命令不修改映射、不生成 `skills/` 或预览，也不提交 Git。`--help` 显示用法。
+
+[upstream/revision.json](../upstream/revision.json) 是这八个 skill 快照来源的唯一版本记录：`repository` 是上游仓库，`revision` 是完整 Git commit SHA，`sourceRoot` 是上游 skill 的父目录。它不参与生成，也不代表 `dependent-skills/` 的版本；后者由自己的 `sources.json` 记录。只有八个完整目录都与选定提交一致（允许 CRLF/LF 归一化）时才推进 revision，并与快照、生成产物一起提交；不要只因上游执行了 pull 就更新记录。
+
+配置好 `paths.local.json` 后，在本仓库根目录运行以下 Bash 命令。先查看变更，再更新快照与版本记录：
+
+```bash
+UPSTREAM=$(node -p "require('./paths.local.json').sources['mattpocock-skills']")
+BASE=$(node -p "require('./upstream/revision.json').revision")
+git -C "$UPSTREAM" show --no-patch --format=fuller "$BASE"
+git -C "$UPSTREAM" log --oneline "$BASE"..HEAD -- skills/engineering
+git -C "$UPSTREAM" diff --stat "$BASE" HEAD -- skills/engineering
+git -C "$UPSTREAM" diff "$BASE" HEAD -- skills/engineering/wayfinder
+```
+
+最后一条可换成任意待查 skill 路径；目录级 diff 会包含 manifest 白名单之外的资源变化。`HEAD` 指本地上游检出的提交，不是实时远端版本；若找不到基线 commit，先在该检出中获取对应历史。更新后的基线与 HEAD 相同时，log/diff 为空是预期结果。
+
+本次同步包含全新子代理上下文、tracker 配置检查及 GitHub/GitLab 操作修复。已有 `docs/agents/` 配置不会自动刷新；旧 GitLab map 的子票若仅有 `Part of` 正文，需先补齐 map 链接，再采用新版基于 `/links` 的 frontier 查询，避免漏票。
+
+1. 运行 `node deltas/update-upstream.mjs`，同步八个完整的 `upstream/` skill 目录和 `dependent-skills/sources.json` 登记的全部依赖技能（包括 expert-translate），并更新两处版本记录。构建仍只消费 manifest 白名单文件。
 2. 针对新基线逐条适配映射的锚点与编辑，同时保留上游的修复和 fork 已确认的语义。预期会有 op 因锚点被点名而构建失败——这正是评审点，不是意外。
 3. 运行 `node deltas/build.mjs`，然后检查重新生成的差异（预览页面，或 `git diff skills/`）。
 4. 运行 `node deltas/build.mjs --check`。
